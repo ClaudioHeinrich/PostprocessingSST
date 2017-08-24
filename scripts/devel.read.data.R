@@ -45,6 +45,7 @@ ncobs = nc_open(ncnameobs)
 
 ##------- Extract Observations ---------------
 sst_obs = ncvar_get(ncobs, "sst")
+sst_obs = sst_obs - 273 ## Convert from Kelvin
 lon_obs = ncvar_get(ncobs, "longitude")
 lat_obs = ncvar_get(ncobs, "latitude")
 ##-------------------------------------------
@@ -96,7 +97,7 @@ for(i in 1:length(lon_obs))
     ##------ Load In Ensemble Values ------
     if(length(w_use) == 0)
     {
-      sst_ensemble[i,j,] = NA
+      sst_ensemble_rescaled[i,j,] = NA
     }else{
       for(k in 1:dim(sst_ensemble_rescaled)[3])
       {
