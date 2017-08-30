@@ -31,6 +31,13 @@ plot_system = function(dt,
   if(print_figs){pdf(paste0(file_out, "_bias.pdf"))}else{X11()}
   image(A_bias,main = paste0(mn," bias"))
   if(print_figs)dev.off()
+
+  if(print_figs)
+  {
+    png(paste0(file_out, "_bias.png"))
+    image(A_bias,main = paste0(mn," bias"))
+    dev.off()
+  }
   ##------------------------
   
 }
