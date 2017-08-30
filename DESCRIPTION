@@ -8,5 +8,5 @@ Maintainer: Alex Lenkoski <alex@nr.no>
 Description: This does seasonal forecasting
 License: GPL (>= 2)
 Depends: data.table, ncdf4
-Imports: Rcpp (>= 0.12.8)
+Imports: Rcpp (>= 0.12.4)
 LinkingTo: Rcpp
