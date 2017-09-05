@@ -1,13 +1,16 @@
 plot_system = function(dt,
                        YM_j,
-                       file_out = paste0("./figures/system_",YM_j))
+                       file_out = paste0("./figures/system_",YM_j),
+                       lons = NULL,
+                       lats = NULL)
 {
 
-  ##----- HACK -------
+  
+  ##----- HACK, fix -------
   ##Load globals
   dt_obs = load_observations(2000,1)
-  lon_all = dt_obs[,unique(Lon)]
-  lat_all = dt_obs[,unique(Lat)]
+  lon_all = sort(dt_obs[,unique(Lon)])
+  lat_all = sort(dt_obs[,unique(Lat)])
   n_lon = length(lon_all)
   n_lat = length(lat_all)
   ##------------------
@@ -31,13 +34,19 @@ plot_system = function(dt,
   color <- designer.colors(n=length(brk)-1)
   ##--------------------------
 
+  ##------- Scope ------------
+  if(is.null(lons))lons = range(dt_sub[,Lon])
+  if(is.null(lats))lats = range(dt_sub[,Lat])
+  ##--------------------------
+
   ##------- Plot -----------
   if(print_figs){pdf(paste0(file_out, "_bias.pdf"))}else{X11()} 
   image.plot(lon_all,lat_all,A_bias,
              main=mn,xlab="Longitude",ylab="Latitude",
              zlim=rr,
+             xlim = lons,
+             ylim = lats,
              breaks=brk,
-             ##           lab.breaks=brk.lab,
              col=color,
              cex.main=1.8,cex.lab=1.4,
              cex.axis=1,
@@ -51,10 +60,11 @@ plot_system = function(dt,
   {
     png(paste0(file_out, "_bias.png"))
     image.plot(lon_all,lat_all,A_bias,
-               main="Hello",xlab="Longitude",ylab="Latitude",
+               main=mn,xlab="Longitude",ylab="Latitude",
+               xlim = lons,
+               ylim = lats,
                zlim=rr,
                breaks=brk,
-               ##           lab.breaks=brk.lab,
                col=color,
                cex.main=1.8,cex.lab=1.4,
                cex.axis=1,
