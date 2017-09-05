@@ -1,41 +1,77 @@
 plot_system = function(dt,
                        YM_j,
-                       file_out = paste0("./figures/system_",YM_j))
+                       file_out = paste0("./figures/system_",YM_j),
+                       lons = NULL,
+                       lats = NULL)
 {
 
+  
+  ##----- HACK, fix -------
+  ##Load globals
+  dt_obs = load_observations(2000,1)
+  lon_all = sort(dt_obs[,unique(Lon)])
+  lat_all = sort(dt_obs[,unique(Lat)])
+  n_lon = length(lon_all)
+  n_lat = length(lat_all)
+  ##------------------
+  
   ##------- Setup --------
   dt_sub = dt[YM == YM_j]
-  n_lon = length(dt_sub[,unique(Lon)])
-  n_lat = length(dt_sub[,unique(Lat)])
   mn = paste0(dt_sub[,min(month)], "/",dt_sub[,min(year)])
+  rr = range(dt[,residual],na.rm=TRUE)
   ##----------------------
 
-  ##----- Observation -------
-  A_obs = matrix(NA, n_lon,n_lat)
-  A_obs[ dt_sub[grid_id < length(A_obs), grid_id] ] = dt_sub[grid_id < length(A_obs),SST_bar] ## FIX
-  if(print_figs){pdf(paste0(file_out, "_obs.pdf"))}else{X11()}
-  image(A_obs, main = paste0(mn," observation"))
-  if(print_figs)dev.off()
-  ##-------------------------
-
-  ##----- Ensemble -----------
-  A_ens = matrix(NA, n_lon,n_lat)
-  A_ens[ dt_sub[grid_id < length(A_ens), grid_id] ] = dt_sub[grid_id < length(A_ens),SST_hat_grid] ## FIX
-  if(print_figs){pdf(paste0(file_out, "_ens.pdf"))}else{X11()}
-  image(A_ens,main = paste0(mn, " ensemble"))
-  if(print_figs)dev.off()
-  ##-------------------------
-
   ##----- Bias --------------
-  A_bias = A_obs - A_ens
-  if(print_figs){pdf(paste0(file_out, "_bias.pdf"))}else{X11()}
-  image(A_bias,main = paste0(mn," bias"))
+  A_bias = matrix(NA, n_lon, n_lat)
+  A_bias[dt_sub[, grid_id]] = dt_sub[, residual]
+  ##-------------------------
+
+  ##------- Scaling ----------
+  brk = seq(rr[1],rr[2],length = 500)
+  brk.ind = round(seq(1,length(brk),length = 10))
+  brk.at = brk[brk.ind]
+  brk.lab = round(brk[brk.ind],2)
+  color <- designer.colors(n=length(brk)-1)
+  ##--------------------------
+
+  ##------- Scope ------------
+  if(is.null(lons))lons = range(dt_sub[,Lon])
+  if(is.null(lats))lats = range(dt_sub[,Lat])
+  ##--------------------------
+
+  ##------- Plot -----------
+  if(print_figs){pdf(paste0(file_out, "_bias.pdf"))}else{X11()} 
+  image.plot(lon_all,lat_all,A_bias,
+             main=mn,xlab="Longitude",ylab="Latitude",
+             zlim=rr,
+             xlim = lons,
+             ylim = lats,
+             breaks=brk,
+             col=color,
+             cex.main=1.8,cex.lab=1.4,
+             cex.axis=1,
+             axis.args=list(cex.axis=1,
+                            at = brk.at,
+                            label = brk.lab))
+  map("world", add = TRUE)
   if(print_figs)dev.off()
 
   if(print_figs)
   {
     png(paste0(file_out, "_bias.png"))
-    image(A_bias,main = paste0(mn," bias"))
+    image.plot(lon_all,lat_all,A_bias,
+               main=mn,xlab="Longitude",ylab="Latitude",
+               xlim = lons,
+               ylim = lats,
+               zlim=rr,
+               breaks=brk,
+               col=color,
+               cex.main=1.8,cex.lab=1.4,
+               cex.axis=1,
+               axis.args=list(cex.axis=1,
+                              at = brk.at,
+                              label = brk.lab))
+    map("world", add = TRUE)
     dev.off()
   }
   ##------------------------

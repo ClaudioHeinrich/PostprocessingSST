@@ -89,33 +89,41 @@ combine_data = function(dt_ens, dt_obs)
 {
   ##------- Collapse Observations -------
   dt_obs_mean = dt_obs[,.("SST_bar" = mean(SST)),.(Lon,Lat)]
-  setkey(dt_obs_mean, "Lon","Lat")
+  setkey(dt_obs_mean, "Lat","Lon")
   ##-------------------------------------
   
-  ##---- Now we set up a tortured hash ----
+  ##------ First Organize the Obs -------
   lon_all = sort(dt_obs_mean[,unique(Lon)])
   n_lon = length(lon_all)
-  f_lon = approxfun(lon_all, 1:n_lon, method="constant", rule = 2)
-
+  cutoff_lon = c(-Inf,head(lon_all,-1) + diff(lon_all)/2)
+  f_lon = approxfun(cutoff_lon, 1:n_lon, method="constant", rule = 2)
+  
   lat_all = sort(dt_obs_mean[,unique(Lat)])
   n_lat = length(lat_all)
-  f_lat = approxfun(lat_all, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
-  
+  cutoff_lat = c(-Inf, head(lat_all,-1) + diff(lat_all)/2)
+  f_lat = approxfun(cutoff_lat, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
   dt_obs_mean[,grid_id := f_lon(Lon) + f_lat(Lat)]
-  setkey(dt_obs_mean, grid_id)
-  ##----------------------------------------
-
+  ##--------------------------------------
+  
   ##------ Now merge the obs and ens data ---
   dt_ens_mean = dt_ens[,.("SST_hat" = mean(Forecast)),.(Lon,Lat)]
-  dt_ens_mean[,grid_id := round(f_lon(Lon)) + round(f_lat(Lat))]
+  setkey(dt_ens_mean, "Lat","Lon")
+  dt_ens_mean[,grid_id := f_lon(Lon) + f_lat(Lat)]
   setkey(dt_ens_mean,grid_id)
   dt_ens_grid_mean = dt_ens_mean[,.("Lon_bar" = mean(Lon),
                                     "Lat_bar" = mean(Lat),
-                                    "SST_hat_grid" = mean(SST_hat)),grid_id]
-  
+                                    "SST_hat_grid" = mean(SST_hat, na.rm=TRUE)),grid_id]
   dt_combine = dt_obs_mean[dt_ens_grid_mean,on="grid_id"]
   ##------------------------------------------
   
+  
   return(dt_combine)
 
+}
+
+load_combined = function(data.dir="~/PostClimDataNoBackup/")
+{
+  file = paste0(data.dir,"/SFE/Derived/dt_combine.RData")
+  load(file)
+  return(dt)
 }
