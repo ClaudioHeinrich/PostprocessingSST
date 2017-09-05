@@ -120,3 +120,10 @@ combine_data = function(dt_ens, dt_obs)
   return(dt_combine)
 
 }
+
+load_combined = function(data.dir="~/PostClimDataNoBackup/")
+{
+  file = paste0(data.dir,"/SFE/Derived/dt_combine.RData")
+  load(file)
+  return(dt)
+}

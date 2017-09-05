@@ -20,24 +20,26 @@ make_combined_dataset = function(y_start = 1985,
     }
   }
   ##------------------------
+
+  ##--------- Combine -----
+  dt_combined_all = load_combined()
+  dt = rbindlist(dt_combined_all)
+  dt[, YM := year * 12 + month]
+  setkey(dt, "YM", "Lon", "Lat")
+  ##------------------------
   
   ##----- Should I save or should I go? -----
   if(is.null(data.dir))
   {
-    return(dt_combine_all)
+    return(dt)
   }else{
-    save(dt_combine_all,
+    save(dt,
          file = paste0(data.dir,"./SFE/Derived/dt_combine.RData"))
     return(1)
   }
   ##-------------------------------------------
+
   
 }
 
-load_combined = function(data.dir="~/PostClimDataNoBackup/")
-{
-  file = paste0(data.dir,"/SFE/Derived/dt_combine.RData")
-  load(file)
-  return(dt_combine_all)
-}
                                  
