@@ -4,7 +4,7 @@ rm(list = ls())
 library(SeasonalForecasting)
 setwd("~/NR/SFE/")
 options(max.print = 1e3)
-print_figs = FALSE
+print_figs = TRUE
 ##------------------------
 
 ##----- Load Constituents ---

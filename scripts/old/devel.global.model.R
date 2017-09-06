@@ -10,19 +10,49 @@ print_figs = TRUE
 
 ##------ Set up -------
 dt = load_combined()
-dt[,residual := SST_bar - SST_hat_grid]
-
 ##---------------------
 
-##--- Calculate Running Bias -------
-setkey(dt,"grid_id","month","year")
-dt[,meanresid := (cumsum(residual) - residual) / (year - min(year)),.(month,grid_id)]
-dt[,SST_hat_local:=SST_hat_grid + meanresid]
-##----------------------------------
+##----- Calculate Errors ---
+dt[,residual := SST_bar - SST_hat_grid]
+##--------------------------
 
 
-bias_ym = dt[,.("Bias" = mean(SST_bar - SST_hat_local, na.rm=TRUE)),keyby=YM]
-bias_ym = bias_ym[is.finite(Bias)]
+##--------------------------------------
+
+##------  Simple Model ------------
+year_all = bias_ym[,unique(Year)]
+bias_ym[,bias_coef:=0.0]
+mod_save = list()
+for(j in 2:length(year_all))
+{
+  mod = lm("Bias ~ as.factor(Month) - 1", data = bias_ym[Year < year_all[2]])
+  f_mod = approxfun(1:12,mod$coeff,method = "constant",rule=2)
+  mod_save[[j]] = mod
+  bias_ym[Year == year_all[j],bias_coef:=f_mod(Month)]
+}
+##---------------------------------
+
+##------ Propogate simple model forwards -----
+f_bias_ym = approxfun(bias_ym$YM,bias_ym$bias_coef, method="constant", rule=2)
+dt[,bias_coef:= f_bias_ym(YM)]
+dt[,SST_hat_grid_global_bias:=SST_hat_grid + bias_coef]
+dt[,bias_global:= SST_bar - SST_hat_grid_global_bias]
+##---------------------------------------------
+
+##------- New results -------------------------
+bias_ym = dt[,.("Bias"= mean(bias,na.rm=TRUE),
+                "RMSE" = sqrt(mean(bias^2, na.rm=TRUE)),
+                "MAE" = mean(abs(bias), na.rm=TRUE),
+                "Bias_Global"= mean(bias_global,na.rm=TRUE),
+                "RMSE_Global" = sqrt(mean(bias_global^2, na.rm=TRUE)),
+                "MAE_Global" = mean(abs(bias_global), na.rm=TRUE),
+                "Year"= min(year),
+                "Month" = min(month)),
+             keyby = YM]
+##----------------------------------------------
+
+
+yy_all = range(dt[,year])
 
 if(print_figs){pdf("./figures/bias_ym.pdf")}else{X11()}
 plot(bias_ym[,.(YM,Bias)], type="l", axes = FALSE, xlab="Year",ylab="Global Mean Bias (C)", ylim = c(0, bias_ym[,max(Bias)]))
