@@ -2,7 +2,11 @@ plot_system = function(dt,
                        YM_j,
                        file_out = paste0("./figures/system_",YM_j),
                        lons = NULL,
-                       lats = NULL)
+                       lats = NULL,
+                       var_plot = "residual",
+                       rr = NULL,
+                       mn_add = "",
+                       outside_control = FALSE)
 {
 
   
@@ -17,13 +21,13 @@ plot_system = function(dt,
   
   ##------- Setup --------
   dt_sub = dt[YM == YM_j]
-  mn = paste0(dt_sub[,min(month)], "/",dt_sub[,min(year)])
-  rr = range(dt[,residual],na.rm=TRUE)
+  mn = paste0(dt_sub[,min(month)], "/",dt_sub[,min(year)],mn_add)
+  if(is.null(rr)) rr = range(dt[,residual],na.rm=TRUE)
   ##----------------------
 
   ##----- Bias --------------
   A_bias = matrix(NA, n_lon, n_lat)
-  A_bias[dt_sub[, grid_id]] = dt_sub[, residual]
+  A_bias[dt_sub[, grid_id]] = dt_sub[, eval(parse(text = var_plot))]
   ##-------------------------
 
   ##------- Scaling ----------
@@ -40,7 +44,14 @@ plot_system = function(dt,
   ##--------------------------
 
   ##------- Plot -----------
-  if(print_figs){pdf(paste0(file_out, "_bias.pdf"))}else{X11()} 
+  if(print_figs & !outside_control)
+  {
+    pdf(paste0(file_out, "_bias.pdf"))
+  }
+  else{
+    if(!outside_control) X11()
+  }
+
   image.plot(lon_all,lat_all,A_bias,
              main=mn,xlab="Longitude",ylab="Latitude",
              zlim=rr,
@@ -54,9 +65,9 @@ plot_system = function(dt,
                             at = brk.at,
                             label = brk.lab))
   map("world", add = TRUE)
-  if(print_figs)dev.off()
+  if(print_figs & !outside_control) dev.off()
 
-  if(print_figs)
+  if(print_figs & !outside_control)
   {
     png(paste0(file_out, "_bias.png"))
     image.plot(lon_all,lat_all,A_bias,

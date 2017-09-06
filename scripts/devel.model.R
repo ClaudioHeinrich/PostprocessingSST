@@ -5,7 +5,7 @@ library(SeasonalForecasting)
 setwd("~/NR/SFE/")
 data.dir = "~/PostClimDataNoBackup/"
 options(max.print = 1e3)
-print_figs = TRUE
+print_figs = FALSE
 ##------------------------
 
 ##------ Set up -------
@@ -82,3 +82,23 @@ axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
 legend("bottomright", lty = 1, col = c("black","red","blue"), legend = c("Raw","Global","Local"))
 if(print_figs)dev.off()
 ##-----------------------------------
+
+YM_all = sort(dt[,unique(YM)])
+YM_all = YM_all[-(1:12)]
+rr = range(dt[,.(residual,residual_local, residual_global)], na.rm=TRUE)
+for(j in 1:length(YM_all))
+{
+  print(j)
+  if(print_figs){png(paste0("./figures/system_joined_",YM_all[j],".png"),width=1000,height=500)}else{X11()}
+  par(mfrow = c(1,2))
+  plot_system(dt,YM_all[j],
+              var_plot = "residual", rr = rr,
+              mn_add = " Ensemble", outside_control=TRUE)
+  plot_system(dt,YM_all[j],
+              var_plot = "residual_local", rr = rr,
+              mn_add = " Local", outside_control = TRUE)
+  if(print_figs)dev.off()
+}
+
+
+
