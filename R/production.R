@@ -1,9 +1,7 @@
 make_combined_dataset = function(y_start = 1985,
-                                 y_stop = 2010,
+                                 y_stop = 2010, vintage = "mr",
                                  data.dir = "~/PostClimDataNoBackup/")
-{
-
-  ##------ Loop ----------
+{ ##------ Loop ----------
   dt_combine_all = list()
   k = 1
   for(y in y_start:y_stop)
@@ -11,7 +9,7 @@ make_combined_dataset = function(y_start = 1985,
     for(m in 1:12)
     {
       print(c(y,m))
-      dt_ens = load_ensemble(y,m)
+      dt_ens = load_ensemble(y,m,vintage)
       dt_obs = load_observations(y,m)
       dt_combine_all[[k]] = combine_data(dt_ens, dt_obs)
       dt_combine_all[[k]][,year:=y]
@@ -21,12 +19,11 @@ make_combined_dataset = function(y_start = 1985,
   }
   ##------------------------
 
-  ##--------- Combine -----
-  dt_combined_all = load_combined()
-  dt = rbindlist(dt_combined_all)
-  dt[, YM := year * 12 + month]
-  setkey(dt, "YM", "Lon", "Lat")
-  ##------------------------
+  ##------Create data.table-----
+   dt = rbindlist(dt_combine_all)
+   dt[, YM := year * 12 + month]
+   setkey(dt, "YM", "Lon", "Lat")
+  # ##------------------------
   
   ##----- Should I save or should I go? -----
   if(is.null(data.dir))
@@ -34,7 +31,7 @@ make_combined_dataset = function(y_start = 1985,
     return(dt)
   }else{
     save(dt,
-         file = paste0(data.dir,"./SFE/Derived/dt_combine.RData"))
+         file = paste0(data.dir,"./SFE/Derived/dt_combine_",vintage,".RData"))
     return(1)
   }
   ##-------------------------------------------
