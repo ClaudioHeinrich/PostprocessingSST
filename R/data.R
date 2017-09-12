@@ -1,3 +1,23 @@
+contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
+                             dt_obs = load_observations(1985,1))
+{
+
+  dt_obs_grid = unique(dt_obs[,.(Lon,Lat)])
+  point_match = NULL
+  for(j in 1:dim(dt_obs_grid)[1])
+  {
+    if(j %% 1e2 == 0)print(j)
+    ##---------------------------------------
+    a = geosphere::distHaversine(as.vector(dt_obs_grid[j,.(Lon,Lat)]),as.matrix(dt_ens_grid[,.(Lon,Lat)]))
+    point_match[j] = order(a)[1]
+    ##--------------------------------------
+  }
+
+  dt_map = data.table(dt_obs_grid[,.(Lon,Lat)], dt_ens_grid[point_match,.(Lon,Lat)])
+
+  return(dt_map)
+}
+
 load_ensemble = function(year,
                          month,
                          data.dir = "~/PostClimDataNoBackup")
@@ -42,7 +62,7 @@ load_ensemble = function(year,
                                        Forecast = as.vector(sst_ensemble[,,j]))
   }
   dt_ensemble = rbindlist(dt_ensemble_list)
-  setkey(dt_ensemble,"Lon","Lat")
+  setkey(dt_ensemble,"Lon","Lat","Ens")
   ##-----------------------------------------
 
   return(dt_ensemble)
@@ -85,41 +105,44 @@ load_observations = function(year, month,
   return(dt_obs)
 }
 
-combine_data = function(dt_ens, dt_obs)
+combine_data = function(dt_ens, dt_obs, dt_map)
 {
+
   ##------- Collapse Observations -------
   dt_obs_mean = dt_obs[,.("SST_bar" = mean(SST)),.(Lon,Lat)]
-  setkey(dt_obs_mean, "Lat","Lon")
+  setkey(dt_obs_mean, "Lon","Lat")
   ##-------------------------------------
   
-  ##------ First Organize the Obs -------
-  lon_all = sort(dt_obs_mean[,unique(Lon)])
+  ##------- First fill out ensemble with obs lookup ---
+  setkey(dt_map, "Lon_Ens","Lat_Ens")
+  setkey(dt_ens, "Lon", "Lat")
+  dt_ens = dt_ens[dt_map]
+  ##-----------------------------------------------
+  
+  ##------- Now fill in Observations --------
+  setkey(dt_ens, "Lon_Obs", "Lat_Obs")
+  dt_combine = dt_obs_mean[dt_ens]
+  dt_combine[,i.Lon := NULL]
+  dt_combine[,i.Lat := NULL]
+  ##-----------------------------------------
+  
+  ##------ Form a convenient key -------
+  lon_all = sort(dt_combine[,unique(Lon)])
   n_lon = length(lon_all)
   cutoff_lon = c(-Inf,head(lon_all,-1) + diff(lon_all)/2)
   f_lon = approxfun(cutoff_lon, 1:n_lon, method="constant", rule = 2)
   
-  lat_all = sort(dt_obs_mean[,unique(Lat)])
+  lat_all = sort(dt_combine[,unique(Lat)])
   n_lat = length(lat_all)
   cutoff_lat = c(-Inf, head(lat_all,-1) + diff(lat_all)/2)
   f_lat = approxfun(cutoff_lat, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
-  dt_obs_mean[,grid_id := f_lon(Lon) + f_lat(Lat)]
+  dt_combine[,grid_id := f_lon(Lon) + f_lat(Lat)]
   ##--------------------------------------
   
-  ##------ Now merge the obs and ens data ---
-  dt_ens_mean = dt_ens[,.("SST_hat" = mean(Forecast)),.(Lon,Lat)]
-  setkey(dt_ens_mean, "Lat","Lon")
-  dt_ens_mean[,grid_id := f_lon(Lon) + f_lat(Lat)]
-  setkey(dt_ens_mean,grid_id)
-  dt_ens_grid_mean = dt_ens_mean[,.("Lon_bar" = mean(Lon),
-                                    "Lat_bar" = mean(Lat),
-                                    "SST_hat_grid" = mean(SST_hat, na.rm=TRUE)),grid_id]
-  dt_combine = dt_obs_mean[dt_ens_grid_mean,on="grid_id"]
-  ##------------------------------------------
-  
-  
   return(dt_combine)
-
+  
 }
+
 
 load_combined = function(data.dir="~/PostClimDataNoBackup/")
 {

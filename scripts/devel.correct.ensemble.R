@@ -15,37 +15,29 @@ dt[,residual := SST_bar - SST_hat_grid]
 
 ##--- Calculate Running Bias -------
 setkey(dt,"grid_id","month","year")
-dt[,"MeanResid" := mean(residual),.(grid_id, month,year)]
-setkey(dt,"grid_id","Ens","month","year")
-dt[,"MeanResidCum" := (cumsum(MeanResid) - MeanResid) / (year - min(year)),.(grid_id, Ens, month)]
-setkey(dt,"grid_id","month","year", "Ens")
-dt[,"SST_hat_local":=SST_hat_grid + MeanResidCum]
-dt[,"Obs_above_orig":=SST_bar > SST_hat_grid]
-dt[,"Obs_above_local":=SST_bar > SST_hat_local]
-dt[,"Rank_orig":=cumsum(Obs_above_orig),.(grid_id,year,month)]
-dt[,"Rank_local":=cumsum(Obs_above_local),.(grid_id,year,month)]
-dt[,"residual_local":=SST_bar - SST_hat_local]
+dt[,meanresid := (cumsum(residual) - residual) / (year - min(year)),.(month,grid_id)]
+dt[,SST_hat_local:=SST_hat_grid + meanresid]
+dt[,residual_local:=SST_bar  - SST_hat_local]
 ##----------------------------------
 
-dt_rank = dt[,.("Q_Orig"=max(Rank_orig),"Q_local"=max(Rank_local)),.(grid_id,year,month)]
-
-prop_orig = dt_rank[,.N,by="Q_Orig"]
-prop_orig = prop_orig[!is.na(Q_Orig)]
-prop_orig[,"Prop":=N/sum(N)]
-prop_orig[,Q_Orig:=Q_Orig + 1]
-
-prop_local = dt_rank[,.N,by="Q_local"]
-prop_local = prop_local[!is.na(Q_local)]
-prop_local[,"Prop":=N/sum(N)]
-prop_local[,Q_local:=Q_local + 1]
-
-plot(prop_orig[,.(Q_Orig,Prop)],type="h",lwd = 3)
-lines(prop_local[,.(Q_local + .1, Prop)], type="h", lwd = 3, col="blue")
+##--- Now do Global Model --------
+setkey(dt,"month","year")
+bias_ym = dt[,.("Bias" = mean(residual, na.rm=TRUE)),keyby=.(month,year)]
+bias_ym[,Trailing_Bias:=(cumsum(Bias) - Bias)/(year - min(year)),month]
+bias_ym[!is.finite(Trailing_Bias), Trailing_Bias:=NA]
+bias_ym[,Bias:=NULL]
+dt = dt[bias_ym,on=.(month,year)]
+dt[,SST_hat_global:=SST_hat_grid + Trailing_Bias]
+dt[,residual_global:=SST_bar - SST_hat_global]
+##----------------------------------
 
 ##-------- Get Results -------------
 results_ym = dt[,.("Bias"= mean(residual,na.rm=TRUE),
                    "RMSE" = sqrt(mean(residual^2, na.rm=TRUE)),
                    "MAE" = mean(abs(residual), na.rm=TRUE),
+                   "Bias_Global"= mean(residual_global,na.rm=TRUE),
+                   "RMSE_Global" = sqrt(mean(residual_global^2, na.rm=TRUE)),
+                   "MAE_Global" = mean(abs(residual_global), na.rm=TRUE),
                    "Bias_Local"= mean(residual_local,na.rm=TRUE),
                    "RMSE_Local" = sqrt(mean(residual_local^2, na.rm=TRUE)),
                    "MAE_Local" = mean(abs(residual_local), na.rm=TRUE),

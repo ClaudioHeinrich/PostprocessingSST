@@ -1,7 +1,25 @@
+make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
+{
+  dt_map = construct_grid_map()
+  save(dt_map, file = paste0(out.file,"dt_map.RData"))
+}
+
 make_combined_dataset = function(y_start = 1985,
                                  y_stop = 2010,
-                                 data.dir = "~/PostClimDataNoBackup/")
+                                 data.dir = "~/PostClimDataNoBackup/",
+                                 grid_mapping_loc = "./Data/PostClim/SFE/Derived/")
 {
+
+  ##----- Load Grid Mapping ---
+  ff = paste0(grid_mapping_loc,"dt_map.RData")
+  if(file.exists(ff))
+  {
+    load(ff)
+    names(dt_map)= c("Lon_Obs","Lat_Obs","Lon_Ens","Lat_Ens") ## Get rid of this eventually.
+  }else{
+    stop("Could not find grid mapping info")
+  }
+  ##--------------------------
 
   ##------ Loop ----------
   dt_combine_all = list()
@@ -13,7 +31,7 @@ make_combined_dataset = function(y_start = 1985,
       print(c(y,m))
       dt_ens = load_ensemble(y,m)
       dt_obs = load_observations(y,m)
-      dt_combine_all[[k]] = combine_data(dt_ens, dt_obs)
+      dt_combine_all[[k]] = combine_data(dt_ens, dt_obs, dt_map)
       dt_combine_all[[k]][,year:=y]
       dt_combine_all[[k]][,month:=m]
       k = k + 1
@@ -22,8 +40,7 @@ make_combined_dataset = function(y_start = 1985,
   ##------------------------
 
   ##--------- Combine -----
-  dt_combined_all = load_combined()
-  dt = rbindlist(dt_combined_all)
+  dt = rbindlist(dt_combine_all)
   dt[, YM := year * 12 + month]
   setkey(dt, "YM", "Lon", "Lat")
   ##------------------------
