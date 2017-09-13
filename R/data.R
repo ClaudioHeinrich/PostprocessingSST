@@ -19,12 +19,18 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
 }
 
 load_ensemble = function(year,
-                         month,
+                         month,vintage = "mr",
                          data.dir = "~/PostClimDataNoBackup")
 {
 
   ##------ Setup ----------
+  month_num = month;  # store month as an integer
   if(month < 10)month = paste0("0",month)
+  
+  if(vintage == "Jan")vin_mon = 1
+  if(vintage == "Apr")vin_mon = 4
+  if(vintage == "Jul")vin_mon = 7
+  if(vintage == "Oct")vin_mon = 10
   ##-----------------------
 
   ##---- Collect Grid Info ------------------
@@ -38,7 +44,16 @@ load_ensemble = function(year,
   ##-------- Find target run ----------------
   filedir <- paste0(data.dir,"/SFE/NorCPM_Ocean/")
   ff_all = system(paste0("ls ",filedir,"*_mem01.*.",year,"-",month,"*"), intern = TRUE)
-  ff_use = tail(ff_all,1)
+  
+  if (vintage == "mr") {ff_use = tail(ff_all,1)
+  } else {
+    month_num <- (month_num-vin_mon+1)%%12 # start the month labelling at the vintage month
+    if(month_num == 0)month_num == 12
+    if (month_num < 4) {ff_use = rev(ff_all)[1]
+    }else if (month_num < 7) {ff_use = rev(ff_all)[2]
+    }else if (month_num < 10) {ff_use = rev(ff_all)[3]
+    }else  ff_use = rev(ff_all)[4]
+  }
   ##-----------------------------------------
   
   ##----- Get Raw Ensemble ------------------
@@ -143,10 +158,9 @@ combine_data = function(dt_ens, dt_obs, dt_map)
   
 }
 
-
-load_combined = function(data.dir="~/PostClimDataNoBackup/")
+load_combined = function(data.dir = "~/PostClimDataNoBackup/", vintage = "mr")
 {
-  file = paste0(data.dir,"/SFE/Derived/dt_combine.RData")
+  file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,".RData")
   load(file)
   return(dt)
 }

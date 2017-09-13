@@ -6,6 +6,7 @@ make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
 
 make_combined_dataset = function(y_start = 1985,
                                  y_stop = 2010,
+                                 vintage = "mr",
                                  data.dir = "~/PostClimDataNoBackup/",
                                  grid_mapping_loc = "./Data/PostClim/SFE/Derived/")
 {
@@ -21,7 +22,7 @@ make_combined_dataset = function(y_start = 1985,
   }
   ##--------------------------
 
-  ##------ Loop ----------
+ ##------ Loop ----------
   dt_combine_all = list()
   k = 1
   for(y in y_start:y_stop)
@@ -29,7 +30,7 @@ make_combined_dataset = function(y_start = 1985,
     for(m in 1:12)
     {
       print(c(y,m))
-      dt_ens = load_ensemble(y,m)
+      dt_ens = load_ensemble(y,m,vintage)
       dt_obs = load_observations(y,m)
       dt_combine_all[[k]] = combine_data(dt_ens, dt_obs, dt_map)
       dt_combine_all[[k]][,year:=y]
@@ -51,7 +52,7 @@ make_combined_dataset = function(y_start = 1985,
     return(dt)
   }else{
     save(dt,
-         file = paste0(data.dir,"./SFE/Derived/dt_combine.RData"))
+         file = paste0(data.dir,"./SFE/Derived/dt_combine_",vintage,".RData"))
     return(1)
   }
   ##-------------------------------------------
