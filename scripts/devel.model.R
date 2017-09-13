@@ -5,7 +5,7 @@ library(SeasonalForecasting)
 setwd("~/NR/SFE/")
 data.dir = "~/PostClimDataNoBackup/"
 options(max.print = 1e3)
-print_figs = TRUE
+print_figs = FALSE
 ##------------------------
 
 ##------ Set up -------
@@ -109,6 +109,18 @@ YM_all = sort(dt_reduced[,unique(YM)])
 YM_all = YM_all[-(1:12)]
 dt_reduced[,residual:=SST_bar - MeanOrig]
 dt_reduced[,residual_local:=SST_bar - MeanLocal]
+
+##----- Plot a few systems -----------
+ym_ex = YM_all[8]
+rr = range(dt_reduced[YM == ym_ex, .(SST_bar,MeanOrig)],na.rm=TRUE)
+rr_resid = range(dt_reduced[YM == ym_ex, .(residual,residual_local)],na.rm=TRUE)
+plot_system(dt_reduced,ym_ex,var_plot="SST_bar",rr =rr, mn_add = " Observation", file_out = "./figures/obs_example")
+plot_system(dt_reduced,ym_ex,var_plot="MeanOrig",rr =rr, mn_add = " Ensemble", file_out = "./figures/obs_ensemble")
+plot_system(dt_reduced,ym_ex,var_plot="residual", rr = rr_resid, mn_add = " Residual", file_out = "./figures/obs_residual")
+plot_system(dt_reduced,ym_ex,var_plot="residual_local", rr = rr_resid, mn_add = " Local Residual", file_out = "./figures/obs_local")
+##------------------------------------
+
+##----- Make a movie ----------------
 rr = range(dt_reduced[,.(residual,residual_local)], na.rm=TRUE)
 setkey(dt_reduced,"YM","grid_id")
 for(j in 1:length(YM_all))
@@ -124,6 +136,67 @@ for(j in 1:length(YM_all))
               mn_add = " Local", outside_control = TRUE)
   if(print_figs)dev.off()
 }
+##------------------------------------
 
+
+A = dt_reduced[,.(Lon = head(Lon,1),
+                  Lat = head(Lat,1),
+                  month = 12,
+                  year= 2010,
+                  YM = 1,
+                  "SigmaOrig" = var(residual),
+                  "SigmaLocal" = var(residual_local,na.rm=TRUE)),.(grid_id)]
+
+rr = range(A[,SigmaLocal],na.rm=TRUE)
+
+##----- HACK, fix -------
+##Load globals
+dt_obs = load_observations(2000,1)
+lon_all = sort(dt_obs[,unique(Lon)])
+lat_all = sort(dt_obs[,unique(Lat)])
+n_lon = length(lon_all)
+n_lat = length(lat_all)
+##------------------
+  
+##------- Setup --------
+dt_sub = A
+mn = "Variance of Local Residuals"
+##----------------------
+
+  ##----- Bias --------------
+var_plot = "SigmaLocal"
+A_plot = matrix(NA, n_lon, n_lat)
+A_plot[dt_sub[, grid_id]] = dt_sub[, eval(parse(text = var_plot))]
+  ##-------------------------
+
+##------- Scaling ----------
+brk = seq(0,rr[2],length = 500)
+brk.ind = round(seq(1,length(brk),length = 10))
+brk.at = brk[brk.ind]
+brk.lab = round(brk[brk.ind],2)
+color <- designer.colors(n=length(brk)-1, col = c("white", "darkred"))
+##--------------------------
+
+##------- Scope ------------
+if(is.null(lons))lons = range(dt_sub[,Lon])
+if(is.null(lats))lats = range(dt_sub[,Lat])
+##--------------------------
+
+##------- Plot -----------
+if(print_figs){ pdf("./figures/local_variance.pdf")}else{X11()}
+image.plot(lon_all,lat_all,A_plot,
+           main=mn,xlab="Longitude",ylab="Latitude",
+           zlim=rr,
+           xlim = lons,
+           ylim = lats,
+           breaks=brk,
+           col=color,
+           cex.main=1.8,cex.lab=1.4,
+           cex.axis=1,
+           axis.args=list(cex.axis=1,
+                          at = brk.at,
+                          label = brk.lab))
+map("world", add = TRUE)
+if(print_figs) dev.off()
 
 

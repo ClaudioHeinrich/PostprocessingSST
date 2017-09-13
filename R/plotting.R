@@ -22,7 +22,7 @@ plot_system = function(dt,
   ##------- Setup --------
   dt_sub = dt[YM == YM_j]
   mn = paste0(dt_sub[,min(month)], "/",dt_sub[,min(year)],mn_add)
-  if(is.null(rr)) rr = range(dt[,residual],na.rm=TRUE)
+  if(is.null(rr)) rr = range(dt[,eval(parse(text = var_plot))],na.rm=TRUE)
   ##----------------------
 
   ##----- Bias --------------
