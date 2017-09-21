@@ -5,48 +5,83 @@ library(SeasonalForecasting)
 setwd("~/NR/SFE/")
 data.dir = "~/PostClimDataNoBackup/"
 options(max.print = 1e3)
-print_figs = FALSE
+print_figs = TRUE
 ##------------------------
 
-##------ Set up -------
-dt = load_combined()
+
+##------- Specify desired vintages ---------
+
+vintage.vec=c("mr","2r","3r")
+
+vintage_label = function (vin){
+  if (vin == "mr") return("most recent vintage")
+  if (vin == "2r") return("2nd recent vintage")
+  if (vin == "3r") return("3rd recent vintage")
+  if (vin == "4r") return("4th recent vintage")
+  if (vin == "Jan") return("January vintage")
+  if (vin == "Apr") return("April vintage")
+  if (vin == "Jul") return("July vintage")
+  if (vin == "Oct") return("October vintage")
+  if (vin == "test") return("test vintage")
+}
+  
+
+
+##------ Set up - maybe merge this into production ?------
+dt=list()
+for(k in 1:length(vintage.vec))
+{
+  print(vintage.vec[k])
+    dt_vin = load_combined(vintage = vintage.vec[k])
+    dt_vin[,vintage := vintage.vec[k]]
+    dt[[k]]=dt_vin
+    }
+dt = rbindlist(dt)
 dt[,residual := SST_bar - Forecast]
+
 ##---------------------
 
 ##--- Calculate Running Bias -------
-setkey(dt,"grid_id","Ens","month","year")
-dt[,"MeanResid" := mean(residual),.(grid_id, month,year)]
-setkey(dt,"grid_id","Ens","month","year")
-dt[,"MeanResidCum" := (cumsum(MeanResid) - MeanResid) / (year - min(year)),.(grid_id, Ens, month)]
-setkey(dt,"grid_id","month","year", "Ens")
+setkey(dt,"vintage","grid_id","Ens","month","year")
+dt[,"MeanResid" := mean(residual),.(vintage, grid_id, month,year)]
+#setkey(dt,"grid_id","Ens","month","year")
+dt[,"MeanResidCum" := (cumsum(MeanResid) - MeanResid) / (year - min(year)+1),.(vintage, grid_id, Ens, month)]
+#setkey(dt,"grid_id","month","year", "Ens")
 dt[,"SST_hat_local":=Forecast + MeanResidCum]
 dt[,"Obs_above_orig":=SST_bar > Forecast]
 dt[,"Obs_above_local":=SST_bar > SST_hat_local]
-dt[,"Rank_orig":=cumsum(Obs_above_orig),.(grid_id,year,month)]
-dt[,"Rank_local":=cumsum(Obs_above_local),.(grid_id,year,month)]
+dt[,"Rank_orig":=cumsum(Obs_above_orig),.(vintage, grid_id,year,month)]
+dt[,"Rank_local":=cumsum(Obs_above_local),.(vintage, grid_id,year,month)]
 dt[,"residual_local":=SST_bar - SST_hat_local]
 ##----------------------------------
 
-dt_rank = dt[,.("Q_Orig"=max(Rank_orig) + 1,"Q_local"=max(Rank_local) + 1),.(grid_id,year,month)]
+dt_rank = dt[,.("Q_Orig"=max(Rank_orig) + 1,"Q_local"=max(Rank_local) + 1),.(vintage,grid_id,year,month)]
 
-prop_orig = dt_rank[,.N,by="Q_Orig"]
+prop_orig = dt_rank[,.N,by=.(Q_Orig, vintage)]
 prop_orig = prop_orig[!is.na(Q_Orig)]
-prop_orig[,"Prop":=N/sum(N)]
+prop_orig[,"Prop":=N/sum(N), by = "vintage"]
 
-prop_local = dt_rank[,.N,by="Q_local"]
+prop_local = dt_rank[,.N,by=.(Q_local, vintage)]
 prop_local = prop_local[!is.na(Q_local)]
-prop_local[,"Prop":=N/sum(N)]
+prop_local[,"Prop":=N/sum(N), by = "vintage"]
 
 ##---- Rank Histograms -------------------
-if(print_figs){pdf("./figures/calibration.pdf")}else{X11()}
-plot(prop_orig[,.(Q_Orig,Prop)],type="h",lwd = 3, xlab = "Rank of Observation in Ensemble", ylab = "Proportion")
-lines(prop_local[,.(Q_local + .1, Prop)], type="h", lwd = 3, col="blue")
+
+
+for(k in 1:length(vintage.vec)){
+vin = vintage.vec[k]
+vin_lab <- vintage_label(vin)
+if(print_figs){pdf(paste0("./figures/calibration_",vin,"_vin.pdf"))}else{X11()}
+plot(prop_orig[vintage == vin,.(Q_Orig,Prop)],type="h",lwd = 3, xlab = "Rank of Observation in Ensemble",
+     ylab = "Proportion", main = paste0("Rank histogram for ",vin_lab))
+lines(prop_local[vintage == vin,.(Q_local + .1, Prop)], type="h", lwd = 3, col="blue")
 legend("topleft", lty =1, col=c("black","blue"),legend = c("Raw Ensemble","Local Seasonally Adjusted")) 
 if(print_figs)dev.off()
+}
 ##----------------------------------------
 
 ##----- Reduce Observation Space ---------
-setkey(dt,"grid_id","YM","Ens")
+setkey(dt,"vintage","grid_id","YM","Ens")
 dt_reduced = dt[,.("Lon" = head(Lon,1),
                    "Lat" = head(Lat,1),
                    "SST_bar" = head(SST_bar,1),
@@ -56,7 +91,7 @@ dt_reduced = dt[,.("Lon" = head(Lon,1),
                    "MedianLocal" = median(SST_hat_local),
                    "year" = head(year,1),
                    "month" = head(month,1)),
-                .(grid_id, YM)]
+                .(vintage, grid_id, YM)]
 ##------------------------------------------
 
 ##-------- Get Results -------------
@@ -66,43 +101,81 @@ results_ym = dt_reduced[,.("Bias"= mean(SST_bar - MeanOrig,na.rm=TRUE),
                    "Bias_Local"= mean(SST_bar - MeanLocal,na.rm=TRUE),
                    "RMSE_Local" = sqrt(mean( (SST_bar - MeanLocal)^2, na.rm=TRUE)),
                    "MAE_Local" = mean(abs(SST_bar - MedianLocal), na.rm=TRUE),
-                   "Year"= min(year),
+                   "Year"= year,
                    "Month" = min(month)),
-                keyby = YM]
-results_ym = results_ym[!(Year == 1985)]
+                keyby = .(vintage,YM)]
+minYear = results_ym[,.(min_y = min(Year)),by = vintage]
+results_ym = results_ym[Year > max(minYear[,min_y])]
 yy_all = results_ym[,range(Year)]
 ##-----------------------------------
 
 ##----- Plot -------------
-if(print_figs){pdf("./figures/bias_ym.pdf")}else{X11()}
-rr = range(results_ym[,.(Bias,Bias_Local)])
-plot(results_ym[,.(YM,Bias)], type="l", axes = FALSE,
-     xlab="Year",ylab="Global Mean Bias (C)", ylim = rr)
-lines(results_ym[,.(YM,Bias_Local)],col="blue")
-axis(2)
-axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
-legend("bottomright", lty = 1, col = c("black","blue"), legend = c("Raw","Local"))
-if(print_figs)dev.off()
 
-if(print_figs){pdf("./figures/rmse_ym.pdf")}else{X11()}
-rr = range(results_ym[,.(RMSE,RMSE_Local)])
-plot(results_ym[,.(YM,RMSE)], type="l", axes = FALSE,
-     xlab="Year",ylab="RMSE", ylim = c(0,rr[2]))
-lines(results_ym[,.(YM,RMSE_Local)],col="blue")
-axis(2)
-axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
-legend("bottomright", lty = 1, col = c("black","blue"), legend = c("Raw","Local"))
-if(print_figs)dev.off()
+col_vec = c("blue","darkgreen","darkmagentared","darkorange2")
+col_vec <- col_vec[1:length(vintage.vec)]
 
-if(print_figs){pdf("./figures/mae_ym.pdf")}else{X11()}
-rr = range(results_ym[,.(MAE,MAE_Local)])
-plot(results_ym[,.(YM,MAE)], type="l", axes = FALSE,
-     xlab="Year",ylab="MAE", ylim = c(0,rr[2]))
-lines(results_ym[,.(YM,MAE_Local)],col="blue")
-axis(2)
-axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
-legend("bottomright", lty = 1, col = c("black","blue"), legend = c("Raw","Local"))
+for(k in 1:length(vintage.vec))
+{
+  print(k)
+  if(print_figs){pdf(paste0("./figures/bias_ym_",vintage.vec[k],".pdf"))}else{X11()}
+  rr = range(results_ym[,.(Bias,Bias_Local)])
+  plot(results_ym[vintage == vintage.vec[1],.(YM,Bias)], type="l", axes = FALSE,
+     xlab="Year",ylab="Global Mean Bias (C)", ylim = rr*c(1,1.1))
+     leg = c("Raw, most recent vintage")
+  for(l in 1:k)
+  {
+    print(l)
+    lines(results_ym[vintage == vintage.vec[l],.(YM,Bias_Local)],col=col_vec[l])  
+    leg = c(leg,paste0("Local, ",vintage_label(vintage.vec[l])))
+  }
+  axis(2)
+  axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
+  legend("topright", lty = 1, col = c("black",col_vec), legend = leg)
 if(print_figs)dev.off()
+}
+
+
+for(k in 1:length(vintage.vec))
+{
+  print(k)
+  if(print_figs){pdf(paste0("./figures/RMSE_ym_",vintage.vec[k],".pdf"))}else{X11()}
+  rr = range(results_ym[,.(RMSE,RMSE_Local)])
+  plot(results_ym[vintage == vintage.vec[1],.(YM,RMSE)], type="l", axes = FALSE,
+       xlab="Year",ylab="Global Mean RMSE (C)", ylim = rr*c(1,1.1))
+  leg = c("Raw, most recent vintage")
+  for(l in 1:k)
+  {
+    print(l)
+    lines(results_ym[vintage == vintage.vec[l],.(YM,RMSE_Local)],col=col_vec[l])  
+    leg = c(leg,paste0("Local, ",vintage_label(vintage.vec[l])))
+  }
+  axis(2)
+  axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
+  legend("topright", lty = 1, col = c("black",col_vec), legend = leg)
+  if(print_figs)dev.off()
+}
+
+for(k in 1:length(vintage.vec))
+{
+  print(k)
+  if(print_figs){pdf(paste0("./figures/MAE_ym_",vintage.vec[k],".pdf"))}else{X11()}
+  rr = range(results_ym[,.(MAE,MAE_Local)])
+  plot(results_ym[vintage == vintage.vec[1],.(YM,MAE)], type="l", axes = FALSE,
+       xlab="Year",ylab="Global Mean MAE (C)", ylim = rr*c(1,1.1))
+  leg = c("Raw, most recent vintage")
+  for(l in 1:k)
+  {
+    print(l)
+    lines(results_ym[vintage == vintage.vec[l],.(YM,MAE_Local)],col=col_vec[l])  
+    leg = c(leg,paste0("Local, ",vintage_label(vintage.vec[l])))
+  }
+  axis(2)
+  axis(1, at = 0:(diff(yy_all)) * 12 + dt[,min(YM)], label = yy_all[1]:yy_all[2])
+  legend("topright", lty = 1, col = c("black",col_vec), legend = leg)
+  if(print_figs)dev.off()
+}
+
+
 ##-----------------------------------
 
 YM_all = sort(dt_reduced[,unique(YM)])

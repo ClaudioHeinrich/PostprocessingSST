@@ -46,8 +46,10 @@ load_ensemble = function(year,
   ff_all = system(paste0("ls ",filedir,"*_mem01.*.",year,"-",month,"*"), intern = TRUE)
   
   if (vintage == "mr") {ff_use = tail(ff_all,1)
-  } else {
-    month_num <- (month_num-vin_mon+1)%%12 # start the month labelling at the vintage month
+  } else if (vintage == "2r") {ff_use = rev(ff_all)[2]
+  } else if (vintage == "3r") {ff_use = rev(ff_all)[3]
+  } else if (vintage == "4r") {ff_use = rev(ff_all)[4]
+  } else  {month_num <- (month_num-vin_mon+1)%%12 # start the month labelling at the vintage month
     if(month_num == 0)month_num == 12
     if (month_num < 4) {ff_use = rev(ff_all)[1]
     }else if (month_num < 7) {ff_use = rev(ff_all)[2]

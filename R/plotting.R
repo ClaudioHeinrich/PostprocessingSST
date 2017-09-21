@@ -6,9 +6,11 @@ plot_system = function(dt,
                        var_plot = "residual",
                        rr = NULL,
                        mn_add = "",
-                       outside_control = FALSE)
+                       outside_control = FALSE,
+                       vintage = "mr")
 {
-
+  
+  if(vintage != "mr") file_out <- paste0(file_out,vintage)
   
   ##----- HACK, fix -------
   ##Load globals
