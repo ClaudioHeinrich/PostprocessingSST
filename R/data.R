@@ -166,3 +166,54 @@ load_combined = function(data.dir = "~/PostClimDataNoBackup/", vintage = "mr")
   load(file)
   return(dt)
 }
+
+combine_data_wide= function(dt_ens, dt_obs, dt_map)
+{
+  ##------- Collapse Observations -------
+  dt_obs[,SST_Name:=paste0("SST",Obs)]
+  dt_obs_wide = dcast(dt_obs, Lon + Lat ~ SST_Name,value.var="SST")
+  dt_obs_wide[,SST_bar:= rowMeans(dt_obs_wide[,paste0("SST",1:10)])]
+  dt_obs_wide[,SST_sd:= apply(dt_obs_wide[,paste0("SST",1:10)],1,"sd")]
+  ##-------------------------------------
+  
+  ##------- Collapse Ensemble -----------
+  dt_ens[,Ens_Name:=paste0("Ens",Ens)]
+  dt_ens_wide= dcast(dt_ens, Lon + Lat ~ Ens_Name, value.var = "Forecast")
+  dt_ens_wide[,Ens_bar:=rowMeans(dt_ens_wide[,paste0("Ens",1:9)])]
+  dt_ens_wide[,Ens_sd:= apply(dt_ens_wide[,paste0("Ens",1:9)],1,"sd")]
+  ##-------------------------------------
+  
+  ##------- First fill out ensemble with obs lookup ---
+  setkey(dt_map, "Lon_Ens","Lat_Ens")
+  setkey(dt_ens_wide, "Lon", "Lat")
+  dt_ens_wide = dt_ens_wide[dt_map]
+  ##-----------------------------------------------
+  
+  ##------- Now fill in Observations --------
+  setkey(dt_ens_wide, "Lon_Obs", "Lat_Obs")
+  dt_combine = dt_obs_wide[dt_ens_wide]
+  dt_combine[,i.Lon := NULL]
+  dt_combine[,i.Lat := NULL]
+  ##-----------------------------------------
+  
+  ##------ Form a convenient key -------
+  lon_all = sort(dt_combine[,unique(Lon)])
+  n_lon = length(lon_all)
+  cutoff_lon = c(-Inf,head(lon_all,-1) + diff(lon_all)/2)
+  f_lon = approxfun(cutoff_lon, 1:n_lon, method="constant", rule = 2)
+  
+  lat_all = sort(dt_combine[,unique(Lat)])
+  n_lat = length(lat_all)
+  cutoff_lat = c(-Inf, head(lat_all,-1) + diff(lat_all)/2)
+  f_lat = approxfun(cutoff_lat, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
+  dt_combine[,grid_id := f_lon(Lon) + f_lat(Lat)]
+  ##--------------------------------------
+  
+}
+
+load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/", vintage = "mr")
+{
+  file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,"_wide.RData")
+  load(file)
+  return(dt)
+}
