@@ -11,7 +11,8 @@ print_figs = TRUE
 
 ##------- Specify desired vintages ---------
 
-vintage.vec=c("mr","2r","3r")
+vintage.vec=c("mr","2r","3r","4r")
+num_vin = length(vintage.vec)
 
 vintage_label = function (vin){
   if (vin == "mr") return("most recent vintage")
@@ -27,9 +28,9 @@ vintage_label = function (vin){
   
 
 
-##------ Set up - maybe merge this into production ?------
+##------ Set up------
 dt=list()
-for(k in 1:length(vintage.vec))
+for(k in 1:num_vin)
 {
   print(vintage.vec[k])
     dt_vin = load_combined(vintage = vintage.vec[k])
@@ -66,18 +67,21 @@ prop_local = prop_local[!is.na(Q_local)]
 prop_local[,"Prop":=N/sum(N), by = "vintage"]
 
 ##---- Rank Histograms -------------------
+col_vec = c("blue","darkgreen","darkmagenta","darkorange2")
+col_vec <- col_vec[1:num_vin]
 
-
-for(k in 1:length(vintage.vec)){
-vin = vintage.vec[k]
-vin_lab <- vintage_label(vin)
-if(print_figs){pdf(paste0("./figures/calibration_",vin,"_vin.pdf"))}else{X11()}
-plot(prop_orig[vintage == vin,.(Q_Orig,Prop)],type="h",lwd = 3, xlab = "Rank of Observation in Ensemble",
-     ylab = "Proportion", main = paste0("Rank histogram for ",vin_lab))
-lines(prop_local[vintage == vin,.(Q_local + .1, Prop)], type="h", lwd = 3, col="blue")
-legend("topleft", lty =1, col=c("black","blue"),legend = c("Raw Ensemble","Local Seasonally Adjusted")) 
-if(print_figs)dev.off()
+if(print_figs){pdf(paste0("./figures/calibration_",vintage.vec[num_vin],"_vin.pdf"))}else{X11()}
+plot(prop_orig[vintage == vintage.vec[1],.(Q_Orig -.2 ,Prop)],type="h",lwd = 3, 
+     xlab = "Rank of Observation in Ensemble", ylab = "Proportion", 
+     xlim = c(.5 , max(prop_orig[,Q_Orig])+.5), main = "Rank histogram" )
+leg = c("Raw, most recent vintage")
+for(l in 1:num_vin){
+    lines(prop_local[vintage == vintage.vec[l],.(Q_local + l*.1 - .2, Prop)], type="h", lwd = 3, col=col_vec[l])
+    leg <- c(leg,vintage_label(vintage.vec[l]))
 }
+legend("topleft", lty = 1, col = c("black",col_vec),legend = leg) 
+if(print_figs)dev.off()
+
 ##----------------------------------------
 
 ##----- Reduce Observation Space ---------
@@ -110,9 +114,6 @@ yy_all = results_ym[,range(Year)]
 ##-----------------------------------
 
 ##----- Plot -------------
-
-col_vec = c("blue","darkgreen","darkmagentared","darkorange2")
-col_vec <- col_vec[1:length(vintage.vec)]
 
 for(k in 1:length(vintage.vec))
 {
