@@ -19,19 +19,21 @@ dt[,"MeanResidCum" := (cumsum(MeanResid) - MeanResid) / (year - min(year)),.(gri
 dt[,"SST_hat_local":=Ens_bar + MeanResidCum]
 for(j in 1:9)
 {
-  dt[,paste0("SST_hat_",j):=eval(parse(text = paste0(paste0("Ens",j)," + MeanResidCum")))]
+  dt[,paste0("SST_hat_",j) := get(paste0("Ens",j)) + MeanResidCum]
 }
+##dt[,paste0("SST_hat_test_",1:9):=eval(parse(text = paste0(paste0("Ens",1:9)," + MeanResidCum")))]
 ##-----------------------------------
 
 ##------ Compute calibration --------
-nms = c(paste0("SST",1:10), paste0("SST_hat_",1:9))
-R = apply(dt[!is.na(SST_hat_local) & !is.na(SST_bar), ..nms], 1, "rank")
-f = function(x){b = rep(0,19);b[x] = 1;return(b)}
-B = apply(R[1:10,],2,f)
+g = function(i,dt){return(rank(dt[i,]))}
+nms = c(paste0("SST",1), paste0("SST_hat_",1:9))
+dt_clean = dt[!is.na(SST_hat_local) & !is.na(SST_bar),..nms]
+R = apply(dt_clean,1, "rank")
+f = function(x){b = rep(0,10);b[x] = 1;return(b)}
+B = apply(R[1,,drop=FALSE],2,f)
 A = rowMeans(B)
 ##-------------------------------------
 
-pdf("./figures/combined_calibration.pdf")
-
+pdf("./figures/combined_calibration_obs1.pdf")
 plot(A, xlab = "Bin", ylab="Frequency", pch = 20)
 dev.off()
