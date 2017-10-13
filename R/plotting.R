@@ -23,7 +23,7 @@ plot_system = function(dt,
   
   ##------- Setup --------
   dt_sub = dt[YM == YM_j]
-  mn = paste0(dt_sub[,min(month)], "/",dt_sub[,min(year)],mn_add)
+  mn = paste0(dt_sub[,month][1], "/",dt_sub[,year][1],mn_add)
   if(is.null(rr)) rr = range(dt[,eval(parse(text = var_plot))],na.rm=TRUE)
   ##----------------------
 
@@ -90,6 +90,100 @@ plot_system = function(dt,
   ##------------------------
   
 }
+
+
+plot_obs= function(obs_num = 1,
+                   YM_j,
+                   file_out = paste0("./figures/obs_",YM_j),
+                   lons = NULL,
+                   lats = NULL,
+                   rr = NULL,
+                   mn_add = "",
+                   outside_control = FALSE)
+{
+  
+  ##----- HACK, fix -------
+  ##Load globals
+  Y = floor((YM_j-1)/12)
+  M = YM_j %% 12
+  if(M == 0) M = 12
+  dt_obs = load_observations(Y,M)
+  dt_obs = dt_obs[Obs == obs_num,]
+  lon_all = sort(dt_obs[,unique(Lon)])
+  lat_all = sort(dt_obs[,unique(Lat)])
+  n_lon = length(lon_all)
+  n_lat = length(lat_all)
+  ##------------------
+  
+  ##------- Setup --------
+  mn = paste0("Observation ",M, "/",Y,mn_add)
+  if(is.null(rr)) rr = range(dt_obs[,SST],na.rm=TRUE)
+  ##----------------------
+  
+  ##----- SST --------------
+  A_SST = matrix(dt_obs[, SST],  n_lon, n_lat, byrow = TRUE)
+  ##-------------------------
+  
+  ##------- Scaling ----------
+  brk = seq(rr[1],rr[2],length = 500)
+  brk.ind = round(seq(1,length(brk),length = 10))
+  brk.at = brk[brk.ind]
+  brk.lab = round(brk[brk.ind],2)
+  color <- designer.colors(n=length(brk)-1)
+  ##--------------------------
+  
+  ##------- Scope ------------
+  if(is.null(lons))lons = range(dt_obs[,Lon])
+  if(is.null(lats))lats = range(dt_obs[,Lat])
+  ##--------------------------
+  
+  ##------- Plot -----------
+  if(print_figs & !outside_control)
+  {
+    pdf(paste0(file_out, "_obs",obs_num,".pdf"))
+  }else{
+    if(!outside_control) X11()
+  }
+  
+  image.plot(lon_all,lat_all,A_SST,
+             main=mn,xlab="Longitude",ylab="Latitude",
+             zlim=rr,
+             xlim = lons,
+             ylim = lats,
+             breaks=brk,
+             col=color,
+             cex.main=1.8,cex.lab=1.4,
+             cex.axis=1,
+             axis.args=list(cex.axis=1,
+                            at = brk.at,
+                            label = brk.lab))
+  map("world", add = TRUE)
+  if(print_figs & !outside_control) dev.off()
+  
+  if(print_figs & !outside_control)
+  {
+    png(paste0(file_out, "_bias.png"))
+    image.plot(lon_all,lat_all,A_SST,
+               main=mn,xlab="Longitude",ylab="Latitude",
+               xlim = lons,
+               ylim = lats,
+               zlim=rr,
+               breaks=brk,
+               col=color,
+               cex.main=1.8,cex.lab=1.4,
+               cex.axis=1,
+               axis.args=list(cex.axis=1,
+                              at = brk.at,
+                              label = brk.lab))
+    map("world", add = TRUE)
+    dev.off()
+  }
+  ##------------------------
+  
+}
+
+
+
 
 plot_animation = function(dt,
                           file_out = "./figures/system_animation.pdf")

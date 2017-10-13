@@ -6,10 +6,9 @@ rm(list = ls())
 library(SeasonalForecasting)
 library(irlba)
 setwd("~/NR/SFE/")
+data.dir = "~/PostClimDataNoBackup/SFE/PCACov/"
 options(max.print = 1e3)
 
-
-  
 dt = load_combined_wide()
 
 ens.num = 9
@@ -43,39 +42,21 @@ for(mon in 1:12){
   }
 
 emp_cov = emp_cov/((y_range[2]-y_range[1])*ens.num-1)
-data.dir = "~/PostClimDataNoBackup/SFE/PCACov"
 save(emp_cov,
      file = paste0(data.dir,"Cov_",mon,".RData"))
 
 }
 
 
-temp <- dt_reduced[,cov_vec]
+#--- PCA ---
 
 mon = 1
+PCA_depth = 5
+load(file = paste0(data.dir,"Cov_",mon,".RData"))
+PCA <- irlba(emp_cov,nv = PCA_depth, right_only = TRUE)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 
-Cov_Mat = function(mon) 
+#cov_reduced <- tcrossprod(PCA$v %*% Diagonal(PCA_depth,PCA$d), PCA$v)
 
-
-
-
-corr_fac = 9*y_range / (9*y_range - 1)
-
-dt_reduced = dt_reduced[, "emp_cov_vec" :=  - 9*y_range/(9*y_range-1)*obs_mean, by = .(month, grid_id)]
-emp_cov[obs_mean == mean_obs,.N]
-
-emp_cov=melt(emp_cov, measure.vars = paste0("Ens",1:9))
+noise <- PCA$v %*% sqrt(Diagonal(PCA_depth,PCA$d)) %*% rnorm(PCA_depth)
 
 
-emp_cov = dt[,sum .SD - obs_mean, .SD = paste0("Ens_dev_",1:9)]
-
-
-
-dt_cov = dt[,c(.SD,"SST_bar","SST_sd") := NULL,.SD=paste0("SST",1:10)]
-
-dt[,paste0("SST_", 1:10,"plus_1"):=.SD +1.0,.SD=paste0("SST",1:10)]
-
-
-
-emp_cov = dt[, "sum_obs" := rowSums(.SD), .SD = paste0("Ens",1:9)]
-emp_cov = dt[, "mean_obs" := mean(sum_obs, na.rm = TRUE)/9, by = .(month, grid_id
