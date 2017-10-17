@@ -24,16 +24,30 @@ for(j in 1:9)
 ##dt[,paste0("SST_hat_test_",1:9):=eval(parse(text = paste0(paste0("Ens",1:9)," + MeanResidCum")))]
 ##-----------------------------------
 
+##------- Subset -----------
+dt_1990 = dt[year == 1990]
+##--------------------------
+
 ##------ Compute calibration --------
-g = function(i,dt){return(rank(dt[i,]))}
-nms = c(paste0("SST",1), paste0("SST_hat_",1:9))
-dt_clean = dt[!is.na(SST_hat_local) & !is.na(SST_bar),..nms]
-R = apply(dt_clean,1, "rank")
-f = function(x){b = rep(0,10);b[x] = 1;return(b)}
-B = apply(R[1,,drop=FALSE],2,f)
-A = rowMeans(B)
+nms = c(paste0("SST",1:10), paste0("SST_hat_",1:9))
+dt_clean = dt_1990[!is.na(SST_hat_local) & !is.na(SST_bar),..nms]
+R = t(apply(dt_clean,1,"rank", ties.method = "random"))
+f = function(x){b = rep(0,19);b[x] = 1;return(b)}
+B = t(apply(R[,1:10],1,f))
+A = colMeans(B)
 ##-------------------------------------
 
 pdf("./figures/combined_calibration_obs1.pdf")
 plot(A, xlab = "Bin", ylab="Frequency", pch = 20)
 dev.off()
+
+##----- Now look at mean and at 1 obs ----
+nms = c(paste0("SST",1), paste0("SST_hat_",1:9))
+dt_clean = dt_1990[!is.na(SST_hat_local) & !is.na(SST_bar),..nms]
+R = t(apply(dt_clean,1,"rank", ties.method = "random"))
+f = function(x){b = rep(0,10);b[x] = 1;return(b)}
+B = t(apply(R[,1,drop=FALSE],1,f))
+A = colMeans(B)
+##-------------------------------------
+
+##----------------------------------------

@@ -5,12 +5,11 @@ library(SeasonalForecasting)
 setwd("~/NR/SFE/")
 data.dir = "~/PostClimDataNoBackup/"
 options(max.print = 1e3)
-print_figs = TRUE
+print_figs = FALSE
 ##------------------------
 
 
 ##------- Specify desired vintages ---------
-
 vintage.vec=c("mr","2r","3r","4r")
 num_vin = length(vintage.vec)
 
