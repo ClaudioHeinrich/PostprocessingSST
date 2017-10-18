@@ -55,7 +55,7 @@ load_ensemble = function(year,
     }else if (month_num < 7) {ff_use = rev(ff_all)[2]
     }else if (month_num < 10) {ff_use = rev(ff_all)[3]
     }else  ff_use = rev(ff_all)[4]
-  }
+    }
   ##-----------------------------------------
   
   ##----- Get Raw Ensemble ------------------

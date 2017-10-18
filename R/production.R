@@ -4,7 +4,7 @@ make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
   save(dt_map, file = paste0(out.file,"dt_map.RData"))
 }
 
-make_combined_dataset = function(y_start = 1986,
+make_combined_dataset = function(y_start = 1985,
                                  y_stop = 2010,
                                  vintage = "mr",
                                  data.dir = "~/PostClimDataNoBackup/",
@@ -60,7 +60,7 @@ make_combined_dataset = function(y_start = 1986,
   
 }
 
-make_combined_wide_dataset = function(y_start = 1986,
+make_combined_wide_dataset = function(y_start = 1985,
                                       y_stop = 2010,
                                       vintage = "mr",
                                       data.dir = "~/PostClimDataNoBackup/",

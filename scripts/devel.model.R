@@ -11,7 +11,7 @@ print_figs = TRUE
 
 ##------- Specify desired vintages ---------
 
-vintage.vec=c("mr","2r","3r","4r")
+vintage.vec=c("mr")
 num_vin = length(vintage.vec)
 
 vintage_label = function (vin){
@@ -148,6 +148,7 @@ for(k in 1:length(vintage.vec))
   {
     print(l)
     lines(results_ym[vintage == vintage.vec[l],.(YM,RMSE_Local)],col=col_vec[l])  
+    abline(h = 1.5, lty = "dashed")
     leg = c(leg,paste0("Local, ",vintage_label(vintage.vec[l])))
   }
   axis(2)
