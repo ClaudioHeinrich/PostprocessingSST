@@ -99,7 +99,8 @@ plot_obs= function(obs_num = 1,
                    lats = NULL,
                    rr = NULL,
                    mn_add = "",
-                   outside_control = FALSE)
+                   outside_control = FALSE,
+                   print_figs = TRUE)
 {
   
   ##----- HACK, fix -------

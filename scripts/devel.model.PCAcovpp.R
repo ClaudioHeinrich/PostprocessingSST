@@ -1,53 +1,5 @@
-rm(list = ls())
 
 
-
-##-------- Setup ---------
-library(SeasonalForecasting)
-library(irlba)
-setwd("~/NR/SFE/")
-data.dir = "~/PostClimDataNoBackup/SFE/PCACov/"
-options(max.print = 1e3)
-
-#------setup PCA
-
-dt = load_combined_wide()
-obs.num = 10
-
-#---- bias correction -----
-
-dt[,"Loc_Bias_Est" := (cumsum(SST_bar-Ens_bar) - (SST_bar-Ens_bar)) / (year - min(year)),.(grid_id, month)]
-dt[,"SST_hat_local":=Ens_bar + Loc_Bias_Est]
-
-#--- bring out the trash, reshape and save ---
-
-dt_reduced <- dt[,c(paste0("Ens", 1:9),"Ens_bar","SST_sd","Ens_sd"):=NULL,]
-dt_reduced = dt_reduced[,"obs_mean_y" := mean( SST_bar, na.rm = TRUE), by = .(month, grid_id)]
-dt_reduced = dt_reduced[,"SST_bar":=NULL,]
-dt_reduced = melt(dt_reduced, measure.vars = paste0("SST",1:obs.num))
-dt_reduced = dt_reduced[,"cov_vec" :=  value - obs_mean_y , by = .(month, grid_id)]
-save(dt_reduced, file = paste0(data.dir,"../Derived/dt_reduced_PCA.RData"))
-
-
-
-
-
-
-
-
-#---- compute empirical covariance matrices
-
-dt_reduced = na.omit(load(file = paste0(data.dir,"../Derived/dt_reduced_PCA.RData")))
-y_range= c(min(dt_reduced[,year]),max(dt_reduced[,year]))
-num_y = y_range[2]-y_range[1]+1
-cov_size_row = length(unique(dt_reduced[,grid_id]))
-cov_size_col = num_y * obs.num
-
-for(mon in 1:12){
-  A=matrix(dt_reduced[month == mon, cov_vec], nrow = cov_size_row, ncol = cov_size_col, byrow = FALSE)/sqrt(cov_size_col-1)
-  # the empirical covariance matrix is A %*% t(A), but does not need to be computed
-  save(A, file = paste0(data.dir,"/Cov_",mon,".RData"))
-}
 
 
 
@@ -56,17 +8,31 @@ for(mon in 1:12){
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
 load(file = paste0("~/PostClimDataNoBackup/SFE/Derived/dt_reduced_PCA.RData"))
 
-forecast_PCA = function(dt_reduced, 
+forecast_PCA = function(dt_reduced = NULL, 
                         y = 1999, 
-                        m = 11, 
+                        m = 1, 
                         PCA_depth = 5, 
+                        load_data = FALSE,
                         save.dir="./Data/PostClim/SFE/Derived/PCA",
-                        data.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                        saveorgo = TRUE){
+                        cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                        data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                        saveorgo = TRUE,
+                        truncate = TRUE){
   
-  land_grid_id = dt_reduced[variable == "SST1" & year %in% y & month %in% m & is.na(SST_hat_local),.(Lon,Lat,grid_id,month,year)]
+  if(load_data) load(file = paste0(data.dir,"dt_reduced_PCA.RData"))
   
-  fc <- na.omit(dt_reduced[variable == "SST1" & year %in% y & month %in% m,.(Lon,Lat,grid_id,month,year,SST_hat_local)])
+  #find land grid ids:
+  
+  land_grid_id = dt_reduced[variable == "SST1" & 
+                              year == min(y) & 
+                              month == min(m) & 
+                              is.na(SST_hat_local),
+                            .(Lon,Lat,grid_id,month,year)]
+  
+  fc <- na.omit( dt_reduced[variable == "SST1" 
+                            & year %in% y 
+                            & month %in% m,
+                            .(Lon,Lat,grid_id,month,year,SST_hat_local)])
   
   
   #----- generate noise ------------
@@ -74,7 +40,12 @@ forecast_PCA = function(dt_reduced,
   }else {
     no <- c()
     for(mon in m){
-      load(file = paste0(data.dir,"Cov_",mon,".RData"))  
+      load(file = paste0(cov.dir,"CovOU_mon",mon,".RData"))  
+      load(file = paste0(cov.dir,"Cov_FU_mon",mon,".RData"))  
+      
+      A = matrix(c(cov_for_unc,cov_obs_unc), 
+                 nrow = dim(cov_obs_unc)[1])
+      
       PCA <- irlba(crossprod(A),nv = PCA_depth)                       
     
       for(year in y){
@@ -95,6 +66,13 @@ forecast_PCA = function(dt_reduced,
   fc_land = rbindlist(fc_land, fill = TRUE)
   fc_land = fc_land[order(fc_land[["grid_id"]])]
   
+  #-------- truncate negative temperatures
+  
+  if(truncate) fc_land[forecast < -1.62, forecast := -1.62]
+  
+  
+  #-------- save -------
+  
   if(saveorgo){ 
     save(fc_land, file = paste0(save.dir,"/fc_",PCA_depth,"pc_",y,"_",m,".RData"))
   }else  return(fc_land)
@@ -102,4 +80,10 @@ forecast_PCA = function(dt_reduced,
 
 
 
-
+vec1 = c(0,5,10,15,25,50,100,200)
+for(d in vec1){
+  print(d)
+  forecast_PCA(dt_reduced = dt_reduced,y=2000, m=1, PCA_depth = d)
+  plot_forecast(YM_j=2000*12+1,depth = d)
+}
+  
