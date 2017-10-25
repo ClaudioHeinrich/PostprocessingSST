@@ -1,11 +1,10 @@
+rm(list = ls())
+
+library(SeasonalForecasting)
+setwd("~/NR/SFE")
+options(max.print = 1e3)
 
 
-
-
-
-
-#--- PCA ---
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
 load(file = paste0("~/PostClimDataNoBackup/SFE/Derived/dt_reduced_PCA.RData"))
 
 forecast_PCA = function(dt_reduced = NULL, 
@@ -19,7 +18,7 @@ forecast_PCA = function(dt_reduced = NULL,
                         saveorgo = TRUE,
                         truncate = TRUE){
   
-  if(load_data) load(file = paste0(data.dir,"dt_reduced_PCA.RData"))
+  if(!is.null(dt_reduced) load(file = paste0(data.dir,"dt_reduced_PCA.RData"))
   
   #find land grid ids:
   
