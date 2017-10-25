@@ -26,9 +26,9 @@ exp_mov_av_bc = function (vec,ratio){
 bias_correct = function(dt = NULL,
                         Y = 1985:2010,
                         M = 1:12,
-                        method = "gwa",  # "gwa" for 'gliding window average', 
+                        method = "ema",  # "gwa" for 'gliding window average', i.e. simple moving average, 
                                          # "ema" for 'exponential moving average'
-                        par_1 = 5,  # if method = gwa, par_1 is the length of gliding window
+                        par_1 = .2,  # if method = gwa, par_1 is the length of gliding window
                                     # if method = ema, par_1 is the ratio of the exp. mov. av.
                         global_mean_scores = FALSE,
                         reduced_output = FALSE
@@ -74,7 +74,7 @@ bias_correct = function(dt = NULL,
 
 
 
-
+#---- get global mean scores for a range of parameters and save them ---
 
 test_bias_correct = function(method = "gwa",
                              num.years = 26,

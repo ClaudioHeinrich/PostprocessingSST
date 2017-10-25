@@ -1,7 +1,6 @@
 
 
 for_unc_cov = function(dt = NULL,
-                       dt.load = TRUE,
                        Y = 1985:2010,
                        M = 1:12,
                        save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
@@ -11,12 +10,11 @@ for_unc_cov = function(dt = NULL,
   
   #------setup PCA
   
-  if(dt.load) dt = load_combined_wide()
+  if(is.null(dt)) dt = load_combined_wide()
   
   #---- bias correction -----
   
-  dt[,"Loc_Bias_Est" := (cumsum(SST_bar-Ens_bar) - (SST_bar-Ens_bar)) / (year - min(year)+1),.(grid_id, month)]
-  dt[,"SST_hat_local":=Ens_bar + Loc_Bias_Est]
+  dt = bias_correct(dt = dt)
   
   year.num = max(Y)-min(Y)+1
   
@@ -33,14 +31,19 @@ for_unc_cov = function(dt = NULL,
       dt_PCA = dt_PCA[,(trash):=NULL,]
       
       for(ens in  1:ens.num){
-        dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Loc_Bias_Est-eval(parse(text = paste0("SST",obs)))]
+        dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-eval(parse(text = paste0("SST",obs)))]
         dt_PCA = dt_PCA[, paste0("Ens",ens):=NULL]
       }
-      dt_PCA = dt_PCA[,"res_mean" := mean(Ens_bar-eval(parse(text = paste0("SST",obs)))), by =  grid_id]
+      dt_PCA = dt_PCA[,"res_mean" := mean(Ens_bar - eval(parse(text = paste0("SST",obs)))), by =  grid_id]
       
       sqrt_cov_mat = c()
-      for( ens in 1:ens.num) sqrt_cov_mat = c(sqrt_cov_mat, na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
-      sqrt_cov_mat = matrix(sqrt_cov_mat,nrow = length(na.omit(dt_PCA[,res_mean]))/year.num,ncol=year.num*ens.num) 
+      for( ens in 1:ens.num){
+        sqrt_cov_mat = c(sqrt_cov_mat, 
+                         na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
+      }
+      sqrt_cov_mat = matrix(sqrt_cov_mat,
+                            nrow = length(na.omit(dt_PCA[,res_mean]))/year.num,
+                            ncol = year.num*ens.num) 
       sqrt_cov_mat = sqrt_cov_mat/(sqrt(year.num*ens.num -1))
       
       save(sqrt_cov_mat, file = paste0(save.dir,"CovFU_mon",mon,"_obs",obs,".RData"))
@@ -94,8 +97,8 @@ obs_unc_cov = function(M = 1:12,
   if(! load_reduced_data){
     
     dt = load_combined_wide()
-    dt[,"Loc_Bias_Est" := (cumsum(SST_bar-Ens_bar) - (SST_bar-Ens_bar)) / (year - min(year)+1),.(grid_id, month)]
-    dt[,"SST_hat_local":=Ens_bar + Loc_Bias_Est]
+    
+    dt = bias_correct(dt = dt)
     
     dt_reduced <- dt[,c(paste0("Ens", 1:9),"Ens_bar","SST_sd","Ens_sd"):=NULL,]
     dt_reduced = dt_reduced[,"obs_mean_y" := mean( SST_bar, na.rm = TRUE), by = .(month, grid_id)]
