@@ -76,7 +76,7 @@ bias_correct = function(dt = NULL,
 
 #---- get global mean scores for a range of parameters and save them ---
 
-test_bias_correct = function(method = "gwa",
+test_bias_correct = function(method = "gwa", # also accepts ema
                              num.years = 26,
                              saveorgo = TRUE,
                              save.dir = "~/PostClimDataNoBackup/SFE/Derived/"

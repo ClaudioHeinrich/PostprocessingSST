@@ -44,7 +44,7 @@ save(dt_sd, file = "~/PostClimDataNoBackup/SFE/Derived/dtcombine_mr_wide_sd.RDat
 
 global_uncertainty_plot = function(dt_sd = NULL,
                                    M=1:12,
-                                   type = "comb",  #type of uncertainty takes 'ens','obs', 'comb' or 'res'
+                                   type = "res",  #type of uncertainty takes 'ens','obs', 'comb' or 'res'
                                    file_out = paste0("./figures/sd_by_loc_",type),
                                    lons = NULL,
                                    lats = NULL,
@@ -71,7 +71,7 @@ global_uncertainty_plot = function(dt_sd = NULL,
   for(m in M){
     print(paste0("Month =",m))
   
-    mn = paste0("sample variance for ",type,", month",m)
+    mn = paste0("sample standard deviation for ",type,", month",m)
     if(is.null(rr)) rr = range(dt_sd[month == m,eval(parse(text = type_id))],na.rm=TRUE)
   
   
@@ -146,3 +146,5 @@ if(png_out){
 }
 
 }
+
+global_uncertainty_plot()

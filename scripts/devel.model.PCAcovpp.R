@@ -9,13 +9,17 @@ load(file = paste0("~/PostClimDataNoBackup/SFE/Derived/dt_reduced_PCA.RData"))
 
 
 setup_PCA = function(m=7,
-                     max_PCA_depth = 500,
+                     y = 1999,
+                     max_PCA_depth = 200,
                      cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                     data.dir = "~/PostClimDataNoBackup/SFE/Derived/"){
+                     data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                     obs_unc = FALSE){
   
-  if(! exists("dt_reduced")) { load(file = paste0(data.dir,"dt_reduced_PCA.RData"))
+  if(! exists("dt_reduced")) { 
+      load(file = paste0(data.dir,"dt_reduced_PCA.RData"))
       dt_reduced <<- dt_reduced
-      } print("loading complete")
+      } 
+  print("loading complete")
   
   
   #find land grid ids:
@@ -26,25 +30,46 @@ setup_PCA = function(m=7,
                                 is.na(Bias_Est),
                               .(Lon,Lat,grid_id,month,year)]
   print("finding land complete")
+  
+  
+  fc <<- na.omit( dt_reduced[variable == "SST1" 
+                            & year %in% y 
+                            & month %in% m,
+                            .(Lon,Lat,grid_id,month,year,SST_hat)])
+  
+  print("creating fc complete")
+  
 
   #get covariance matrices
   
   for(mon in m){
+    if(obs_unc == TRUE){
     load(file = paste0(cov.dir,"CovOU_mon",mon,".RData"))  
-    load(file = paste0(cov.dir,"Cov_FU_mon",mon,".RData"))  
+    load(file = paste0(cov.dir,"Cov_FU_mon",mon,".RData"))
+    }else load(file = paste0(cov.dir,"CovRes_mon",mon,".RData"))
     
-    assign(paste0("A",mon),
+    if(obs_unc == TRUE){assign(paste0("A",mon),
            matrix(c(cov_for_unc,cov_obs_unc), nrow = dim(cov_obs_unc)[1]),
            envir = globalenv()
            )
+    }
+    if(!obs_unc){assign(paste0("A",mon),
+                        matrix(res_cov, 
+                               nrow = dim(res_cov)[1]),
+                        envir = globalenv()  )
+    }
+    
     
     assign(paste0("PCA",mon),
-           irlba(crossprod(eval(parse(text = paste0 ("A",mon)))), nv = max_PCA_depth),
+           irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth),
            envir = globalenv())
     print(paste0("Month ",mon," complete"))
   
   }
 }
+
+
+setup_PCA()
 
 
 forecast_PCA = function(y = 1999, 
@@ -55,10 +80,12 @@ forecast_PCA = function(y = 1999,
                         save.dir="./Data/PostClim/SFE/Derived/PCA",
                         cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                         data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        showEVs = FALSE, #If TRUE, the eigenspaces are plotted
+                        output_opts = "Forecast", # also takes "mar_sd", then the approximate marginal 
+                                                  # variance is returned, or "PC" where the dth Eigenvector
+                                                  # is returned (d=PCA_depth)
                         saveorgo = TRUE,
                         truncate = TRUE,
-                        max_PCA_depth = 500) {
+                        max_PCA_depth = 100) {
   
   # Check whether setup_PCA has been run
   
@@ -66,14 +93,6 @@ forecast_PCA = function(y = 1999,
   print("setup complete")
   
   
-  fc <- na.omit( dt_reduced[variable == "SST1" 
-                            & year %in% y 
-                            & month %in% m,
-                            .(Lon,Lat,grid_id,month,year,SST_hat)])
-  
-  
-  
-  print("creating fc completed")
   
   
   #----- generate noise ------------
@@ -85,23 +104,28 @@ forecast_PCA = function(y = 1999,
     for(mon in m){
       A <- eval(parse(text = paste0("A",mon)))
       PCA <- eval(parse(text = paste0("PCA",mon)))
+      eigen_vectors <- PCA$u[,1:d]
+      sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
         
       for(year in y){
         
-          if(!showEVs) a <- A %*% PCA$v  %*% c(rnorm(d),rep(0,max_PCA_depth-d))
-          if(showEVs) a <- A %*% PCA$v  %*% c(rep(1,d),rep(0,max_PCA_depth-d))
+          if(output_opts == "forecast") a <- eigen_vectors  %*% sing_values %*% rnorm(d)
+          if(output_opts == "mar_sd") a <- sqrt(( eigen_vectors %*% sing_values)^2  %*% rep(1,d))
+          if(output_opts == "PC") {
+            if(d == 1) a <-  PCA$d[d]*eigen_vectors else a <-  PCA$d[d]*eigen_vectors[,d]
+          }
+          
           no <- c(no, a)
         
-          if(!showEVs)  {
+          if(output_opts == "forecast")  {
             fc = fc[,"noise":= no]
             fc=fc[,"forecast":=SST_hat+noise]
           }
           
-          if(showEVs)   {
-            fc = fc[year == min(year),"forecast":= abs(no)]
-            #the plot function plots the forecast, 
-            #so the forecast should contain the abs value of the Eigenspaces
-          }
+          if(output_opts == "mar_sd" | output_opts == "PC")   {
+            fc = fc[year == min(year), "forecast" := no]
+            #because the plotting functions plot the forecast
+            }
           
           #-------- add land --------------
           
@@ -113,16 +137,20 @@ forecast_PCA = function(y = 1999,
           
           #-------- truncate negative temperatures
           
-          if(truncate & !showEVs) fc_land[forecast < -1.62, forecast := -1.62]
-          if(truncate & showEVs) fc_land[SST_hat < -1.61, forecast := 0]
+          if(truncate & output_opts %in% c("forecast","PC")) fc_land[forecast < -1.62, forecast := -1.62]
+          if(truncate & output_opts == "mar_sd") fc_land[SST_hat < -1.61, forecast := 0]
           
           #-------- save -------
           
-          if(saveorgo & !showEVs){ 
+          if(saveorgo & output_opts == "forecast"){ 
             save(fc_land, file = paste0(save.dir,"/fc_",d,"pc_",y,"_",m,".RData"))
           }
-          if(saveorgo & showEVs){ 
-            save(fc_land, file = paste0(save.dir,"/PCA_",d,"evs.RData"))
+          if(saveorgo & output_opts == "mar_sd"){ 
+            save(fc_land, file = paste0(save.dir,"/PCA_mar_sd",d,".RData"))
+          }
+          
+          if(saveorgo & output_opts == "PC"){ 
+            save(fc_land, file = paste0(save.dir,"/PCA_",d,"PC.RData"))
           }
           
         }
@@ -135,20 +163,16 @@ forecast_PCA = function(y = 1999,
 }
 
 
-
 vec1 = c(1:5,10,15,25,50,100,200)
-for(obs in c(1,2,"mean")){
-print(paste0("Obs = ",obs))
-  for(d in vec1){
-  print(d)
-  forecast_PCA(dt_reduced = dt_reduced,y=1999, m=7, PCA_depth = d)
-  plot_residuals(Y=1999,M=7,depth = d,obs_num = obs)
-  }}
-
-vec1 = c(1:5,10,15,25,50,100,200,500)
-forecast_PCA(y=1999, m=7, PCA_depth = vec1, showEVs = TRUE)
+forecast_PCA(y=1999, m=7, PCA_depth = vec1, max_PCA_depth = 100, output_opts = "mar_sd" )
 for(d in vec1){
   plot_EVs(M=7,depth = d)
 }
 
+
+vec2 = c(1:25)
+forecast_PCA(y=1999, m=7, PCA_depth = vec2, max_PCA_depth = 100, output_opts = "PC" )
+for(d in vec2){
+  plot_EVs(M=7,depth = d,type = "PC")
+}
   

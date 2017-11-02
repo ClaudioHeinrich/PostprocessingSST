@@ -34,7 +34,7 @@ for_unc_cov = function(dt = NULL,
         dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-eval(parse(text = paste0("SST",obs)))]
         dt_PCA = dt_PCA[, paste0("Ens",ens):=NULL]
       }
-      dt_PCA = dt_PCA[,"res_mean" := mean(Ens_bar - eval(parse(text = paste0("SST",obs)))), by =  grid_id]
+      dt_PCA = dt_PCA[,"res_mean" := mean(Ens_bar +Bias_Est- eval(parse(text = paste0("SST",obs)))), by =  grid_id]
       
       sqrt_cov_mat = c()
       for( ens in 1:ens.num){
