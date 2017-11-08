@@ -72,7 +72,7 @@ global_uncertainty_plot = function(dt_sd = NULL,
     print(paste0("Month =",m))
   
     mn = paste0("sample standard deviation for ",type,", month",m)
-    if(is.null(rr)) rr = range(dt_sd[month == m,eval(parse(text = type_id))],na.rm=TRUE)
+    rr = range(dt_sd[month == m,eval(parse(text = type_id))],na.rm=TRUE)
   
   
   #-------get sd as matrix---------------
@@ -148,3 +148,22 @@ if(png_out){
 }
 
 global_uncertainty_plot()
+
+
+
+get_ranges = function(M=1:12,
+                      file_out = "~/PostClimDataNoBackup/SFE/Derived/range_sd_res.RData"
+                      ){
+  # saves the ranges of the standard deviation by month to allow direct comparison with PCA
+
+  if(is.null(dt_sd))  load(file = "~/PostClimDataNoBackup/SFE/Derived/dtcombine_mr_wide_sd.RData")
+  
+  
+  rr = dt_sd[,.(month,res_sd_by_loc)]
+  rr = rr[, .(max_sd_res = max(res_sd_by_loc,na.rm = TRUE),
+         min_sd_res = min(res_sd_by_loc,na.rm = TRUE)), month]   
+  
+  save(rr,file = file_out)
+  }
+  
+  

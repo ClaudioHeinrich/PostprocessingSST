@@ -305,7 +305,8 @@ plot_EVs = function(M=7,
   ##------Load globals-----
   
     if(type == "mar_sd") file.name = paste0("/PCA_mar_sd",depth,".RData")
-    if(type == "PC") file.name = paste0("/PCA_",d,"PC.RData")
+    if(type == "PC") file.name = paste0("/PCA_",depth,"PC.RData")
+    if(type == "PCsum") file.name = paste0("/PCA_",depth,"sum.RData")
     
     load(paste0(dir.name,file.name))
     dt_for = fc_land
@@ -321,6 +322,7 @@ plot_EVs = function(M=7,
   ##------- Setup --------
   if(type == "mar_sd") mn =  paste0("marginal standard deviation for ",depth," PCs")
   if(type == "PC") mn =  paste0(depth,". principal component")
+  if(type == "PCsum") mn =  paste0("sum over first ",depth," principal components")
   if(is.null(rr)) rr = range(dt_for[,forecast],na.rm=TRUE)
   ##----------------------
   
@@ -370,17 +372,21 @@ plot_EVs = function(M=7,
 plot_residuals = function(Y = 1999,
                           M = 7,
                           YM_j = NULL,
-                          type = "res",    #'res' plots residuals, 'obs' observed SST, 'for' forecasted SST
-                          obs_num = 1,     # takes numbers from 1 to 9 or "mean"
-                          method = "PCA",
-                          depth = 5,
+                          type = "res",    #'res' plots residuals, 
+                                           #'obs' observed SST, 
+                                           #'for' forecasted SST,
+                                           #'
+                          obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
+                                                # type = 'obs' or 'res'
+                          depth = 5,  # only used for 'for'
                           file_dir = "./figures/",
                           lons = NULL,
                           lats = NULL,
                           rr = NULL,
                           mn_add = "",
                           outside_control = FALSE,
-                          print_figs = TRUE)
+                          print_figs = TRUE,
+                          png_out = FALSE)
 {
   if(!is.null(YM_j)){
       Y = floor((YM_j-1)/12)
@@ -418,7 +424,6 @@ plot_residuals = function(Y = 1999,
   
   if(type == "res" | type == "for"){
   
-    if(method == "PCA"){
       dir.name = "./Data/PostClim/SFE/Derived/PCA"
       file.name = paste0("/fc_",depth,"pc_",Y,"_",M,".RData")
       load(paste0(dir.name,file.name))
@@ -428,7 +433,7 @@ plot_residuals = function(Y = 1999,
       if(depth == 0){mn_for = ", Ens"
       } else{ mn_for = paste0(", ",depth," PCs")}
       file_out = paste0(file_out,"PCA",depth)
-    }
+    
   }
   
   

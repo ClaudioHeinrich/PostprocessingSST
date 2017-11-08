@@ -5,37 +5,38 @@ setwd("~/NR/SFE")
 options(max.print = 1e3)
 
 
-load(file = paste0("~/PostClimDataNoBackup/SFE/Derived/dt_reduced_PCA.RData"))
 
-
-setup_PCA = function(m=7,
+setup_PCA = function(dt=NULL,
+                     m=7,
                      y = 1999,
                      max_PCA_depth = 200,
                      cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                      data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                     obs_unc = FALSE){
+                     obs_unc = FALSE,
+                     oriented = FALSE # tries to orient the eigenvectors in the same direction
+                                      # (e.g. for visualisation of PCs) if TRUE. This is done
+                                      # by multiplying the left  singular vectors by -1 if this 
+                                      # decreases the Euclidean distance to the 1st left singular vector
+                     ){
   
-  if(! exists("dt_reduced")) { 
-      load(file = paste0(data.dir,"dt_reduced_PCA.RData"))
-      dt_reduced <<- dt_reduced
-      } 
-  print("loading complete")
+  if(is.null(dt)) { print("load and prepare data")
+      dt = load_combined_wide(bias = TRUE)
+      trash = c(paste0("SST",1:10),paste0("Ens",1:9))
+       dt[, (trash):=NULL]
+       dt = dt[year %in% y & month %in% m]
+       dt <<- dt
+    } 
+  print("loading and data reduction complete")
   
   
   #find land grid ids:
   
-  land_grid_id <<- dt_reduced[variable == "SST1" & 
-                                year == min(year) & 
-                                month == min(m) & 
-                                is.na(Bias_Est),
+  land_grid_id <<- dt[year == min(y) & month == min(m) & (is.na(Ens_bar) | is.na(SST_bar)),
                               .(Lon,Lat,grid_id,month,year)]
   print("finding land complete")
   
   
-  fc <<- na.omit( dt_reduced[variable == "SST1" 
-                            & year %in% y 
-                            & month %in% m,
-                            .(Lon,Lat,grid_id,month,year,SST_hat)])
+  fc <<- na.omit( dt[,.(Lon,Lat,grid_id,month,year,SST_hat)])
   
   print("creating fc complete")
   
@@ -56,20 +57,24 @@ setup_PCA = function(m=7,
     if(!obs_unc){assign(paste0("A",mon),
                         matrix(res_cov, 
                                nrow = dim(res_cov)[1]),
-                        envir = globalenv()  )
+                        envir = globalenv())
     }
     
+    PCA = irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
     
-    assign(paste0("PCA",mon),
-           irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth),
-           envir = globalenv())
+    if(oriented){
+      for(d in 2:max_PCA_depth){
+        if(sum((PCA$u[,1]-PCA$u[,d])^2) > sum((PCA$u[,1]+PCA$u[,d])^2)) PCA$u[,d] = -PCA$u[,d]     
+      }
+    }
+    
+    assign(paste0("PCA",mon), PCA, envir = globalenv())
     print(paste0("Month ",mon," complete"))
-  
   }
 }
 
 
-setup_PCA()
+setup_PCA(oriented = TRUE)
 
 
 forecast_PCA = function(y = 1999, 
@@ -81,13 +86,15 @@ forecast_PCA = function(y = 1999,
                         cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                         data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
                         output_opts = "Forecast", # also takes "mar_sd", then the approximate marginal 
-                                                  # variance is returned, or "PC" where the dth Eigenvector
+                                                  # variance is returned, 
+                                                  # or "PC" where the dth Eigenvector
                                                   # is returned (d=PCA_depth)
+                                                  # or "PCsum" where the sum over the first d PCs is returned
                         saveorgo = TRUE,
                         truncate = TRUE,
-                        max_PCA_depth = 100) {
+                        max_PCA_depth = 200) {
   
-  # Check whether setup_PCA has been run
+  # Check whether setup_PCA has been run, beware that setup_PCA has been called with the right parameters
   
   if(! exists("land_grid_id")) setup_PCA(m = m, max_PCA_depth = max_PCA_depth)
   print("setup complete")
@@ -110,10 +117,11 @@ forecast_PCA = function(y = 1999,
       for(year in y){
         
           if(output_opts == "forecast") a <- eigen_vectors  %*% sing_values %*% rnorm(d)
-          if(output_opts == "mar_sd") a <- sqrt(( eigen_vectors %*% sing_values)^2  %*% rep(1,d))
+          if(output_opts == "mar_sd") a <- sqrt( (eigen_vectors %*% sing_values)^2  %*% rep(1,d))
           if(output_opts == "PC") {
             if(d == 1) a <-  PCA$d[d]*eigen_vectors else a <-  PCA$d[d]*eigen_vectors[,d]
           }
+          if(output_opts == "PCsum") a <-  eigen_vectors %*% sing_values  %*% rep(1,d)
           
           no <- c(no, a)
         
@@ -122,7 +130,7 @@ forecast_PCA = function(y = 1999,
             fc=fc[,"forecast":=SST_hat+noise]
           }
           
-          if(output_opts == "mar_sd" | output_opts == "PC")   {
+          if(output_opts == "mar_sd" | output_opts == "PC" | output_opts == "PCsum"){
             fc = fc[year == min(year), "forecast" := no]
             #because the plotting functions plot the forecast
             }
@@ -138,7 +146,7 @@ forecast_PCA = function(y = 1999,
           #-------- truncate negative temperatures
           
           if(truncate & output_opts %in% c("forecast","PC")) fc_land[forecast < -1.62, forecast := -1.62]
-          if(truncate & output_opts == "mar_sd") fc_land[SST_hat < -1.61, forecast := 0]
+          if(truncate & output_opts %in% c("mar_sd","PCsum")) fc_land[SST_hat < -1.61, forecast := 0]
           
           #-------- save -------
           
@@ -153,6 +161,11 @@ forecast_PCA = function(y = 1999,
             save(fc_land, file = paste0(save.dir,"/PCA_",d,"PC.RData"))
           }
           
+          if(saveorgo & output_opts == "PCsum"){ 
+            save(fc_land, file = paste0(save.dir,"/PCA_",d,"sum.RData"))
+          }
+          
+          
         }
         
       }
@@ -163,16 +176,39 @@ forecast_PCA = function(y = 1999,
 }
 
 
+#---- plot uncertainty things ----
+
+mon = 7
+load("~/PostClimDataNoBackup/SFE/Derived/range_sd_res.RData")
+plot_range = c(0,rr[month == mon,max_sd_res])
 vec1 = c(1:5,10,15,25,50,100,200)
-forecast_PCA(y=1999, m=7, PCA_depth = vec1, max_PCA_depth = 100, output_opts = "mar_sd" )
+forecast_PCA(m=mon, PCA_depth = vec1, max_PCA_depth = 100, output_opts = "mar_sd" )
 for(d in vec1){
-  plot_EVs(M=7,depth = d)
+  plot_EVs(M=mon,depth = d, rr = plot_range)
 }
 
 
+#---- plot PCs ----
+
+mon = 7
 vec2 = c(1:25)
-forecast_PCA(y=1999, m=7, PCA_depth = vec2, max_PCA_depth = 100, output_opts = "PC" )
+# get range:
+PCA = eval(parse(text = paste0("PCA",mon)))
+plot_range = range(PCA$u %*% diag(PCA$d))
+forecast_PCA(y=1999, m=mon, PCA_depth = vec2, max_PCA_depth = 100, output_opts = "PC" )
 for(d in vec2){
-  plot_EVs(M=7,depth = d,type = "PC")
+  plot_EVs(M=mon,depth = d,type = "PC", rr = plot_range)
 }
   
+#---- plot summed PCs
+
+mon = 7
+vec2 = c(1:25)
+# get range:
+PCA = eval(parse(text = paste0("PCA",mon)))
+plot_range = range(PCA$u %*% diag(PCA$d) )
+forecast_PCA(y=1999, m=mon, PCA_depth = vec2, max_PCA_depth = 100, output_opts = "PCsum" )
+for(d in vec2){
+  plot_EVs(M=mon,depth = d,type = "PCsum", rr = plot_range)
+}
+
