@@ -88,7 +88,9 @@ brk = seq(rr[1],rr[2],length = 500)
 brk.ind = round(seq(1,length(brk),length = 10))
 brk.at = brk[brk.ind]
 brk.lab = round(brk[brk.ind],2)
-color <- designer.colors(n=length(brk)-1)
+color <- rgb(139,0,0, # is the rgb specification for darkred, relative to maxColor = 255
+             alpha = seq(0,255,,length(brk)-1),
+             maxColorValue = 255)
 ##--------------------------
 
 ##------- Scope ------------
@@ -105,7 +107,7 @@ else{
   if(!outside_control) X11()
 }
 
-image.plot(lon_all,lat_all,A_sd,
+image.plot.na(lon_all,lat_all,A_sd,
            main=mn,xlab="Longitude",ylab="Latitude",
            zlim=rr,
            xlim = lons,

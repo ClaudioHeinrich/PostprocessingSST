@@ -1,401 +1,52 @@
-plot_system = function(dt,
-                       YM_j,
-                       file_out = paste0("./figures/system_",YM_j),
-                       lons = NULL,
-                       lats = NULL,
-                       var_plot = "residual",
-                       rr = NULL,
-                       mn_add = "",
-                       outside_control = FALSE,
-                       vintage = "mr")
+
+#---- for coloring NA values
+
+image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 {
+  newz.na <- zlim[2]+(zlim[2]-zlim[1])/length(col) # new z for NA
   
-  if(vintage != "mr") file_out <- paste0(file_out,vintage)
+  z[which(is.na(z))] <- newz.na # we affect newz.outside
   
-  ##----- HACK, fix -------
-  ##Load globals
-  dt_obs = load_observations(2000,1)
-  lon_all = sort(dt_obs[,unique(Lon)])
-  lat_all = sort(dt_obs[,unique(Lat)])
-  n_lon = length(lon_all)
-  n_lat = length(lat_all)
-  ##------------------
+  zlim[2] <- newz.na # we finally extend the z limits to include the new value 
   
-  ##------- Setup --------
-  dt_sub = dt[YM == YM_j]
-  mn = paste0(dt_sub[,month][1], "/",dt_sub[,year][1],mn_add)
-  if(is.null(rr)) rr = range(dt[,eval(parse(text = var_plot))],na.rm=TRUE)
-  ##----------------------
-
-  ##----- Bias --------------
-  A_bias = matrix(NA, n_lon, n_lat)
-  A_bias[dt_sub[, grid_id]] = dt_sub[, eval(parse(text = var_plot))]
-  ##-------------------------
-
-  ##------- Scaling ----------
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.at = brk[brk.ind]
-  brk.lab = round(brk[brk.ind],2)
-  color <- designer.colors(n=length(brk)-1)
-  ##--------------------------
-
-  ##------- Scope ------------
-  if(is.null(lons))lons = range(dt_sub[,Lon])
-  if(is.null(lats))lats = range(dt_sub[,Lat])
-  ##--------------------------
-
-  ##------- Plot -----------
-  if(print_figs & !outside_control)
-  {
-    pdf(paste0(file_out, "_bias.pdf"))
-  }
-  else{
-    if(!outside_control) X11()
-  }
-
-  image.plot(lon_all,lat_all,A_bias,
-             main=mn,xlab="Longitude",ylab="Latitude",
-             zlim=rr,
-             xlim = lons,
-             ylim = lats,
-             breaks=brk,
-             col=color,
-             cex.main=1.8,cex.lab=1.4,
-             cex.axis=1,
-             axis.args=list(cex.axis=1,
-                            at = brk.at,
-                            label = brk.lab))
-  map("world", add = TRUE)
-  if(print_figs & !outside_control) dev.off()
-
-  if(print_figs & !outside_control)
-  {
-    png(paste0(file_out, "_bias.png"))
-    image.plot(lon_all,lat_all,A_bias,
-               main=mn,xlab="Longitude",ylab="Latitude",
-               xlim = lons,
-               ylim = lats,
-               zlim=rr,
-               breaks=brk,
-               col=color,
-               cex.main=1.8,cex.lab=1.4,
-               cex.axis=1,
-               axis.args=list(cex.axis=1,
-                              at = brk.at,
-                              label = brk.lab))
-    map("world", add = TRUE)
-    dev.off()
-  }
-  ##------------------------
+  col <- c(col, na.color) # we construct the new color range by including: na.color and outside.color
   
-}
-
-
-
-plot_obs= function(obs_num = 1,
-                   YM_j,
-                   file_out = paste0("./figures/obs_",YM_j),
-                   lons = NULL,
-                   lats = NULL,
-                   rr = NULL,
-                   mn_add = "",
-                   outside_control = FALSE,
-                   print_figs = TRUE)
-{
+  breaks = c(breaks,zlim[2])
   
-  ##----- HACK, fix -------
-  ##Load globals
-  Y = floor((YM_j-1)/12)
-  M = YM_j %% 12
-  if(M == 0) M = 12
-  dt_obs = load_observations(Y,M)
-  dt_obs = dt_obs[Obs == obs_num,]
-  lon_all = sort(dt_obs[,unique(Lon)])
-  lat_all = sort(dt_obs[,unique(Lat)])
-  n_lon = length(lon_all)
-  n_lat = length(lat_all)
-  ##------------------
-  
-  ##------- Setup --------
-  mn = paste0("Observation ",M, "/",Y,mn_add)
-  if(is.null(rr)) rr = range(dt_obs[,SST],na.rm=TRUE)
-  ##----------------------
-  
-  ##----- SST --------------
-  A_SST = matrix(dt_obs[, SST],  n_lon, n_lat, byrow = TRUE)
-  ##-------------------------
-  
-  ##------- Scaling ----------
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.at = brk[brk.ind]
-  brk.lab = round(brk[brk.ind],2)
-  color <- designer.colors(n=length(brk)-1)
-  ##--------------------------
-  
-  ##------- Scope ------------
-  if(is.null(lons))lons = range(dt_obs[,Lon])
-  if(is.null(lats))lats = range(dt_obs[,Lat])
-  ##--------------------------
-  
-  ##------- Plot -----------
-  if(print_figs & !outside_control)
-  {
-    pdf(paste0(file_out, "_obs",obs_num,".pdf"))
-  }else{
-    if(!outside_control) X11()
-  }
-  
-  image.plot(lon_all,lat_all,A_SST,
-             main=mn,xlab="Longitude",ylab="Latitude",
-             zlim=rr,
-             xlim = lons,
-             ylim = lats,
-             breaks=brk,
-             col=color,
-             cex.main=1.8,cex.lab=1.4,
-             cex.axis=1,
-             axis.args=list(cex.axis=1,
-                            at = brk.at,
-                            label = brk.lab))
-  map("world", add = TRUE)
-  if(print_figs & !outside_control) dev.off()
-  
-  if(print_figs & !outside_control)
-  {
-    png(paste0(file_out, "_bias.png"))
-    image.plot(lon_all,lat_all,A_SST,
-               main=mn,xlab="Longitude",ylab="Latitude",
-               xlim = lons,
-               ylim = lats,
-               zlim=rr,
-               breaks=brk,
-               col=color,
-               cex.main=1.8,cex.lab=1.4,
-               cex.axis=1,
-               axis.args=list(cex.axis=1,
-                              at = brk.at,
-                              label = brk.lab))
-    map("world", add = TRUE)
-    dev.off()
-  }
-  ##------------------------
-  
+  image.plot(x,y,z,zlim=zlim, col=col, breaks = breaks,...) 
 }
 
 
 
 
-
-plot_forecast = function(YM_j,
-                         file_out = paste0("./figures/for_",YM_j),
-                         lons = NULL,
-                         lats = NULL,
-                         rr = NULL,
-                         method = "PCA",
-                         depth=5,
-                         outside_control = FALSE,
-                         print_figs = TRUE)
-{
-  
-  
-  ##------Load globals-----
-  
-  Y = floor((YM_j-1)/12)
-  M = YM_j %% 12
-  if(M == 0) M = 12
-  
-  
-  if(method == "PCA"){
-    dir.name = "./Data/PostClim/SFE/Derived/PCA"
-    file.name = paste0("/fc_",depth,"pc_",Y,"_",M,".RData")
-    load(paste0(dir.name,file.name))
-    dt_for = fc_land
-    if(depth == 0){mn_add = ""
-    } else{ mn_add = paste0(", ",depth," principal components")}
-    file_out = paste0(file_out,"PCA",depth)
-    }
-   
-  lon_all = sort(dt_for[,unique(Lon)])
-  lat_all = sort(dt_for[,unique(Lat)])
-  n_lon = length(lon_all)
-  n_lat = length(lat_all)
-  ##------------------
-  
-    ##------- Setup --------
-  mn = paste0("FC ",M, "/",Y,mn_add)
-  if(is.null(rr)) rr = range(dt_for[,forecast],na.rm=TRUE)
-  ##----------------------
-  
-  ##----- SST --------------
-  A_SST = matrix(dt_for[, forecast],  n_lon, n_lat)
-  ##-------------------------
-  
-  ##------- Scaling ----------
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.at = brk[brk.ind]
-  brk.lab = round(brk[brk.ind],2)
-  color <- designer.colors(n=length(brk)-1)
-  ##--------------------------
-  
-  ##------- Scope ------------
-  if(is.null(lons))lons = range(dt_for[,Lon])
-  if(is.null(lats))lats = range(dt_for[,Lat])
-  ##--------------------------
-  
-  ##------- Plot -----------
-  if(print_figs & !outside_control)
-  {
-    pdf(paste0(file_out,".pdf"))
-  }else{
-    if(!outside_control) X11()
-  }
-  
-  image.plot(lon_all,lat_all,A_SST,
-             main=mn,xlab="Longitude",ylab="Latitude",
-             zlim=rr,
-             xlim = lons,
-             ylim = lats,
-             breaks=brk,
-             col=color,
-             cex.main=1.8,cex.lab=1.4,
-             cex.axis=1,
-             axis.args=list(cex.axis=1,
-                            at = brk.at,
-                            label = brk.lab))
-  map("world", add = TRUE)
-  if(print_figs & !outside_control) dev.off()
-  
-  if(print_figs & !outside_control)
-  {
-    png(paste0(file_out,".png"))
-    image.plot(lon_all,lat_all,A_SST,
-               main=mn,xlab="Longitude",ylab="Latitude",
-               xlim = lons,
-               ylim = lats,
-               zlim=rr,
-               breaks=brk,
-               col=color,
-               cex.main=1.8,cex.lab=1.4,
-               cex.axis=1,
-               axis.args=list(cex.axis=1,
-                              at = brk.at,
-                              label = brk.lab))
-    map("world", add = TRUE)
-    dev.off()
-  }
-
-}
-
-
-plot_EVs = function(M=7,
-                    depth=5,
-                    type = "mar_sd", #also takes PC, then it plots the corr. principal component
-                    file_out = paste0("./figures/",type,depth,"_m",M,".pdf"),
-                    dir.name = "./Data/PostClim/SFE/Derived/PCA",
-                    lons = NULL,
-                    lats = NULL,
-                    rr = NULL,
-                    outside_control = FALSE,
-                    print_figs = TRUE) {
-  
-  
-  ##------Load globals-----
-  
-    if(type == "mar_sd") file.name = paste0("/PCA_mar_sd",depth,".RData")
-    if(type == "PC") file.name = paste0("/PCA_",depth,"PC.RData")
-    if(type == "PCsum") file.name = paste0("/PCA_",depth,"sum.RData")
-    
-    load(paste0(dir.name,file.name))
-    dt_for = fc_land
-    
-    
-  
-  lon_all = sort(dt_for[,unique(Lon)])
-  lat_all = sort(dt_for[,unique(Lat)])
-  n_lon = length(lon_all)
-  n_lat = length(lat_all)
-  ##------------------
-  
-  ##------- Setup --------
-  if(type == "mar_sd") mn =  paste0("marginal standard deviation for ",depth," PCs")
-  if(type == "PC") mn =  paste0(depth,". principal component")
-  if(type == "PCsum") mn =  paste0("sum over first ",depth," principal components")
-  if(is.null(rr)) rr = range(dt_for[,forecast],na.rm=TRUE)
-  ##----------------------
-  
-  ##----- SST --------------
-  A_SST = matrix(dt_for[, forecast],  n_lon, n_lat)
-  ##-------------------------
-  
-  ##------- Scaling ----------
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.at = brk[brk.ind]
-  brk.lab = round(brk[brk.ind],2)
-  color <- designer.colors(n=length(brk)-1)
-  ##--------------------------
-  
-  ##------- Scope ------------
-  if(is.null(lons))lons = range(dt_for[,Lon])
-  if(is.null(lats))lats = range(dt_for[,Lat])
-  ##--------------------------
-  
-  ##------- Plot -----------
-  if(print_figs & !outside_control)
-  {
-    pdf(file_out)
-  }else{
-    if(!outside_control) X11()
-  }
-  
-  image.plot(lon_all,lat_all,A_SST,
-             main=mn,xlab="Longitude",ylab="Latitude",
-             zlim=rr,
-             xlim = lons,
-             ylim = lats,
-             breaks=brk,
-             col=color,
-             cex.main=1.8,cex.lab=1.4,
-             cex.axis=1,
-             axis.args=list(cex.axis=1,
-                            at = brk.at,
-                            label = brk.lab))
-  map("world", add = TRUE)
-  if(print_figs & !outside_control) dev.off()
-  
-}
-
-
-plot_residuals = function(Y = 1999,
+plot_system = function(Y = 1999,
                           M = 7,
-                          YM_j = NULL,
                           type = "res",    #'res' plots residuals, 
                                            #'obs' observed SST, 
-                                           #'for' forecasted SST,
-                                           #'
+                                           #'for' forecasted SST using PCA generated noise,
+                                           #'PC' the dth principal component (upscaled eigenvector) where d=depth
+                                           #'PCsum' sum over the first d PCs
+                                           #'mar_sd' marginal standard deviation computed for the first d PCs
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
                                                 # type = 'obs' or 'res'
-                          depth = 5,  # only used for 'for'
+                          depth = 10,  
                           file_dir = "./figures/",
+                          data.dir = "./Data/PostClim/SFE/Derived/",
                           lons = NULL,
                           lats = NULL,
                           rr = NULL,
-                          mn_add = "",
                           outside_control = FALSE,
                           print_figs = TRUE,
                           png_out = FALSE)
 {
-  if(!is.null(YM_j)){
-      Y = floor((YM_j-1)/12)
-      M = YM_j %% 12
-      if(M == 0) M = 12
-  }
-  if(is.null(YM_j)) YM_j = 12*Y + M
+  #------- file name -----------
   
-  file_out = paste0(file_dir,type,"_y",Y,"_m",M)
+  if(type == "obs")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
+  if(type == "for")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
+  if(type == "res")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
+  if(type == "mar_sd") file_out = paste0("./figures/",type,depth,"_m",M)
+  if(type == "PC") file_out = paste0("./figures/",type,depth,"_m",M)
+  if(type == "PCsum") file_out = paste0("./figures/",type,depth,"_m",M)
   
   ## ----- load observation ------
   if(type == "obs" | type == "res"){
@@ -413,10 +64,7 @@ plot_residuals = function(Y = 1999,
   
     dt_obs = dt_obs[Obs == obs_num,]
     dt_obs = dt_obs[order(Lat,Lon)]
-    lon_all = sort(dt_obs[,unique(Lon)])
-    lat_all = sort(dt_obs[,unique(Lat)])
-    n_lon = length(lon_all)
-    n_lat = length(lat_all)
+    
   }
   ##------------------
   
@@ -427,37 +75,139 @@ plot_residuals = function(Y = 1999,
       dir.name = "./Data/PostClim/SFE/Derived/PCA"
       file.name = paste0("/fc_",depth,"pc_",Y,"_",M,".RData")
       load(paste0(dir.name,file.name))
-      
       dt_for = fc_land
       
-      if(depth == 0){mn_for = ", Ens"
-      } else{ mn_for = paste0(", ",depth," PCs")}
-      file_out = paste0(file_out,"PCA",depth)
-    
+      mn_for = paste0(" FC depth ",depth)
   }
   
   
-  ##------- Setup --------
-  mn = paste0("Residual ",M, "/",Y,mn_obs,mn_for)
-  dt_res = copy(dt_obs)
-  dt_res[,"Res":= dt_for[,forecast] - SST]
-  if(is.null(rr)) rr = range(dt_res[,Res],na.rm=TRUE)
+  if(type == "res"){
+    dt_res = copy(dt_obs)
+    dt_res[,"Res":= dt_for[,forecast] - SST]
+    }
   
-    ##----- SST --------------
-  A_res = matrix(dt_res[, Res],  n_lon, n_lat)
-  ##-------------------------
+  #---- load rest ------
   
-  ##------- Scaling ----------
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.at = brk[brk.ind]
-  brk.lab = round(brk[brk.ind],2)
-  color <- designer.colors(n=length(brk)-1)
+  if(type == "mar_sd") {
+    file.name = paste0("PCA/PCA_mar_sd",depth,".RData")
+    load(paste0(data.dir,file.name))
+    dt_for = fc_land
+  }
+  
+  if(type == "PC") {
+    file.name = paste0("PCA/PCA_",depth,"PC.RData")
+    load(paste0(data.dir,file.name))
+    dt_for = fc_land
+  }
+  
+  if(type == "PCsum") {
+    file.name = paste0("PCA/PCA_",depth,"sum.RData")
+    load(paste0(data.dir,file.name))
+    dt_for = fc_land
+  }
+  
+  
+  #----- get number of lons and lats ----
+  
+  if(type %in% c("res","obs")) {
+    lon_all = sort(dt_obs[,unique(Lon)])
+    lat_all = sort(dt_obs[,unique(Lat)])}
+  
+  if(type %in% c("for","mar_sd","PC","PCsum")) {
+    lon_all = sort(dt_for[,unique(Lon)])
+    lat_all = sort(dt_for[,unique(Lat)])}
+  
+  n_lon = length(lon_all)
+  n_lat = length(lat_all)
+  
+  #------- adjusting range -------
+  
+  if(is.null(rr)) {
+    if(type == "obs")   rr = range(dt_obs[,SST],na.rm=TRUE)
+    if(type == "for")   rr = range(dt_for[,forecast],na.rm=TRUE)
+    if(type == "res")   rr = range(dt_res[,Res],na.rm=TRUE)
+    if(type == "mar_sd")rr = range(dt_for[,forecast],na.rm=TRUE)
+    if(type == "PC")    rr = range(dt_for[,forecast],na.rm=TRUE)
+    if(type == "PCsum") rr = range(dt_for[,forecast],na.rm=TRUE)
+  } 
+  
+  
+  #------- titles for plot -------
+  
+  if(type == "res")     mn = paste0("Residual ",M, "/",Y,mn_obs,mn_for)
+  if(type == "obs")     mn = paste0(mn_obs," ",M, "/",Y)
+  if(type == "for")     mn = paste0(mn_for,M, "/",Y)
+  if(type == "mar_sd")  mn =  paste0("marginal standard deviation for ",depth," PCs")
+  if(type == "PC")      mn =  paste0(depth,". principal component")
+  if(type == "PCsum")   mn =  paste0("sum over first ",depth," principal components")
+  
+  ##----- get plotting data --------------
+  
+  if(type == "res")   A = matrix(dt_res[, Res],  n_lon, n_lat)
+  if(type == "obs")   A = matrix(dt_obs[, SST],  n_lon, n_lat)
+  if(type == "for")   A = matrix(dt_for[, forecast],  n_lon, n_lat)
+  if(type == "mar_sd")A = matrix(dt_for[, forecast],  n_lon, n_lat)
+  if(type == "PC")    A = matrix(dt_for[, forecast],  n_lon, n_lat)
+  if(type == "PCsum") A = matrix(dt_for[, forecast],  n_lon, n_lat)
+    
+  
+  
+  ##------- Scaling and colors----------
+  if (type %in% c("obs","for")){
+    brk = seq(rr[1],rr[2],length = 500)
+    brk.ind = round(seq(1,length(brk),length = 10))
+    brk.lab = round(brk[brk.ind],2)
+    brk.at = brk[brk.ind]
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+  }
+  
+  if (type %in% c("res","PC","PCsum")){
+    brk = seq(rr[1],rr[2],length = 500)
+    brk.ind = round(seq(1,length(brk),length = 10))
+    zero.ind = min(which(brk > 0))/length(brk)
+    brk.at = brk[brk.ind]
+    brk.lab = round(brk[brk.ind],2)
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
+  }
+  
+  if (type %in% c("mar_sd")){
+    brk = seq(rr[1],rr[2],length = 500)
+    brk.ind = round(seq(1,length(brk),length = 10))
+    zero.ind = min(which(brk > 0))/length(brk)
+    brk.at = brk[brk.ind]
+    brk.lab = round(brk[brk.ind],2)
+    color <- rgb(139,0,0, # is the rgb specification for darkred, relative to maxColor = 255
+                 alpha = seq(0,255,,length(brk)-1),
+                 maxColorValue = 255)
+  }
+  
+  
+  
+  
+  
+   
   ##--------------------------
   
   ##------- Scope ------------
-  if(is.null(lons))lons = range(dt_res[,Lon])
-  if(is.null(lats))lats = range(dt_res[,Lat])
+  if(is.null(lons)){
+    if(type == "res")   lons = range(dt_res[,Lon])
+    if(type == "obs")   lons = range(dt_obs[,Lon])
+    if(type == "for")   lons = range(dt_for[,Lon])
+    if(type == "mar_sd")lons = range(dt_for[,Lon])
+    if(type == "PC")    lons = range(dt_for[,Lon])
+    if(type == "PCsum") lons = range(dt_for[,Lon])
+  }
+  
+  if(is.null(lats)){
+    if(type == "res")   lats = range(dt_res[,Lat])
+    if(type == "obs")   lats = range(dt_obs[,Lat])
+    if(type == "for")   lats = range(dt_for[,Lat])
+    if(type == "mar_sd")lats = range(dt_for[,Lat])
+    if(type == "PC")    lats = range(dt_for[,Lat])
+    if(type == "PCsum") lats = range(dt_for[,Lat])
+  }
+    
+    
   ##--------------------------
   
   ##------- Plot -----------
@@ -468,7 +218,7 @@ plot_residuals = function(Y = 1999,
     if(!outside_control) X11()
   }
   
-  image.plot(lon_all,lat_all,A_res,
+  image.plot.na(lon_all,lat_all,A,
              main=mn,xlab="Longitude",ylab="Latitude",
              zlim=rr,
              xlim = lons,
@@ -483,24 +233,26 @@ plot_residuals = function(Y = 1999,
   map("world", add = TRUE)
   if(print_figs & !outside_control) dev.off()
   
-  if(print_figs & !outside_control)
-  {
-    png(paste0(file_out, ".png"))
-    image.plot(lon_all,lat_all,A_res,
-               main=mn,xlab="Longitude",ylab="Latitude",
-               xlim = lons,
-               ylim = lats,
-               zlim=rr,
-               breaks=brk,
-               col=color,
-               cex.main=1.8,cex.lab=1.4,
-               cex.axis=1,
-               axis.args=list(cex.axis=1,
-                              at = brk.at,
-                              label = brk.lab))
-    map("world", add = TRUE)
-    dev.off()
+  if(png_out){
+    if(print_figs & !outside_control)
+    {
+      png(paste0(file_out, ".png"))
+      image.plot.na(lon_all,lat_all,A_res,
+                 main=mn,xlab="Longitude",ylab="Latitude",
+                 xlim = lons,
+                 ylim = lats,
+                 zlim=rr,
+                 breaks=brk,
+                 col=color,
+                 cex.main=1.8,cex.lab=1.4,
+                 cex.axis=1,
+                 axis.args=list(cex.axis=1,
+                                at = brk.at,
+                                label = brk.lab))
+      map("world", add = TRUE)
+      dev.off()
     }
+  }
 }
 
 

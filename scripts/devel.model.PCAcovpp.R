@@ -22,10 +22,11 @@ setup_PCA = function(dt=NULL,
   if(is.null(dt)) { print("load and prepare data")
       dt = load_combined_wide(bias = TRUE)
       trash = c(paste0("SST",1:10),paste0("Ens",1:9))
-       dt[, (trash):=NULL]
-       dt = dt[year %in% y & month %in% m]
+      dt[, (trash):=NULL]
+       dt = dt[year %in% y & month %in% m,]
        dt <<- dt
-    } 
+  }
+  
   print("loading and data reduction complete")
   
   
@@ -85,7 +86,7 @@ forecast_PCA = function(y = 1999,
                         save.dir="./Data/PostClim/SFE/Derived/PCA",
                         cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                         data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        output_opts = "Forecast", # also takes "mar_sd", then the approximate marginal 
+                        output_opts = "forecast", # also takes "mar_sd", then the approximate marginal 
                                                   # variance is returned, 
                                                   # or "PC" where the dth Eigenvector
                                                   # is returned (d=PCA_depth)
@@ -131,7 +132,8 @@ forecast_PCA = function(y = 1999,
           }
           
           if(output_opts == "mar_sd" | output_opts == "PC" | output_opts == "PCsum"){
-            fc = fc[year == min(year), "forecast" := no]
+            fc = fc[year == min(year)]
+            fc[, "forecast" := no]
             #because the plotting functions plot the forecast
             }
           
@@ -182,9 +184,9 @@ mon = 7
 load("~/PostClimDataNoBackup/SFE/Derived/range_sd_res.RData")
 plot_range = c(0,rr[month == mon,max_sd_res])
 vec1 = c(1:5,10,15,25,50,100,200)
-forecast_PCA(m=mon, PCA_depth = vec1, max_PCA_depth = 100, output_opts = "mar_sd" )
+forecast_PCA(m=mon, PCA_depth = vec1,  output_opts = "mar_sd" )
 for(d in vec1){
-  plot_EVs(M=mon,depth = d, rr = plot_range)
+  plot_system(M=mon, type = "mar_sd",depth = d, rr = plot_range)
 }
 
 
@@ -197,7 +199,7 @@ PCA = eval(parse(text = paste0("PCA",mon)))
 plot_range = range(PCA$u %*% diag(PCA$d))
 forecast_PCA(y=1999, m=mon, PCA_depth = vec2, max_PCA_depth = 100, output_opts = "PC" )
 for(d in vec2){
-  plot_EVs(M=mon,depth = d,type = "PC", rr = plot_range)
+  plot_system(M=mon,depth = d,type = "PC", rr = plot_range)
 }
   
 #---- plot summed PCs
@@ -209,6 +211,6 @@ PCA = eval(parse(text = paste0("PCA",mon)))
 plot_range = range(PCA$u %*% diag(PCA$d) )
 forecast_PCA(y=1999, m=mon, PCA_depth = vec2, max_PCA_depth = 100, output_opts = "PCsum" )
 for(d in vec2){
-  plot_EVs(M=mon,depth = d,type = "PCsum", rr = plot_range)
+  plot_system(M=mon,depth = d,type = "PCsum", rr = plot_range)
 }
 
