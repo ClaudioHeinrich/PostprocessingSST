@@ -9,32 +9,76 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
   
   zlim[2] <- newz.na # we finally extend the z limits to include the new value 
   
-  col <- c(col, na.color) # we construct the new color range by including: na.color and outside.color
+  col <- c(col, na.color) # we construct the new color range by including: na.color 
   
   breaks = c(breaks,zlim[2])
   
-  image.plot(x,y,z,zlim=zlim, col=col, breaks = breaks,...) 
+  image.plot(x,y,z,zlim = zlim, col = col, breaks = breaks,...) 
+}
+
+
+plot_diagnostic = function( dt )
+  {
+  dt = dt[order(Lat,Lon)]
+  
+  lon_all = sort(dt[,unique(Lon)])
+  lat_all = sort(dt[,unique(Lat)])
+  n_lon = length(lon_all)
+  n_lat = length(lat_all)
+  
+  rr = range(dt[,3],na.rm=TRUE)
+  
+  A = matrix(dt[[3]],  n_lon, n_lat)
+  
+  brk = seq(rr[1],rr[2],length = 500)
+  brk.ind = round(seq(1,length(brk),length = 10))
+  brk.lab = round(brk[brk.ind],2)
+  brk.at = brk[brk.ind]
+  color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+  
+  lons = range(dt[,Lon])
+  lats = range(dt[,Lat])
+  
+  
+  image.plot.na(lon_all,lat_all,A,
+                xlab="Longitude",ylab="Latitude",
+                zlim=rr,
+                xlim = lons,
+                ylim = lats,
+                breaks=brk,
+                col=color,
+                cex.main=1.8,cex.lab=1.4,
+                cex.axis=1,
+                axis.args=list(cex.axis=1,
+                               at = brk.at,
+                               label = brk.lab))
+  map("world", add = TRUE)
+  
 }
 
 
 
-
-plot_system = function(Y = 1999,
+plot_system = function( Y = 1999,
                           M = 7,
                           type = "res",    #'res' plots residuals, 
-                                           #'obs' observed SST, 
+                                           #'obs' observed SST,
+                                           #'ens' the raw ensemble with obs_num being the ensemble number, this is slow as it calls load_combined_wide
                                            #'for' forecasted SST using PCA generated noise,
                                            #'PC' the dth principal component (upscaled eigenvector) where d=depth
                                            #'PCsum' sum over the first d PCs
                                            #'mar_sd' marginal standard deviation computed for the first d PCs
+                                           #'cal' plots moment estimates of the PIT, uses all years and months
+                                           
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
                                                 # type = 'obs' or 'res'
+                          moment = 1, #only used for type = 'cal'
                           depth = 10,  
                           file_dir = "./figures/",
                           data.dir = "./Data/PostClim/SFE/Derived/",
                           lons = NULL,
                           lats = NULL,
                           rr = NULL,
+                          plot_title = NULL,
                           outside_control = FALSE,
                           print_figs = TRUE,
                           png_out = FALSE)
@@ -43,10 +87,12 @@ plot_system = function(Y = 1999,
   
   if(type == "obs")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
   if(type == "for")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
+  if(type == "ens")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
   if(type == "res")file_out = paste0(file_dir,type,"_y",Y,"_m",M)
   if(type == "mar_sd") file_out = paste0("./figures/",type,depth,"_m",M)
   if(type == "PC") file_out = paste0("./figures/",type,depth,"_m",M)
   if(type == "PCsum") file_out = paste0("./figures/",type,depth,"_m",M)
+  if(type == "cal") file_out = paste0("./figures/",type,"_PC",depth,"_mom",moment)
   
   ## ----- load observation ------
   if(type == "obs" | type == "res"){
@@ -88,8 +134,21 @@ plot_system = function(Y = 1999,
   
   #---- load rest ------
   
+  if(type == "ens"){
+    file_out = paste0(file_out,"_",obs_num)
+    
+    dt = load_combined_wide()
+    mn_ens = paste0(" Ens ",obs_num)
+    ens_ind = paste0("Ens",obs_num)
+    if(obs_num == "mean") ens_ind = "Ens_bar"
+    
+   dt_for = dt[year %in% Y & month %in% M,.(Lon,Lat, eval(parse(text = ens_ind)))]
+   setnames(dt_for,"V3", "Ens")
+  }
+    
+  
   if(type == "mar_sd") {
-    file.name = paste0("PCA/PCA_mar_sd",depth,".RData")
+    file.name = paste0("PCA/PCA_mar_sd",depth,"_m",M,".RData")
     load(paste0(data.dir,file.name))
     dt_for = fc_land
   }
@@ -106,6 +165,11 @@ plot_system = function(Y = 1999,
     dt_for = fc_land
   }
   
+  if(type == "cal"){
+    file.name = paste0("PCA/cal",depth,"_mom",moment,".RData")
+    load(paste0(data.dir,file.name))
+  }
+  
   
   #----- get number of lons and lats ----
   
@@ -113,9 +177,14 @@ plot_system = function(Y = 1999,
     lon_all = sort(dt_obs[,unique(Lon)])
     lat_all = sort(dt_obs[,unique(Lat)])}
   
-  if(type %in% c("for","mar_sd","PC","PCsum")) {
+  if(type %in% c("ens","for","mar_sd","PC","PCsum")) {
     lon_all = sort(dt_for[,unique(Lon)])
     lat_all = sort(dt_for[,unique(Lat)])}
+  
+  if(type == "cal") {
+    lon_all = sort(calib[,unique(Lon)])
+    lat_all = sort(calib[,unique(Lat)])
+  }
   
   n_lon = length(lon_all)
   n_lat = length(lat_all)
@@ -125,35 +194,47 @@ plot_system = function(Y = 1999,
   if(is.null(rr)) {
     if(type == "obs")   rr = range(dt_obs[,SST],na.rm=TRUE)
     if(type == "for")   rr = range(dt_for[,forecast],na.rm=TRUE)
+    if(type == "ens")   rr = range(dt_for[,Ens],na.rm=TRUE)
     if(type == "res")   rr = range(dt_res[,Res],na.rm=TRUE)
     if(type == "mar_sd")rr = range(dt_for[,forecast],na.rm=TRUE)
     if(type == "PC")    rr = range(dt_for[,forecast],na.rm=TRUE)
     if(type == "PCsum") rr = range(dt_for[,forecast],na.rm=TRUE)
+    if(type == "cal") rr = range(calib[,moment],na.rm=TRUE)
   } 
   
   
   #------- titles for plot -------
   
-  if(type == "res")     mn = paste0("Residual ",M, "/",Y,mn_obs,mn_for)
-  if(type == "obs")     mn = paste0(mn_obs," ",M, "/",Y)
-  if(type == "for")     mn = paste0(mn_for,M, "/",Y)
-  if(type == "mar_sd")  mn =  paste0("marginal standard deviation for ",depth," PCs")
-  if(type == "PC")      mn =  paste0(depth,". principal component")
-  if(type == "PCsum")   mn =  paste0("sum over first ",depth," principal components")
-  
+  if(!is.null(plot_title)){
+    mn = plot_title
+  }else{
+    if(type == "res")     mn = paste0("Residual ",M, "/",Y,mn_obs,mn_for)
+    if(type == "obs")     mn = paste0(mn_obs," ",M, "/",Y)
+    if(type == "ens")     mn = paste0(mn_ens," ",M, "/",Y)
+    if(type == "for")     mn = paste0(mn_for,M, "/",Y)
+    if(type == "mar_sd")  mn =  paste0("marginal standard deviation for ",depth," PCs")
+    if(type == "PC")      mn =  paste0(depth,". principal component")
+    if(type == "PCsum")   mn =  paste0("sum over first ",depth," principal components")
+    if(type == "cal")     mn =  paste0("PIT variance, ",depth," principal components")
+  }
+    
   ##----- get plotting data --------------
   
   if(type == "res")   A = matrix(dt_res[, Res],  n_lon, n_lat)
   if(type == "obs")   A = matrix(dt_obs[, SST],  n_lon, n_lat)
+  if(type == "ens")   A = matrix(dt_for[, Ens],  n_lon, n_lat,byrow = TRUE)
   if(type == "for")   A = matrix(dt_for[, forecast],  n_lon, n_lat)
   if(type == "mar_sd")A = matrix(dt_for[, forecast],  n_lon, n_lat)
   if(type == "PC")    A = matrix(dt_for[, forecast],  n_lon, n_lat)
   if(type == "PCsum") A = matrix(dt_for[, forecast],  n_lon, n_lat)
+  if(type == "cal")   A = matrix(calib[month == min(month) & year == min(year), moment],
+                                 n_lon, n_lat)
     
   
   
   ##------- Scaling and colors----------
-  if (type %in% c("obs","for")){
+  
+  if (type %in% c("obs","for","ens")){
     brk = seq(rr[1],rr[2],length = 500)
     brk.ind = round(seq(1,length(brk),length = 10))
     brk.lab = round(brk[brk.ind],2)
@@ -182,6 +263,20 @@ plot_system = function(Y = 1999,
   }
   
   
+  if (type %in% c("cal")){
+    brk = seq(rr[1],rr[2],length = 500)
+    brk.ind = round(seq(1,length(brk),length = 10))
+    
+    # make color white for the value achieved by perfect calibration
+    if(moment == 1) zero.ind = min(which(brk > 0.5))/length(brk)
+    if(moment == 2) zero.ind = min(which(brk > 1/12))/length(brk)
+    
+    brk.at = brk[brk.ind]
+    brk.lab = round(brk[brk.ind],2)
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
+  }
+  
+  
   
   
   
@@ -192,19 +287,23 @@ plot_system = function(Y = 1999,
   if(is.null(lons)){
     if(type == "res")   lons = range(dt_res[,Lon])
     if(type == "obs")   lons = range(dt_obs[,Lon])
+    if(type == "ens")   lons = range(dt_for[,Lon])
     if(type == "for")   lons = range(dt_for[,Lon])
     if(type == "mar_sd")lons = range(dt_for[,Lon])
     if(type == "PC")    lons = range(dt_for[,Lon])
     if(type == "PCsum") lons = range(dt_for[,Lon])
+    if(type == "cal")   lons = range(calib[,Lon])
   }
   
   if(is.null(lats)){
     if(type == "res")   lats = range(dt_res[,Lat])
     if(type == "obs")   lats = range(dt_obs[,Lat])
+    if(type == "ens")   lats = range(dt_for[,Lat])
     if(type == "for")   lats = range(dt_for[,Lat])
     if(type == "mar_sd")lats = range(dt_for[,Lat])
     if(type == "PC")    lats = range(dt_for[,Lat])
     if(type == "PCsum") lats = range(dt_for[,Lat])
+    if(type == "cal")   lats = range(calib[,Lat])
   }
     
     

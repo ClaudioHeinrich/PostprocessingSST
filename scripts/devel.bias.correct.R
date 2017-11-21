@@ -14,25 +14,31 @@ options(max.print = 1e3)
 
 #---- get global mean scores for a range of parameters and save them ---
 
-test_bias_correct = function(method = "gwa", # also accepts ema
-                             num.years = 26,
+test_bias_correct = function(model = "NorESM",
+                             method = "gwa", # also accepts ema
                              saveorgo = TRUE,
                              save.dir = "~/PostClimDataNoBackup/SFE/Derived/"
                              ){
   
-  dt = load_combined_wide()
   
+  dt = load_combined_wide(model = model)
+  
+  if(model == "senorge") setnames(dt,"senorge_grid_id","grid_id")
+  
+  file.out = paste0(save.dir,"glob.scores.bc.",method,".",model,".RData")
+  
+  num.years = dt[,range(year)][2] - dt[,range(year)][1] + 1
   
   sc = list()
   
   if(method == "gwa"){
     for (k in 2:num.years){
       print(paste0("gwa length = ",k))
-      temp = bias_correct(dt = dt, par_1 = k, global_mean_scores = TRUE)
+      temp = bias_correct(dt = dt, model = model, par_1 = k, global_mean_scores = TRUE)
       sc[[k]] = temp[,"win_length" := k]
     }
     sc = rbindlist(sc)
-    if(saveorgo) save(sc, file = paste0(save.dir,"glob.scores.bc.gwa.RData"))
+    if(saveorgo) save(sc, file = file.out)
   }
   
   if(method == "ema"){
@@ -40,12 +46,12 @@ test_bias_correct = function(method = "gwa", # also accepts ema
     ind = 1
     for (k in ratio.vec){
       print(paste0("ratio = ",k))
-      temp = bias_correct(dt = dt, method = "ema",par_1 = k, global_mean_scores = TRUE)
+      temp = bias_correct(dt = dt, method = "ema", model = model, par_1 = k, global_mean_scores = TRUE)
       sc[[ind]] = temp[,"ratio" := k]
       ind=ind + 1
     }
     sc = rbindlist(sc)
-    if(saveorgo) save(sc, file = paste0(save.dir,"glob.scores.bc.ema.RData"))
+    if(saveorgo) save(sc, file = file.out )
   }
   
 }

@@ -132,8 +132,7 @@ exp_mov_av_bc = function (vec,ratio){
 
 
 bias_correct = function(dt = NULL,
-                        Y = 1985:2010,
-                        M = 1:12,
+                        model = "NorESM",
                         method = "ema",  # "gwa" for 'gliding window average', i.e. simple moving average, 
                                          # "ema" for 'exponential moving average'
                         par_1 = .2,   # if method = gwa, par_1 is the length of gliding window
@@ -144,23 +143,36 @@ bias_correct = function(dt = NULL,
                         data.dir = "~/PostClimDataNoBackup/"
 ){
   
-  if(is.null(dt)) dt = load_combined_wide()
+  if(model == "NorESM"){
+    obs_var = "SST_bar"
+    if(is.null(dt)) dt = load_combined_wide() 
+    }
   
-  dt = dt[year %in% Y & month %in% M,]
+  if(model == "senorge"){
+    obs_var = "temp"
+    if(is.null(dt)) {
+      dt = load_combined_wide(model = "senorge") 
+      setnames(dt,"senorge_grid_id","grid_id")
+    }
+    }
+  
+  Y = dt[,min(year)]:dt[,max(year)]
+  M = 1:12
+  
   dt_new = copy(dt)
   
   if(method == "gwa"){
-    dt_new = dt_new[!is.na(Ens_bar) & !is.na(SST_bar) ,
-                    "Bias_Est" := par_1/(par_1-1) * SMA(SST_bar - Ens_bar,n = par_1) - (SST_bar - Ens_bar)/(par_1-1),
+    dt_new = dt_new[!is.na(Ens_bar) & !is.na(eval(parse(text = obs_var))) ,
+                    "Bias_Est" := par_1/(par_1-1) * SMA(eval(parse(text = obs_var)) - Ens_bar,n = par_1) - (eval(parse(text = obs_var)) - Ens_bar)/(par_1-1),
                     by = .(grid_id, month)]
     
     dt_new = dt_new[year < min(Y) + par_1, 
-                    Bias_Est := (cumsum(SST_bar-Ens_bar) - (SST_bar-Ens_bar)) / (year - min(year)+1),
+                    Bias_Est := (cumsum(eval(parse(text = obs_var))-Ens_bar) - (eval(parse(text = obs_var))-Ens_bar)) / (year - min(year)+1),
                     by = .(grid_id, month)]
   }
   if (method == "ema"){
-    dt_new = dt_new[!is.na(Ens_bar) & !is.na(SST_bar) ,
-                    "Bias_Est" := exp_mov_av_bc(SST_bar - Ens_bar, ratio = par_1),
+    dt_new = dt_new[!is.na(Ens_bar) & !is.na(eval(parse(text = obs_var))) ,
+                    "Bias_Est" := exp_mov_av_bc(eval(parse(text = obs_var)) - Ens_bar, ratio = par_1),
                     by = .(grid_id, month)]
   }
   
@@ -173,9 +185,9 @@ bias_correct = function(dt = NULL,
   
   if(global_mean_scores){
     glob_mean_sc = dt_new[,.( "RMSE" = 
-                                sqrt(mean( (SST_bar - SST_hat)^2, 
+                                sqrt(mean( (eval(parse(text = obs_var)) - SST_hat)^2, 
                                            na.rm=TRUE)),
-                              "MAE" = mean(abs(SST_bar - SST_hat),
+                              "MAE" = mean(abs(eval(parse(text = obs_var)) - SST_hat),
                                            na.rm=TRUE)),
                           keyby = YM]
     return(glob_mean_sc)

@@ -211,11 +211,22 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
   
 }
 
-load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/", vintage = "mr", bias = FALSE)
+load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/", 
+                              vintage = "mr", 
+                              bias = FALSE,
+                              model = "NorESM"  # also takes "senorge"
+                              )
 {
-  if(!bias) file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,"_wide.RData")
-  if(bias) file = paste0(data.dir,"/SFE/Derived/dt_combine_wide_bias.RData")
+  if(model == "NorESM"){
+    if(!bias) file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,"_wide.RData")
+    if(bias) file = paste0(data.dir,"/SFE/Derived/dt_combine_wide_bias.RData")
   
-  load(file)
-  return(dt)
+    load(file)
+    return(dt)
+    }
+  if(model == "senorge") {
+    file = paste0(data.dir,"/SFE/Derived/senorge2_gfsc1_combined.RData")
+    load(file)
+    return(dt_senorge)
+    }
 }
