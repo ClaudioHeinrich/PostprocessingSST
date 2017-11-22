@@ -225,8 +225,9 @@ load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/",
     return(dt)
     }
   if(model == "senorge") {
-    file = paste0(data.dir,"/SFE/Derived/senorge2_gfsc1_combined.RData")
-    load(file)
+    if(!bias) file = paste0(data.dir,"/SFE/Derived/senorge2_gfsc1_combined.RData")
+    if(bias) file = paste0(data.dir,"/SFE/Derived/senorge2_gfsc1_combined_bias.RData")
+      load(file)
     return(dt_senorge)
     }
 }

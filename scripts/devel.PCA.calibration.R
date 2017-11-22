@@ -10,6 +10,8 @@ options(max.print = 1e3)
 
 
 
+#------- Check marginal calibration --------------------
+
 month = 1:12
 y = 1985:2010
 

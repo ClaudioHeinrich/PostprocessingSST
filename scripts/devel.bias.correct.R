@@ -29,27 +29,29 @@ test_bias_correct = function(model = "NorESM",
   
   num.years = dt[,range(year)][2] - dt[,range(year)][1] + 1
   
-  sc = list()
-  
   if(method == "gwa"){
-    for (k in 2:num.years){
-      print(paste0("gwa length = ",k))
-      temp = bias_correct(dt = dt, model = model, par_1 = k, global_mean_scores = TRUE)
+    
+    dummy_function = function(k){
+      print(paste0("window length = ",k))
+      temp = bias_correct(dt = dt, model = model, method = "gwa",par_1 = k, global_mean_scores = TRUE)
       sc[[k]] = temp[,"win_length" := k]
     }
+    sc = mclapply(X = 2:num.years, FUN = dummy_function,mc.cores = 8)
     sc = rbindlist(sc)
     if(saveorgo) save(sc, file = file.out)
   }
   
   if(method == "ema"){
+    
     ratio.vec = seq(1/num.years,.8,length.out = 20)
-    ind = 1
-    for (k in ratio.vec){
-      print(paste0("ratio = ",k))
-      temp = bias_correct(dt = dt, method = "ema", model = model, par_1 = k, global_mean_scores = TRUE)
-      sc[[ind]] = temp[,"ratio" := k]
-      ind=ind + 1
+    
+    dummy_function = function(k){
+      print(paste0("ratio = ",ratio.vec[k]))
+      temp = bias_correct(dt = dt, model = model, method = "ema",par_1 = ratio.vec[k], global_mean_scores = TRUE)
+      sc[[k]] = temp[,"win_length" := k]
     }
+    
+    sc = mclapply(X = 1:20, FUN = dummy_function,mc.cores = 8)
     sc = rbindlist(sc)
     if(saveorgo) save(sc, file = file.out )
   }
@@ -57,11 +59,14 @@ test_bias_correct = function(model = "NorESM",
 }
 
 
+
+
 #--------plot mean scores for gwa --------
+
 
 load("~/PostClimDataNoBackup/SFE/Derived/glob.scores.bc.gwa.RData")
 
-mean_scores = sc[,.(RMSE_bar = mean(RMSE), MAE_bar = mean(MAE)), by = win_length]
+mean_scores = sc[,.(RMSE_bar = mean(RMSE,na.rm = TRUE), MAE_bar = mean(MAE,na.rm = TRUE)), by = win_length]
 
 yrange = c(mean_scores[,min(range(RMSE_bar),range(MAE_bar))],
            mean_scores[,max(range(RMSE_bar),range(MAE_bar))])
@@ -109,7 +114,7 @@ dev.off()
 
 load("~/PostClimDataNoBackup/SFE/Derived/glob.scores.bc.ema.RData")
 
-mean_scores = sc[,.(RMSE_bar = mean(RMSE), MAE_bar = mean(MAE)), by = ratio]
+mean_scores = sc[,.(RMSE_bar = mean(RMSE,na.rm = TRUE), MAE_bar = mean(MAE, na.rm = TRUE)), by = ratio]
 
 yrange = c(mean_scores[,min(range(RMSE_bar),range(MAE_bar))],
            mean_scores[,max(range(RMSE_bar),range(MAE_bar))])

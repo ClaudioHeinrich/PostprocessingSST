@@ -17,7 +17,23 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 }
 
 
-plot_diagnostic = function( dt )
+quilt.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
+{
+  newz.na <- zlim[2]+(zlim[2]-zlim[1])/length(col) # new z for NA
+  
+  z[which(is.na(z))] <- newz.na 
+  
+  zlim[2] <- newz.na # we finally extend the z limits to include the new value 
+  
+  col <- c(col, na.color) # we construct the new color range by including: na.color 
+  
+  breaks = c(breaks,zlim[2])
+  
+  quilt.plot(x,y,z,zlim = zlim, col = col, breaks = breaks,...) 
+}
+
+
+plot_diagnostic = function( dt , model = "NorESM")
   {
   dt = dt[order(Lat,Lon)]
   
@@ -39,21 +55,38 @@ plot_diagnostic = function( dt )
   lons = range(dt[,Lon])
   lats = range(dt[,Lat])
   
-  
-  image.plot.na(lon_all,lat_all,A,
-                xlab="Longitude",ylab="Latitude",
-                zlim=rr,
-                xlim = lons,
-                ylim = lats,
-                breaks=brk,
-                col=color,
-                cex.main=1.8,cex.lab=1.4,
-                cex.axis=1,
-                axis.args=list(cex.axis=1,
+  if(model == "NorESM"){
+    image.plot.na(lon_all,lat_all,A,
+                  xlab="Longitude",ylab="Latitude",
+                  zlim=rr,
+                  xlim = lons,
+                  ylim = lats,
+                  breaks=brk,
+                  col=color,
+                  cex.main=1.8,cex.lab=1.4,
+                  cex.axis=1,
+                  axis.args=list(cex.axis=1,
                                at = brk.at,
                                label = brk.lab))
-  map("world", add = TRUE)
+      map("world", add = TRUE)}
   
+  if(model == "senorge"){
+    quilt.plot.na (dt[,Lon],dt[,Lat],dt[[3]],
+               xlab="Longitude",ylab="Latitude",
+               nrow = 180,
+               ncol = 180,
+               zlim=rr,
+               xlim = lons,
+               ylim = lats,
+               breaks=brk,
+               col=color,
+               cex.main=1.8,cex.lab=1.4,
+               cex.axis=1,
+               axis.args=list(cex.axis=1,
+                              at = brk.at,
+                              label = brk.lab))
+    map("world", add = TRUE)
+  }
 }
 
 
@@ -353,6 +386,118 @@ plot_system = function( Y = 1999,
     }
   }
 }
+
+
+#-------------------------------
+
+
+plot_system_senorge = function( dt_senorge = NULL,
+                        Y = 1999,
+                        M = 7,
+                        type = "obs",     #'obs' observed temp,
+                                          #'ens' the raw ensemble with obs_num being the ensemble number,
+                                          #'bc' the bias corrected ensemble forecast
+                        ens_num = "mean",     # takes numbers from 1 to 15 or "mean", only used for 
+                        file_dir = "./figures/senorge/",
+                        data.dir = "./Data/PostClim/SFE/Derived/",
+                        lons = NULL,
+                        lats = NULL,
+                        rr = NULL,
+                        plot_title = NULL,
+                        print_figs = TRUE
+                        )
+{
+  if(is.null(dt_senorge)) {
+    dt = load_combined_wide(model = "senorge",bias = TRUE)
+  }else dt = copy(dt_senorge)
+  
+  setnames(dt,c("lon","lat"),c("Lon","Lat"))
+  dt = dt[year == Y][month == M]
+  print("data prep complete")
+  
+  #------- file name -----------
+  
+  file_out = paste0(file_dir,"sn_",type,"_y",Y,"_m",M)
+  
+  ## ---- prepare data ------
+  
+  if(type == "obs" ) dt = dt[,.(Lon,Lat,temp)]
+  
+  if(type == "ens"){ 
+      mn_ens = paste0(ens_num,". raw ensemble forecast")
+      if(ens_num == "mean") mn_ens = "mean raw ensemble forecast"
+      ens_ind = paste0("Ens",ens_num)
+      if(ens_num == "mean") ens_ind = "Ens_bar"
+    
+    dt = dt[,.(Lon,Lat, eval(parse(text = ens_ind)))]
+    setnames(dt,"V3", "Ens")
+  }
+  
+  if(type == "bc" ) dt = dt[,.(Lon,Lat,temp_hat)]
+  
+  
+  
+  #------- adjusting range -------
+  
+  if(is.null(rr)) {
+    rr = range(dt[[3]],na.rm = TRUE)
+    if(rr[1] == Inf) {rr=c(-100,100)
+      plot_title = "data missing"
+      }
+    }
+    
+  
+  #------- titles for plot -------
+  
+  if(!is.null(plot_title)){
+    mn = plot_title
+  }else{
+    if(type == "obs")     mn = paste0(" observed temperature ", M, " / ", Y)
+    if(type == "ens")     mn = paste0(mn_ens," ",M, " / ",Y)
+    if(type == "bc")      mn = paste0(" bias corrected forecast ", M, " / ", Y)
+  }
+  
+  ##------- Scaling and colors----------
+  
+  if (type %in% c("obs","ens","bc")){
+    brk = seq(rr[1],rr[2],length = 500)
+    brk.ind = round(seq(1,length(brk),length = 10))
+    brk.lab = round(brk[brk.ind],2)
+    brk.at = brk[brk.ind]
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+  }
+  
+    ##--------------------------
+  
+  ##------- Scope ------------
+  if(is.null(lons)) lons = range(dt[,Lon])
+  if(is.null(lats)) lats = range(dt[,Lat])
+    
+  ##--------------------------
+  
+  ##------- Plot -----------
+  if(print_figs) pdf(paste0(file_out, ".pdf"))
+  
+  quilt.plot.na (dt[,Lon],dt[,Lat],dt[[3]],
+                   xlab="Longitude",ylab="Latitude",
+                   nrow = 180,
+                   ncol = 180,
+                   zlim=rr,
+                   xlim = lons,
+                   ylim = lats,
+                   main = mn,
+                   breaks=brk,
+                   col=color,
+                   cex.main=1.8,cex.lab=1.4,
+                   cex.axis=1,
+                   axis.args=list(cex.axis=1,
+                                  at = brk.at,
+                                  label = brk.lab))
+    map("world", add = TRUE)
+    dev.off()
+  
+}
+
 
 
 ##------------------------
