@@ -496,7 +496,8 @@ make_GCFS1_wide = function(in.dir = "~/PostClimDataNoBackup/SFE/GCFS1",
 
 
 construct_senorge2_GCFS1_map = function(in.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                                        out.dir = "~/PostClimDataNoBackup/SFE/Derived/")
+                                        out.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                                        mc.cores = 10)
 {
   ##----- Get the Data -----
   load(paste0(in.dir, "/dt_senorge.RData"))
@@ -512,7 +513,7 @@ construct_senorge2_GCFS1_map = function(in.dir = "~/PostClimDataNoBackup/SFE/Der
   l = mclapply(1:dim(dt_senorge_grid)[1], "closest_point_helper",
                dt_1 = dt_senorge_grid, dt_2 = dt_ens_grid,
                N = 4, return_distance = TRUE, distance_haversine = FALSE,
-               mc.cores = 30, mc.silent = FALSE)
+               mc.cores = 10, mc.silent = FALSE)
   M = matrix(unlist(l),ncol= 8, byrow = TRUE)
   colnames(M) = c(paste0("ens_id_",1:4),paste0("dist_ens_",1:4))
   ##--------------------------------------
@@ -603,12 +604,43 @@ combine_senorge_GCFS1 = function(in.dir = "~/PostClimDataNoBackup/SFE/Derived/",
   ##--------------------------------
 }
 
-produce_senorge_data = function()
+combine_senorge_GCFS1_upscaled = function(in.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                                          out.dir = "~/PostClimDataNoBackup/SFE/Derived/")
 {
+  ##------ Load ---------
+  load(paste0(in.dir, "/dt_senorge.RData"))
+  load(paste0(in.dir, "/GCFS1_wide.RData"))
+  load(paste0(in.dir, "/senorge2_gcfs1_map.RData"))
+  ##----------------------
+
+  w_id = unique(dt_senorge_grid[,ens_id_1])
+
+  dt_ens = dt_ens[GCFS1_id %in% w_id]
+  setkey(dt_senorge,senorge_grid_id, year, month)
+  setkey(dt_senorge_grid,senorge_grid_id)
+  dt_senorge = merge(dt_senorge, dt_senorge_grid)
+  A = dt_senorge[,mean(temp,na.rm=TRUE),.(ens_id_1,year,month)]
+  setkey(A, "ens_id_1")
+  
+  dt_senorge_upscale = merge(dt_ens, A, by.x = c("GCFS1_id","year","month"), by.y = c("ens_id_1", "year", "month"))
+  dt_senorge_upscale[,temp:=V1]
+  dt_senorge_upscale[,V1:=NULL]
+  
+  save(dt_senorge_upscale, file = paste0(out.dir,"/senorge2_GCFS1_upscale.RData"))
+}
+
+produce_senorge_data = function(mc.cores = 10)
+{
+  print("Making SeNorge Data")
   make_senorge_data()
+  print("Making GCFS1 Data")
   make_GCFS1_wide()
-  construct_senorge2_GCFS1_map()
+  print("Creating Map between SeNorge GCFS1")
+  construct_senorge2_GCFS1_map(mc.cores = mc.cores)
+  print("Combining Data for Downscaled Analysis")
   combine_senorge_GCFS1()
+  print("Combing Data for Upscaled Analysis")
+  combine_senorge_GCFS1_upscaled()
 }
 
 
