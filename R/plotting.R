@@ -125,7 +125,9 @@ plot_system = function( Y = 1999,
   if(type == "mar_sd") file_out = paste0("./figures/",type,depth,"_m",M)
   if(type == "PC") file_out = paste0("./figures/",type,depth,"_m",M)
   if(type == "PCsum") file_out = paste0("./figures/",type,depth,"_m",M)
-  if(type == "cal") file_out = paste0("./figures/",type,"_PC",depth,"_mom",moment)
+  if(type == "cal" & depth > 0) file_out = paste0("./figures/",type,"_PC",depth,"_mom",moment)
+  if(type == "cal" & depth == 0) file_out = paste0("./figures/",type,"ens_mom",moment)
+  if(type == "cal" & depth == -1) file_out = paste0("./figures/",type,"_clim_mom",moment)
   
   ## ----- load observation ------
   if(type == "obs" | type == "res"){
@@ -200,6 +202,8 @@ plot_system = function( Y = 1999,
   
   if(type == "cal"){
     file.name = paste0("PCA/cal",depth,"_mom",moment,".RData")
+    if(depth == 0) file.name = paste0("PCA/cal_ens_mom",moment,".RData")
+    if(depth == -1) file.name = paste0("PCA/cal_clim_mom",moment,".RData")
     load(paste0(data.dir,file.name))
   }
   
@@ -411,7 +415,7 @@ plot_system_senorge = function( dt_senorge = NULL,
     dt = load_combined_wide(model = "senorge",bias = TRUE)
   }else dt = copy(dt_senorge)
   
-  setnames(dt,c("lon","lat"),c("Lon","Lat"))
+  if("lon" %in% colnames(dt)) setnames(dt,c("lon","lat"),c("Lon","Lat"))
   dt = dt[year == Y][month == M]
   print("data prep complete")
   
