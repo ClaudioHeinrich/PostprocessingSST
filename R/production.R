@@ -117,31 +117,39 @@ make_combined_wide_dataset = function(y_start = 1985,
 }
 
 
-#---- exponential and simple moving averages for bias correction
+#---- exponential and simple moving averages for bias correction, deals with missing values by skipping them
 
 exp_mov_av_bc = function (vec,ratio){
-  a = c(0,vec[1])   
-  for(k in 3:length(vec)){
-    temp=ratio * vec[k-1] + (1-ratio)*a[length(a)]
-    a = c(a,temp)
-  }
-  return(a)
+  if(all(is.na(vec))){as.numeric(rep(NA,times = length(vec)))
+    }else{
+      na_loc = is.na(vec)
+      vec_1 = vec[!is.na(vec)]
+      a = c(0,vec_1[1]) 
+      for(k in 3:length(vec_1)){
+        temp=ratio * vec_1[k-1] + (1-ratio)*a[length(a)]
+        a = c(a,temp)
+      }
+      vec[!is.na(vec)] = a
+    return(vec)
+    }
 }
 
 
 sim_mov_av_bc = function (vec,win_length){
-  a = c(0) 
-  for(k in 2:win_length){
-    a = c(a,mean(vec[1:(k-1)]))
-  }
-  if(win_length < length(vec)){
-    for(k in (win_length + 1):length(vec)){
-      a = c(a,mean(vec[(k-win_length):(k-1)]))
-    }
-    }
-    
   
-  return(a)
+  if(all(is.na(vec))){return(as.numeric(rep(NA,times = length(vec))))
+  } else {
+    a = c(0) 
+    for(k in 2:win_length){
+      a = c(a,mean(vec[1:(k-1)], na.rm = TRUE))
+    }
+    if(win_length < length(vec)){
+      for(k in (win_length + 1):length(vec)){
+        a = c(a,mean(vec[(k-win_length):(k-1)],na.rm = TRUE))
+        }
+      }
+    return(a)
+  }
 }
 
 
@@ -176,13 +184,11 @@ bias_correct = function(dt = NULL,
     dt_new = copy(dt)
   
     if(method == "gwa"){
-      dt_new = dt_new[!is.na(Ens_bar) & !is.na(SST_bar) ,
-                      "Bias_Est" := sim_mov_av_bc(SST_bar - Ens_bar, win_length = par_1),
+      dt_new = dt_new[,"Bias_Est" := sim_mov_av_bc(SST_bar - Ens_bar, win_length = par_1),
                       by = .(grid_id, month)]
     }
     if (method == "ema"){
-      dt_new = dt_new[!is.na(Ens_bar) & !is.na(SST_bar) ,
-                      "Bias_Est" := exp_mov_av_bc(SST_bar - Ens_bar, ratio = par_1),
+      dt_new = dt_new[,"Bias_Est" := exp_mov_av_bc(SST_bar - Ens_bar, ratio = par_1),
                       by = .(grid_id, month)]
     }
   
@@ -733,7 +739,104 @@ make_GCFS1_wide_sst = function(in.dir = "~/PostClimDataNoBackup/SFE/GCFS1",
 
 }
 
-                                 
+
+
+make_NorCPM_wide_again_precip_2mtemp = function(save.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                                                data.names = c("dt_combine_mr_wide_new.RData","dt_prect_NorCPM_wide.RData","dt_2mtemp_NorCPM_wide.RData")){
+  
+  data = fread("~/PostClimDataNoBackup/SFE/NorCPM_2mTemp/wide_data")
+  
+  old_names = paste0("wide_data_2.",c("ym",
+                                      "lon",
+                                      "lat",
+                                      paste0("sst",1:10),
+                                      "sst_bar",
+                                      "sst_sd",
+                                      paste0("ens",1:9),
+                                      "ens_bar",
+                                      "ens_sd",
+                                      paste0("ts",1:9),
+                                      "ts_bar",
+                                      "ts_sd",
+                                      paste0("prect",1:9),
+                                      "prect_bar",
+                                      "prect_sd",
+                                      "sst_noaa",
+                                      "year",
+                                      "month"))
+  
+  new_names = c("YM",
+                "Lon",
+                "Lat",
+                paste0("SST",1:10),
+                "SST_bar",
+                "SST_sd",
+                paste0("Ens",1:9),
+                "Ens_bar",
+                "Ens_sd",
+                paste0("ts",1:9),
+                "ts_bar",
+                "ts_sd",
+                paste0("prect",1:9),
+                "prect_bar",
+                "prect_sd",
+                "sst_noaa",
+                "year",
+                "month")
+  
+  
+  setnames(data,old_names,new_names)
+  
+  # --- change "NULL" into NA and convert strings into doubles ---
+  
+  is.na(data) <- data == "NULL"
+  
+  num_names = c(paste0("SST",1:10),
+                "SST_bar",
+                "SST_sd",
+                paste0("Ens",1:9),
+                "Ens_bar",
+                "Ens_sd",
+                paste0("ts",1:9),
+                "ts_bar",
+                "ts_sd",
+                paste0("prect",1:9),
+                "prect_bar",
+                "prect_sd",
+                "sst_noaa")
+  
+  data[,(num_names) := lapply(.SD,as.numeric),.SDcols = num_names]
+  
+  ##------ include grid_id -------
+  lon_all = sort(data[,unique(Lon)])
+  n_lon = length(lon_all)
+  cutoff_lon = c(-Inf,head(lon_all,-1) + diff(lon_all)/2)
+  f_lon = approxfun(cutoff_lon, 1:n_lon, method="constant", rule = 2)
+  
+  lat_all = sort(data[,unique(Lat)])
+  n_lat = length(lat_all)
+  cutoff_lat = c(-Inf, head(lat_all,-1) + diff(lat_all)/2)
+  f_lat = approxfun(cutoff_lat, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
+  data[,grid_id := f_lon(Lon) + f_lat(Lat)]
+  ##--------------------------------------
+  
+  #----break into smaller chunks and save
+  
+  dt = data[,.SD,.SDcols = c("Lon","Lat", paste0("SST",1:10), "SST_bar","SST_sd", paste0("Ens",1:9),"Ens_bar","Ens_sd","grid_id","year","month","YM","sst_noaa")]
+  dt[,,.SDcols =  c(paste0("SST",1:10), "SST_bar","SST_sd","Ens_bar","Ens_sd")]
+  save(dt, file = paste0(save.dir,data.names[1]))
+  
+  dt_prect = data[,.SD,.SDcols = c("Lon","Lat",paste0("prect",1:9),"prect_bar","prect_sd","grid_id","year","month","YM")]
+  save(dt_prect, file = paste0(save.dir,data.names[2]))
+  
+  dt_2mtemp = data[,.SD,.SDcols = c("Lon","Lat",paste0("ts",1:9),"ts_bar","ts_sd","grid_id","year","month","YM")]
+  save(dt_2mtemp, file = paste0(save.dir,data.names[3]))
+  
+  
+}
+
+
+
 
 construct_NorCPM_GCSF1_map = function(in.dir = "~/PostClimDataNoBackup/SFE/Derived/",
                                       out.dir = "~/PostClimDataNoBackup/SFE/Derived/")

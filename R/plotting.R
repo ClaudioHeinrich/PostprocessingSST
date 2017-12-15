@@ -33,60 +33,142 @@ quilt.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 }
 
 
-plot_diagnostic = function( dt , model = "NorESM")
+plot_diagnostic = function( dt, 
+                            model = "NorESM", 
+                            mn = "",
+                            save.pdf = FALSE,
+                            save.dir = "./figures/",
+                            file.name = "diag_plot",
+                            lons = NULL,
+                            lats = NULL,
+                            rr = NULL,
+                            set.white = NULL)
   {
-  dt = dt[order(Lat,Lon)]
+  #--- get longitudes and latitudes
   
-  lon_all = sort(dt[,unique(Lon)])
-  lat_all = sort(dt[,unique(Lat)])
-  n_lon = length(lon_all)
-  n_lat = length(lat_all)
+  if(is.null(lons)) Lons = seq(-179.5,179.5,by = 1)
+  if(is.null(lats)) Lats = seq(-89.5,89.5,by = 1)
   
-  rr = range(dt[,3],na.rm=TRUE)
+  if(!is.null(lons)){
+    lon_min = floor(lons[1]+0.5)-0.5
+    lon_max = floor(lons[2]+0.5)-0.5
+    Lons = seq(lon_min,lon_max,by = 1)  
+  }
+  
+  if(!is.null(lats)){
+    lat_min = floor(lats[1]+0.5)-0.5
+    lat_max = floor(lats[2]+0.5)-0.5
+    Lats = seq(lat_min,lat_max,by = 1)  
+  }
+  
+  #--- data ---
+  
+  dt = dt[Lat %in% Lats & Lon %in% Lons] [order(Lat,Lon)]
+  
+  n_lon = length(Lons)
+  n_lat = length(Lats)
+  
+  if(is.null(rr))  rr = range(dt[,3],na.rm=TRUE)
   
   A = matrix(dt[[3]],  n_lon, n_lat)
+  
+  # --- scaling and colors ---
+  
+  # make color white for the value achieved by perfect calibration
+ 
   
   brk = seq(rr[1],rr[2],length = 500)
   brk.ind = round(seq(1,length(brk),length = 10))
   brk.lab = round(brk[brk.ind],2)
   brk.at = brk[brk.ind]
+  if(is.null(set.white)){
   color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+  }else{
+     zero.ind = min(which(brk > set.white))/length(brk)
+     color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
+  }
+  #--- plotting ---
   
-  lons = range(dt[,Lon])
-  lats = range(dt[,Lat])
+  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"))
   
-  if(model == "NorESM"){
-    image.plot.na(lon_all,lat_all,A,
+  image.plot.na(Lons,Lats,A,
                   xlab="Longitude",ylab="Latitude",
                   zlim=rr,
-                  xlim = lons,
-                  ylim = lats,
+                  xlim = range(Lons),
+                  ylim = range(Lats),
                   breaks=brk,
                   col=color,
+                  main = mn,
                   cex.main=1.8,cex.lab=1.4,
                   cex.axis=1,
                   axis.args=list(cex.axis=1,
                                at = brk.at,
                                label = brk.lab))
-      map("world", add = TRUE)}
+      map("world", add = TRUE)
   
-  if(model == "senorge"){
-    quilt.plot.na (dt[,Lon],dt[,Lat],dt[[3]],
-               xlab="Longitude",ylab="Latitude",
-               nrow = 180,
-               ncol = 180,
-               zlim=rr,
-               xlim = lons,
-               ylim = lats,
-               breaks=brk,
-               col=color,
-               cex.main=1.8,cex.lab=1.4,
-               cex.axis=1,
-               axis.args=list(cex.axis=1,
-                              at = brk.at,
-                              label = brk.lab))
-    map("world", add = TRUE)
+  if(save.pdf) dev.off()
+  
+}
+
+
+
+
+plot_diagnostic_senorge = function(dt,
+                                   rr= NULL,
+                                   set.white = NULL,
+                                   save.pdf = FALSE,
+                                   save.dir = "./figures/senorge/",
+                                   file.name = "diag_plot"){
+
+  #--- data ---
+  
+  lons = dt[,range(Lon)]
+  lats = dt[,range(Lat)]
+  
+  n_lon = length(dt[,Lon])
+  n_lat = length(dt[,Lat])
+  
+  if(is.null(rr))  rr = range(dt[,3],na.rm=TRUE)
+  
+  A = matrix(dt[[3]],  n_lon, n_lat)
+  
+  # --- scaling and colors ---
+  
+  # make color white for the value achieved by perfect calibration
+  
+  
+  brk = seq(rr[1],rr[2],length = 500)
+  brk.ind = round(seq(1,length(brk),length = 10))
+  brk.lab = round(brk[brk.ind],2)
+  brk.at = brk[brk.ind]
+  if(is.null(set.white)){
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+  }else{
+    zero.ind = min(which(brk > set.white))/length(brk)
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
   }
+  #--- plotting ---
+  
+  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"))
+  
+  quilt.plot.na (dt[,Lon],dt[,Lat],dt[[3]],
+                 xlab="Longitude",ylab="Latitude",
+                 nrow = 180,
+                 ncol = 180,
+                 zlim=rr,
+                 xlim = lons,
+                 ylim = lats,
+                 breaks=brk,
+                 col=color,
+                 cex.main=1.8,cex.lab=1.4,
+                 cex.axis=1,
+                 axis.args=list(cex.axis=1,
+                                at = brk.at,
+                                label = brk.lab))
+  map("world", add = TRUE)
+
+  if(save.pdf) dev.off()
+  
 }
 
 
@@ -129,10 +211,34 @@ plot_system = function( Y = 1999,
   if(type == "cal" & depth == 0) file_out = paste0("./figures/",type,"ens_mom",moment)
   if(type == "cal" & depth == -1) file_out = paste0("./figures/",type,"_clim_mom",moment)
   
+  
+  #--- get longitudes and latitudes
+  
+  if(is.null(lons)) {Lons = seq(-179.5,179.5,by = 1)
+                     lons = c(-179.5,179.5)
+  }
+  if(is.null(lats)) {Lats = seq(-89.5,89.5,by = 1)
+                     lats = c(-89.5,89.5)
+  }
+  
+  if(!is.null(lons)){
+    lon_min = floor(lons[1]+0.5)-0.5
+    lon_max = floor(lons[2]+0.5)-0.5
+    Lons = seq(lon_min,lon_max,by = 1)  
+  }
+  
+  if(!is.null(lats)){
+    lat_min = floor(lats[1]+0.5)-0.5
+    lat_max = floor(lats[2]+0.5)-0.5
+    Lats = seq(lat_min,lat_max,by = 1)  
+  }
+  
+  
   ## ----- load observation ------
   if(type == "obs" | type == "res"){
   
     dt_obs = load_observations(Y,M)
+    dt_obs = dt_obs[Lon %in% Lons & Lat %in% Lats]
     mn_obs = paste0(" Obs ",obs_num)
     file_out = paste0(file_out,"_",obs_num,"_")
   
@@ -156,7 +262,7 @@ plot_system = function( Y = 1999,
       dir.name = "./Data/PostClim/SFE/Derived/PCA"
       file.name = paste0("/fc_",depth,"pc_",Y,"_",M,".RData")
       load(paste0(dir.name,file.name))
-      dt_for = fc_land
+      dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
       
       mn_for = paste0(" FC depth ",depth)
   }
@@ -164,7 +270,7 @@ plot_system = function( Y = 1999,
   
   if(type == "res"){
     dt_res = copy(dt_obs)
-    dt_res[,"Res":= dt_for[,forecast] - SST]
+    dt_res[Lon %in% Lons & Lat %in% Lats,"Res":= dt_for[,forecast] - SST]
     }
   
   #---- load rest ------
@@ -177,7 +283,7 @@ plot_system = function( Y = 1999,
     ens_ind = paste0("Ens",obs_num)
     if(obs_num == "mean") ens_ind = "Ens_bar"
     
-   dt_for = dt[year %in% Y & month %in% M,.(Lon,Lat, eval(parse(text = ens_ind)))]
+   dt_for = dt[Lon %in% Lons & Lat %in% Lats][year %in% Y & month %in% M,.(Lon,Lat, eval(parse(text = ens_ind)))]
    setnames(dt_for,"V3", "Ens")
   }
     
@@ -185,19 +291,19 @@ plot_system = function( Y = 1999,
   if(type == "mar_sd") {
     file.name = paste0("PCA/PCA_mar_sd",depth,"_m",M,".RData")
     load(paste0(data.dir,file.name))
-    dt_for = fc_land
+    dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }
   
   if(type == "PC") {
     file.name = paste0("PCA/PCA_",depth,"PC.RData")
     load(paste0(data.dir,file.name))
-    dt_for = fc_land
+    dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }
   
   if(type == "PCsum") {
     file.name = paste0("PCA/PCA_",depth,"sum.RData")
     load(paste0(data.dir,file.name))
-    dt_for = fc_land
+    dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }
   
   if(type == "cal"){
@@ -236,7 +342,8 @@ plot_system = function( Y = 1999,
     if(type == "mar_sd")rr = range(dt_for[,forecast],na.rm=TRUE)
     if(type == "PC")    rr = range(dt_for[,forecast],na.rm=TRUE)
     if(type == "PCsum") rr = range(dt_for[,forecast],na.rm=TRUE)
-    if(type == "cal") rr = range(calib[,moment],na.rm=TRUE)
+    if(type == "cal" & moment ==1) rr = c(0,1)
+    if(type == "cal" & moment ==2) rr = c(0,.5)
   } 
   
   
@@ -264,8 +371,11 @@ plot_system = function( Y = 1999,
   if(type == "mar_sd")A = matrix(dt_for[, forecast],  n_lon, n_lat)
   if(type == "PC")    A = matrix(dt_for[, forecast],  n_lon, n_lat)
   if(type == "PCsum") A = matrix(dt_for[, forecast],  n_lon, n_lat)
-  if(type == "cal")   A = matrix(calib[month == min(month) & year == min(year), moment],
+  if(type == "cal" & moment == 1)   A = matrix(calib[month == min(month) & year == min(year), moment],
                                  n_lon, n_lat)
+  if(type == "cal" & moment == 2)   A = matrix(calib[month == min(month) & year == min(year), 
+                                                     sqrt(moment)], n_lon, n_lat)
+  
     
   
   
@@ -306,53 +416,22 @@ plot_system = function( Y = 1999,
     
     # make color white for the value achieved by perfect calibration
     if(moment == 1) zero.ind = min(which(brk > 0.5))/length(brk)
-    if(moment == 2) zero.ind = min(which(brk > 1/12))/length(brk)
+    if(moment == 2) zero.ind = min(which(brk > .2887))/length(brk)
     
     brk.at = brk[brk.ind]
     brk.lab = round(brk[brk.ind],2)
     color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
   }
   
-  
-  
-  
+ 
   
    
   ##--------------------------
-  
-  ##------- Scope ------------
-  if(is.null(lons)){
-    if(type == "res")   lons = range(dt_res[,Lon])
-    if(type == "obs")   lons = range(dt_obs[,Lon])
-    if(type == "ens")   lons = range(dt_for[,Lon])
-    if(type == "for")   lons = range(dt_for[,Lon])
-    if(type == "mar_sd")lons = range(dt_for[,Lon])
-    if(type == "PC")    lons = range(dt_for[,Lon])
-    if(type == "PCsum") lons = range(dt_for[,Lon])
-    if(type == "cal")   lons = range(calib[,Lon])
-  }
-  
-  if(is.null(lats)){
-    if(type == "res")   lats = range(dt_res[,Lat])
-    if(type == "obs")   lats = range(dt_obs[,Lat])
-    if(type == "ens")   lats = range(dt_for[,Lat])
-    if(type == "for")   lats = range(dt_for[,Lat])
-    if(type == "mar_sd")lats = range(dt_for[,Lat])
-    if(type == "PC")    lats = range(dt_for[,Lat])
-    if(type == "PCsum") lats = range(dt_for[,Lat])
-    if(type == "cal")   lats = range(calib[,Lat])
-  }
-    
-    
-  ##--------------------------
+ 
   
   ##------- Plot -----------
-  if(print_figs & !outside_control)
-  {
-    pdf(paste0(file_out, ".pdf"))
-  }else{
-    if(!outside_control) X11()
-  }
+  if(print_figs & !outside_control)  pdf(paste0(file_out, ".pdf"))
+  
   
   image.plot.na(lon_all,lat_all,A,
              main=mn,xlab="Longitude",ylab="Latitude",

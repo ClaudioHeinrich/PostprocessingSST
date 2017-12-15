@@ -98,7 +98,7 @@ load_observations = function(year, month,
   
   ##------- Extract Observations ---------------
   sst_obs = ncvar_get(ncobs, "sst")
-  sst_obs = sst_obs - 273 ## Convert from Kelvin
+  sst_obs = sst_obs - 273.15 ## Convert from Kelvin
   lon_obs = ncvar_get(ncobs, "longitude")
   lat_obs = ncvar_get(ncobs, "latitude")
   n_lon = length(lon_obs)

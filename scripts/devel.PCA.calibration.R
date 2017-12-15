@@ -10,39 +10,6 @@ options(max.print = 1e3)
 
 
 
-#------- Check marginal calibration of PCA --------------------
-
-month = 1:12
-y = 1985:2010
-
-
-setup_PCA(m = month, y = y, oriented = TRUE)
-
-vec = 1:4
-for(k in vec){
-
-calib = forecast_PCA(y = y, m = month, PCA_depth = k, output_opts = "mar_sd" , saveorgo = FALSE)
-
-calib[,"variance" := forecast^2]
-
-calib[,"PIT" := pnorm(SST_bar, mean = SST_hat, sd = sqrt(variance))]
-
-
-for(moment in 1:2){
-  
-  if(moment == 1) calib[,"moment":= mean(PIT,na.rm = TRUE),by = grid_id]
-  if(moment == 2) calib[,"moment":= var(PIT,na.rm = TRUE),by = grid_id]
-
-
-  save.dir="./Data/PostClim/SFE/Derived/PCA"
-  save(calib, file = paste0(save.dir,"/cal",k,"_mom",moment,".RData"))
-}
-
-plot_system(type = "cal", moment = 1, depth = k, plot_title = paste0("PIT mean, ",k, " prin.com."))
-plot_system(type = "cal", moment = 2, depth = k, plot_title = paste0("PIT variance, ",k, " prin.com."))
-
-
-}
 
 
 #------- Check marginal calibration of PCA --------------------
@@ -51,17 +18,27 @@ month = 1:12
 y = 1985:2010
 
 
+
+dist_fun_tn = function(value, mean, sd, truncate = -1.619995){ # distribution function for a truncated normal distribution evaluated at value; value, mean and sd need to be vectors of equal length
+  a=rep(0,times = length(value))
+  for(i in  1:length(value))
+  if(is.na(value[i])) { a[i] = NA
+  }else if(value[i] > truncate) {a[i] = pnorm(value[i], mean = mean[i], sd = sd[i])
+  } else a[i] =  runif(1, max = pnorm(truncate, mean = mean[i], sd = sd[i]))
+  return(a)
+}
+
 setup_PCA(m = month, y = y, oriented = TRUE)
 
-vec = 1:4
+vec = c(30,50)
 for(k in vec){
+  print(paste0("k = ",k))
   
-  calib = forecast_PCA(y = y, m = month, PCA_depth = k, output_opts = "mar_sd" , saveorgo = FALSE)
+  calib = forecast_PCA(y = y, m = month, PCA_depth = k, output_opts = "mar_sd" , saveorgo = FALSE, truncate = FALSE)
+  print("forecast_PCA finished")
   
-  calib[,"variance" := forecast^2]
-  
-  calib[,"PIT" := pnorm(SST_bar, mean = SST_hat, sd = sqrt(variance))]
-  
+  calib[,"PIT" := dist_fun_tn(SST_bar, mean = SST_hat, sd = forecast)]
+  print("PIT complete")
   
   for(moment in 1:2){
     
@@ -71,11 +48,12 @@ for(k in vec){
     
     save.dir="./Data/PostClim/SFE/Derived/PCA"
     save(calib, file = paste0(save.dir,"/cal",k,"_mom",moment,".RData"))
+    print("moment complete")
   }
   
   plot_system(type = "cal", moment = 1, depth = k, plot_title = paste0("PIT mean, ",k, " prin.com."))
-  plot_system(type = "cal", moment = 2, depth = k, plot_title = paste0("PIT variance, ",k, " prin.com."))
-  
+  plot_system(type = "cal", moment = 2, depth = k, plot_title = paste0("PIT SD, ",k, " prin.com."))
+  print("plots complete")
   
 }
 
@@ -83,7 +61,7 @@ for(k in vec){
 #-------- Calibration of Ensemble --------
 
 
-load_combined_wide(bias = TRUE)
+dt = load_combined_wide(bias = TRUE)
 
 
 calib = dt[,.(month, year, Lon, Lat,grid_id, SST_bar,SST_hat,Ens_bar,Ens_sd)]
@@ -99,7 +77,7 @@ for(moment in 1:2){
   }
   
   plot_system(type = "cal", moment = 1, depth = 0, plot_title = paste0("PIT mean, bias corrected ensemble forecast"))
-  plot_system(type = "cal", moment = 2, depth = 0, plot_title = paste0("PIT variance, raw ensemble forecast"))
+  plot_system(type = "cal", moment = 2, depth = 0, plot_title = paste0("PIT SD, raw ensemble forecast"))
   
   
   #-------- Calibration of (past) climatology --------

@@ -40,25 +40,12 @@ cumsum.na.rm = function(x){
   return(cs)
 }
  
-regression_coeff = dt_senorge[,.(year, 
-                                 "xy_sum" = cumsum.na.rm(temp * oos_clim_past) - temp * oos_clim_past,
-                                 "xz_sum" = cumsum.na.rm(temp * (Ens_bar - fc_clim_past)) - temp * (Ens_bar - fc_clim_past),
-                                 "yy_sum" = cumsum.na.rm(oos_clim_past^2) - oos_clim_past^2,
-                                 "yz_sum" = cumsum.na.rm(oos_clim_past * (Ens_bar - fc_clim_past)) - oos_clim_past * (Ens_bar - fc_clim_past),
-                                 "zz_sum" = cumsum.na.rm((Ens_bar - fc_clim_past)^2) - (Ens_bar - fc_clim_past)^2),
-                              by = .(month,grid_id)]
 
-regression_coeff[year > min(year) + 1, "a" := (xy_sum * zz_sum - xz_sum * yz_sum)/(yy_sum * zz_sum - yz_sum^2) ]
-regression_coeff[year > min(year) + 1, "b" := (xz_sum - a * yz_sum)/ zz_sum  ]
+dt_senorge = merge(dt_senorge, A, by = c("month","year"), all = TRUE)
 
-regression_coeff = regression_coeff[order(year,month,grid_id)]
+dt_senorge[,"prev_clim_diff" = shift()]
 
-dt_senorge[,"temp_hat_lr" := regression_coeff[,a] * oos_clim_past + regression_coeff[,b] * (Ens_bar - fc_clim_past)]
-
-
-#----- not by grid_id ------
-
-regression_coeff_2 = dt_senorge[,.(year, grid_id,
+regression_coeff = dt_senorge[,.(year, grid_id,
                                  "xy_sum" = cumsum.na.rm(temp * oos_clim_past) - temp * oos_clim_past,
                                  "xz_sum" = cumsum.na.rm(temp * (Ens_bar - fc_clim_past)) - temp * (Ens_bar - fc_clim_past),
                                  "yy_sum" = cumsum.na.rm(oos_clim_past^2) - oos_clim_past^2,
@@ -288,7 +275,7 @@ load(file = "~/PostClimDataNoBackup/SFE/Derived/dt_combine_wide_bias.RData")
 
 num.years = 26
 
-dt[,"oos_clim" := mean(SST_bar,na.rm = TRUE) - SST_bar/num.years, by = .(month,grid_id)]
+dt[,"oos_clim" := (num.years * mean(SST_bar,na.rm = TRUE) - SST_bar)/(num.years-1), by = .(month,grid_id)]
 dt[,"oos_clim_past" := (cumsum(SST_bar) - SST_bar)/(year - min(year) ),
            by = .(month,grid_id)]
 
@@ -414,9 +401,10 @@ dt[,c("a","b") := NULL]
 
 #---- plot mean scores by month ---
 
-RMSE_scores_by_month = dt[year>1990,.( "RMSE_Ens_bar" = sqrt(mean((Ens_bar-SST_bar)^2,na.rm = TRUE)),
+RMSE_scores_by_month = dt[year>1980,.( "RMSE_Ens_bar" = sqrt(mean((Ens_bar-SST_bar)^2,na.rm = TRUE)),
                                                "RMSE_bc" = sqrt(mean((SST_hat-SST_bar)^2,na.rm = TRUE)),
-                                               "RMSE_clim" = sqrt(mean((SST_bar-oos_clim_past)^2,na.rm = TRUE)),
+                                               "RMSE_clim" = sqrt(mean((SST_bar-oos_clim)^2,na.rm = TRUE)),
+                                                "RMSE_clim_past" = sqrt(mean((SST_bar-oos_clim_past)^2,na.rm = TRUE)),
                                                 "RMSE_lr" = sqrt(mean((SST_bar-SST_hat_lr)^2,na.rm = TRUE)),
                                                 "RMSE_lr_2" = sqrt(mean((SST_bar-SST_hat_lr_2)^2,na.rm = TRUE)),
                                                "RMSE_lr_3" = sqrt(mean((SST_bar-SST_hat_lr_3)^2,na.rm = TRUE)),
@@ -428,7 +416,7 @@ RMSE_scores_by_month = dt[year>1990,.( "RMSE_Ens_bar" = sqrt(mean((Ens_bar-SST_b
 rr = range(na.omit(RMSE_scores_by_month[,.(RMSE_Ens_bar,RMSE_bc,RMSE_clim)]))
 
 
-pdf("./figures/RMSE_by_month_1.pdf")
+pdf("./figures/RMSE_by_month_2.pdf")
 
 plot( RMSE_scores_by_month[,month], 
       RMSE_scores_by_month[,RMSE_Ens_bar],
@@ -440,13 +428,13 @@ plot( RMSE_scores_by_month[,month],
       ylim = rr, 
       col = "blue") 
 
-lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_bc], type = 'b', ylog = TRUE, ylim = rr, col = "darkred")
 lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_clim], type = 'b', ylog = TRUE, ylim = rr, col = "darkgreen")
-lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_lr], type = 'b', ylog = TRUE, ylim = rr, col = "black")
-lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_lr_2], type = 'b', ylog = TRUE, ylim = rr, col = "yellow2")
+lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_bc], type = 'b', ylog = TRUE, ylim = rr, col = "darkred")
+#lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_lr], type = 'b', ylog = TRUE, ylim = rr, col = "black")
+lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_clim_past], type = 'b', ylog = TRUE, ylim = rr, col = "yellow2")
 #lines(RMSE_scores_by_month[,month], RMSE_scores_by_month[,RMSE_lr_3], type = 'b', ylog = TRUE, ylim = rr, col = "orange2")
 
-legend("topright",legend = c("raw ensemble", "bias corrected", "climatology", "lr by gridpoint", "lr globally"), col = c("blue","darkred","darkgreen","black","yellow2"),lty = 1)
+legend("topleft",legend = c("raw ensemble", "bias corrected ens", "climatology", "past climatology"), col = c("blue","darkred","darkgreen","yellow2"),lty = 1)
 
 dev.off()
 

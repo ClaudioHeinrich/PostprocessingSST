@@ -50,12 +50,41 @@ global_uncertainty_plot = function(dt_sd = NULL,
                                    lats = NULL,
                                    rr = NULL,
                                    outside_control = FALSE,
-                                   print_figs = TRUE,
-                                   png_out = FALSE){
+                                   print_figs = TRUE){
   
 
   if(is.null(dt_sd))  load(file = "~/PostClimDataNoBackup/SFE/Derived/dtcombine_mr_wide_sd.RData")
 
+  #--- get longitudes and latitudes
+  
+  if(is.null(lons)) {Lons = seq(-179.5,179.5,by = 1)
+  lons = c(-179.5,179.5)
+  }
+  if(is.null(lats)) {Lats = seq(-89.5,89.5,by = 1)
+  lats = c(-89.5,89.5)
+  }
+  
+  if(!is.null(lons)){
+    lon_min = floor(lons[1]+0.5)-0.5
+    lon_max = floor(lons[2]+0.5)-0.5
+    Lons = seq(lon_min,lon_max,by = 1)  
+  }
+  
+  if(!is.null(lats)){
+    lat_min = floor(lats[1]+0.5)-0.5
+    lat_max = floor(lats[2]+0.5)-0.5
+    Lats = seq(lat_min,lat_max,by = 1)  
+  }
+  
+  
+  n_lon = length(Lons)
+  n_lat = length(Lats)
+  
+  dt_sd = dt_sd[Lon %in% Lons & Lat %in% Lats]
+  
+  #-----
+  
+  
   if(type == "comb") type_id = ""
   if(type == "ens") type_id = "ens_"
   if(type == "obs") type_id = "obs_"
@@ -63,24 +92,18 @@ global_uncertainty_plot = function(dt_sd = NULL,
   
   type_id = paste0(type_id,"sd_by_loc")
   
-  lon_all = sort(dt_sd[,unique(Lon)])
-  lat_all = sort(dt_sd[,unique(Lat)])
-  n_lon = length(lon_all)
-  n_lat = length(lat_all)
   
   for(m in M){
     print(paste0("Month =",m))
   
-    mn = paste0("sample standard deviation for ",type,", month",m)
-    rr = range(dt_sd[month == m,eval(parse(text = type_id))],na.rm=TRUE)
+    mn = paste0("residual SD for month ",m)
+    if(is.null(rr)) rr = range(dt_sd[month == m,eval(parse(text = type_id))],na.rm=TRUE)
   
   
   #-------get sd as matrix---------------
 
-
-  A_sd = matrix(NA, n_lon, n_lat)
-  A_sd[dt_sd[month == m & year == 1985, grid_id]] = 
-    dt_sd[month == m & year == 1985, eval(parse(text = type_id))]
+  A_sd =  dt_sd[month == m & year == 1985, eval(parse(text = type_id))]
+  A_sd = matrix(A_sd, nrow = n_lon, byrow = TRUE)
 ##-------------------------
 
 ##------- Scaling ----------
@@ -93,21 +116,10 @@ color <- rgb(139,0,0, # is the rgb specification for darkred, relative to maxCol
              maxColorValue = 255)
 ##--------------------------
 
-##------- Scope ------------
-if(is.null(lons))lons = range(dt_sd[,Lon])
-if(is.null(lats))lats = range(dt_sd[,Lat])
-##--------------------------
-
 ##------- Plot -----------
-if(print_figs & !outside_control)
-{
-  pdf(paste0(file_out,"_m",m, ".pdf"))
-}
-else{
-  if(!outside_control) X11()
-}
+if(print_figs ) pdf(paste0(file_out,"_m",m, ".pdf"))
 
-image.plot.na(lon_all,lat_all,A_sd,
+image.plot.na(Lons,Lats,A_sd,
            main=mn,xlab="Longitude",ylab="Latitude",
            zlim=rr,
            xlim = lons,
@@ -120,34 +132,14 @@ image.plot.na(lon_all,lat_all,A_sd,
                           at = brk.at,
                           label = brk.lab))
 map("world", add = TRUE)
-if(print_figs & !outside_control) dev.off()
+if(print_figs ) dev.off()
 
-
-if(png_out){
-  if(print_figs & !outside_control)
-  {
-    png(paste0(file_out,"_m",m, ".png"))
-    image.plot(lon_all,lat_all,A_sd,
-               main=mn,xlab="Longitude",ylab="Latitude",
-               xlim = lons,
-               ylim = lats,
-               zlim=rr,
-               breaks=brk,
-               col=color,
-               cex.main=1.8,cex.lab=1.4,
-               cex.axis=1,
-               axis.args=list(cex.axis=1,
-                             at = brk.at,
-                              label = brk.lab))
-    map("world", add = TRUE)
-    dev.off()
-  }
-}
-##------------------------
 
 }
 
 }
+
+#--------
 
 global_uncertainty_plot()
 

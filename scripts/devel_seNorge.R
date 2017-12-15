@@ -19,11 +19,11 @@ A[,"Running_Ens" := (cumsum(Mean_Ens) - Mean_Ens) / (year - min(year)),month]
 A[,"Diff_Climate" := Mean_temp - Running_Climatology]
 A[,"Diff_Ens" := Mean_Ens - Running_Ens]
 
-id = 1578720
 
-dt_id = dt_senorge[senorge_grid_id == id][month == 4]
+rr = range(na.omit(A[,.(Diff_Climate,Diff_Ens)]))
 
-rr = range(dt_id[,.(temp, Ens_bar)])
-plot(dt_id[,.(year,temp)], type = "l", ylim = rr)
-lines(dt_id[,.(year, Ens_bar)], col="blue")
-abline(h = mean(dt_id[,temp]), col="red")
+for(y in 1983:2015){
+
+plot(A[year == y,Diff_Climate], main = y,type = 'l', ylim = rr)
+lines(A[year == y,Diff_Ens],col = "blue")
+}

@@ -38,6 +38,7 @@ setup_PCA = function(dt=NULL,
   
   
   fc <<- na.omit( dt[,.(Lon,Lat,grid_id,month,year,SST_hat,SST_bar)])
+ 
   
   print("creating fc complete")
   
@@ -75,7 +76,7 @@ setup_PCA = function(dt=NULL,
 }
 
 
-setup_PCA(oriented = TRUE)
+setup_PCA(y=1999:2002,oriented = TRUE)
 
 
 forecast_PCA = function(y = 1999, 
@@ -117,6 +118,7 @@ forecast_PCA = function(y = 1999,
       for(year in y){
         
           if(output_opts == "forecast") a <- eigen_vectors  %*% sing_values %*% rnorm(d)
+          if(output_opts == "forecast" & d == 0) a <- rep(0, times = dim(PCA$u)[1])
           if(output_opts == "mar_sd") a <- sqrt( (eigen_vectors %*% sing_values)^2  %*% rep(1,d))
           if(output_opts == "PC") {
             if(d == 1) a <-  PCA$d[d]*eigen_vectors else a <-  PCA$d[d]*eigen_vectors[,d]
@@ -140,8 +142,8 @@ forecast_PCA = function(y = 1999,
         
     #-------- truncate negative temperatures
       
-    if(truncate & output_opts %in% c("forecast","PC")) fc[forecast < -1.62, forecast := -1.62]
-    if(truncate & output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < -1.61, forecast := 0]
+    if(truncate & output_opts %in% c("forecast","PC")) fc[forecast < -1.619995, forecast := -1.619995]
+    if(truncate & output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < -1.619995, forecast := 0]
     
     #-------- add land --------------
           
