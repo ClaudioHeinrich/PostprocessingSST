@@ -7,6 +7,12 @@ Author: Alex Lenkoski
 Maintainer: Alex Lenkoski <alex@nr.no>
 Description: This does seasonal forecasting
 License: GPL (>= 2)
-Depends: data.table, ncdf4, fields, irlba, TTR, rgdal, parallel
-Imports: Rcpp (>= 0.12.4)
+Depends: R (>= 2.10)
+Imports: Rcpp (>= 0.12.4),
+	 data.table,
+	 utils,
+	 geosphere,
+	 ncdf4,
+	 stats
 LinkingTo: Rcpp
+RoxygenNote: 6.0.1
