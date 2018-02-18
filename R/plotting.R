@@ -187,7 +187,7 @@ plot_system = function( Y = 1999,
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
                                                 # type = 'obs' or 'res'
                           moment = 1, #only used for type = 'cal'
-                          depth = 10,  
+                          depth = 0,  
                           file_dir = "./figures/",
                           data.dir = "./Data/PostClim/SFE/Derived/",
                           lons = NULL,

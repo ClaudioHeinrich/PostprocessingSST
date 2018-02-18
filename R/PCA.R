@@ -276,7 +276,7 @@ forecast_PCA = function(y = 1999,
                         # or "PCsum" where the sum over the first d PCs is returned
                         saveorgo = TRUE,
                         truncate = TRUE,
-                        max_PCA_depth = 200) {
+                        max_PCA_depth = 100) {
   
   # Check whether setup_PCA has been run, beware that setup_PCA has been called with the right parameters
   
