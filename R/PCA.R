@@ -3,7 +3,7 @@
 #' @param dt The wide data.table
 #' @param Y training years.  So this will use all years in order to form the covariance matrix
 #' @param M training months the PCA should be computed for
-#' @param save.dir
+#' @param save.dir Where we save
 #' @param obs.num The number of observations in the observational product
 #' @param ens.num The number of ensemble members
 #'
@@ -222,7 +222,7 @@ setup_PCA = function(dt=NULL,
                      max_PCA_depth = 100,
                      cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                      data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                     oriented = TRUE
+                     oriented = TRUE)
 {
   
   if(is.null(dt))
@@ -261,7 +261,7 @@ setup_PCA = function(dt=NULL,
            envir = globalenv())
   }
   
-  PCA = irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
+  PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
   
   if(oriented){
     for(d in 2:max_PCA_depth){
@@ -374,7 +374,3 @@ forecast_PCA = function(y = 1999,
   
   return(fc_land)
 }
-
-
-
-
