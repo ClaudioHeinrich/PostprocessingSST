@@ -13,6 +13,7 @@ Imports: Rcpp (>= 0.12.4),
 	 utils,
 	 geosphere,
 	 ncdf4,
-	 stats
+	 stats,
+	 irlba
 LinkingTo: Rcpp
 RoxygenNote: 6.0.1
