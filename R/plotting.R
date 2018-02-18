@@ -92,19 +92,14 @@ plot_diagnostic = function( dt,
   
 }
 
-
-#' @export
+#' Plot the system
+#'
+#' @param type 'res' plots residuals 'obs' observed SST 'ens' the raw ensemble with obs_num being the ensemble number, this is slow as it calls load_combined_wide 'for' forecasted SST using PCA generated noise, 'PC' the dth principal component (upscaled eigenvector) where d=depth 'PCsum' sum over the first d PCs 'mar_sd' marginal standard deviation computed for the first d PCs 'cal' plots moment estimates of the PIT, uses all years and months
+#' @export plot_system
+#' 
 plot_system = function( Y = 1999,
                           M = 7,
-                          type = "res",    #'res' plots residuals, 
-                                           #'obs' observed SST,
-                                           #'ens' the raw ensemble with obs_num being the ensemble number, this is slow as it calls load_combined_wide
-                                           #'for' forecasted SST using PCA generated noise,
-                                           #'PC' the dth principal component (upscaled eigenvector) where d=depth
-                                           #'PCsum' sum over the first d PCs
-                                           #'mar_sd' marginal standard deviation computed for the first d PCs
-                                           #'cal' plots moment estimates of the PIT, uses all years and months
-                                           
+                          type = "res",    
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
                                                 # type = 'obs' or 'res'
                           moment = 1, #only used for type = 'cal'

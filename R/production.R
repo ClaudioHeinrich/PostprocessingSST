@@ -1,3 +1,9 @@
+#' A utility function that makes and stores the grid mapping
+#'
+#' @description This is essentially a wrapper for \code{construct_grid_map}
+#'
+#' @param out.file Location to store the output, which is then saved at \code{/dt_map.RData}
+#'
 #' @export
 make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
 {
@@ -5,6 +11,15 @@ make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
   save(dt_map, file = paste0(out.file,"dt_map.RData"))
 }
 
+
+#' Make the combined dataset for all years and store in a wide format
+#'
+#' @param y_start The first year for which we have obs/ens data
+#' @param y_stop The final year for which we have obs/ens data
+#' @param vintage Which vintage are we using, often "mr" for most recent
+#' @param data.dir The root directory that stores our data
+#' @param grid_mapping_loc The location where the precomputed grid alignment object is stored.
+#'
 #' @export
 make_combined_wide_dataset = function(y_start = 1985,
                                       y_stop = 2010,
