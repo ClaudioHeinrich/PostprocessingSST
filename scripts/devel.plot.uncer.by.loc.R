@@ -1,3 +1,4 @@
+## Plots marginal standard deviation 
 rm(list = ls())
 
 library(SeasonalForecasting)

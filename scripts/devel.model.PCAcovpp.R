@@ -1,3 +1,4 @@
+## Plots examples for PCA
 rm(list = ls())
 
 library(SeasonalForecasting)

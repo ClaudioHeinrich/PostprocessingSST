@@ -1,16 +1,10 @@
+## This produces the plots for the PIT marginal stuff
+
 rm(list = ls())
 
 library(SeasonalForecasting)
 setwd("~/NR/SFE")
 options(max.print = 1e3)
-
-
-
-
-
-
-
-
 
 #------- Check marginal calibration of PCA --------------------
 

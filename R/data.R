@@ -1,4 +1,4 @@
-contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
+construct_grid_map = function(dt_ens = load_ensemble(1985,1),
                              dt_obs = load_observations(1985,1))
 {
 
@@ -122,51 +122,6 @@ load_observations = function(year, month,
   return(dt_obs)
 }
 
-combine_data = function(dt_ens, dt_obs, dt_map)
-{
-
-  ##------- Collapse Observations -------
-  dt_obs_mean = dt_obs[,.("SST_bar" = mean(SST)),.(Lon,Lat)]
-  setkey(dt_obs_mean, "Lon","Lat")
-  ##-------------------------------------
-  
-  ##------- First fill out ensemble with obs lookup ---
-  setkey(dt_map, "Lon_Ens","Lat_Ens")
-  setkey(dt_ens, "Lon", "Lat")
-  dt_ens = dt_ens[dt_map]
-  ##-----------------------------------------------
-  
-  ##------- Now fill in Observations --------
-  setkey(dt_ens, "Lon_Obs", "Lat_Obs")
-  dt_combine = dt_obs_mean[dt_ens]
-  dt_combine[,i.Lon := NULL]
-  dt_combine[,i.Lat := NULL]
-  ##-----------------------------------------
-  
-  ##------ Form a convenient key -------
-  lon_all = sort(dt_combine[,unique(Lon)])
-  n_lon = length(lon_all)
-  cutoff_lon = c(-Inf,head(lon_all,-1) + diff(lon_all)/2)
-  f_lon = approxfun(cutoff_lon, 1:n_lon, method="constant", rule = 2)
-  
-  lat_all = sort(dt_combine[,unique(Lat)])
-  n_lat = length(lat_all)
-  cutoff_lat = c(-Inf, head(lat_all,-1) + diff(lat_all)/2)
-  f_lat = approxfun(cutoff_lat, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
-  dt_combine[,grid_id := f_lon(Lon) + f_lat(Lat)]
-  ##--------------------------------------
-  
-  return(dt_combine)
-  
-}
-
-load_combined = function(data.dir = "~/PostClimDataNoBackup/", vintage = "mr")
-{
-  file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,".RData")
-  load(file)
-  return(dt)
-}
-
 combine_data_wide= function(dt_ens, dt_obs, dt_map)
 {
   ##------- Collapse Observations -------
@@ -213,21 +168,15 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
 
 load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/", 
                               vintage = "mr", 
-                              bias = FALSE,
-                              model = "NorESM"  # also takes "senorge"
+                              bias = FALSE
                               )
 {
-  if(model == "NorESM"){
-    if(!bias) file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,"_wide.RData")
-    if(bias) file = paste0(data.dir,"/SFE/Derived/dt_combine_wide_bias.RData")
-  
-    load(file)
-    return(dt)
-    }
-  if(model == "senorge") {
-    if(!bias) file = paste0(data.dir,"/SFE/Derived/senorge2_gcfs1_combined.RData")
-    if(bias) file = paste0(data.dir,"/SFE/Derived/senorge2_gcfs1_combined_bias.RData")
-      load(file)
-    return(dt_senorge)
-    }
+  if(bias)
+  {
+    file = paste0(data.dir,"/SFE/Derived/dt_combine_wide_bias.RData")
+  } else {
+    file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,"_wide.RData")
+  }
+  load(file)
+  return(dt)
 }
