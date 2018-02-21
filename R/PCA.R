@@ -1,11 +1,13 @@
-
-## ---- functions for computing and saving the PCA cov matrices and to issue PCA forecasts
-
-
-## ---- for computing and saving the PCA cov matrices:
-
-#----- on residuals w.r.t. mean observation ----
-
+#' Creates and saves the covariance matrix for the residuals trained on a specific set of years
+#'
+#' @param dt The wide data.table
+#' @param Y training years.  So this will use all years in order to form the covariance matrix
+#' @param M training months the PCA should be computed for
+#' @param save.dir Where we save
+#' @param obs.num The number of observations in the observational product
+#' @param ens.num The number of ensemble members
+#'
+#' @export
 for_res_cov = function(dt = NULL,
                        Y = 1985:2010,
                        M = 1:12,
@@ -14,7 +16,8 @@ for_res_cov = function(dt = NULL,
                        ens.num = 9
 ){  
   
-  if(is.null(dt)){
+  if(is.null(dt))
+  {
     print("loading data")
     dt = load_combined_wide(bias = TRUE)
   }
@@ -54,9 +57,18 @@ for_res_cov = function(dt = NULL,
 }
 
 
-
-#---- For taking observation uncertainty into account ---
-
+#' Sets up the PCA
+#'
+#' @param dt The wide data table
+#' @param m the month you want the PCA to be performed for
+#' @param y the years you want to perform the PCA for
+#' @param max_PCA_depth The total number of potential PCs
+#' @param cov.dir The directory with the covariances to be saved
+#' @param data.dir Save directory
+#' @param oriented tries to orient the eigenvectors in the same direction (e.g. for visualisation of PCs) if TRUE. This is done
+#' by multiplying the left  singular vectors by -1 if this 
+#' decreases the Euclidean distance to the 1st left singular vector
+#' @export
 for_unc_cov = function(dt = NULL,
                        Y = 1985:2010,
                        M = 1:12,
@@ -105,6 +117,7 @@ for_unc_cov = function(dt = NULL,
 }
 
 
+#' @export
 for_unc_cov_combined = function(M = 1:12,
                                 cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                                 obs.num = 10){
@@ -134,7 +147,7 @@ for_unc_cov_combined = function(M = 1:12,
 
 
 
-
+#' @export
 obs_unc_cov = function(M = 1:12,
                        save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                        obs.num = 10,
@@ -188,26 +201,37 @@ obs_unc_cov = function(M = 1:12,
 
 #----  functions for issuing PCA forecasts ----
 
-
+#' Organize data to be run in a PCA analysis
+#'
+#' @description A preprossesing script that creates the example
+#' dataset from the original raw data
+#'
+#' @importFrom irlba irlba
+#' 
+#' @param dt The data.table of ensemble forecasts and associated observations
+#' @param m Integer vector. Which month(s) to process.
+#' @param y Integer vector. Which year(s) to process.
+#' @param max_PCA_depth Integer. How many principal components should we consider at a maximum
+#' @param cov_dir String.  Where should we store the Covariance matrices?
+#' @param data_dir String. Where should the data be stored?
+#' @param oriented tries to orient the eigenvectors in the same direction (e.g. for visualisation of PCs) if TRUE. This is done  by multiplying the left  singular vectors by -1 if this decreases the Euclidean distance to the 1st left singular vector
+#' @export
 setup_PCA = function(dt=NULL,
                      m=7,
                      y = 1999,
                      max_PCA_depth = 100,
                      cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                      data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                     obs_unc = FALSE,
-                     oriented = FALSE # tries to orient the eigenvectors in the same direction
-                     # (e.g. for visualisation of PCs) if TRUE. This is done
-                     # by multiplying the left  singular vectors by -1 if this 
-                     # decreases the Euclidean distance to the 1st left singular vector
-){
+                     oriented = TRUE)
+{
   
-  if(is.null(dt)) { print("load and prepare data")
+  if(is.null(dt))
+  {
+    print("load and prepare data")
     dt = load_combined_wide(bias = TRUE)
     trash = c(paste0("SST",1:10),paste0("Ens",1:9))
     dt[, (trash):=NULL]
     dt = dt[year %in% y & month %in% m,]
-    
   }
   
   print("loading and data reduction complete")
@@ -226,41 +250,33 @@ setup_PCA = function(dt=NULL,
   print("creating fc complete")
   
   
-  #get covariance matrices
+                                        #get covariance matrices
   
   for(mon in m){
-    if(obs_unc == TRUE){
-      load(file = paste0(cov.dir,"CovOU_mon",mon,".RData"))  
-      load(file = paste0(cov.dir,"Cov_FU_mon",mon,".RData"))
-    }else load(file = paste0(cov.dir,"CovRes_mon",mon,".RData"))
+    load(file = paste0(cov.dir,"CovRes_mon",mon,".RData"))
     
-    if(obs_unc == TRUE){assign(paste0("A",mon),
-                               matrix(c(cov_for_unc,cov_obs_unc), nrow = dim(cov_obs_unc)[1]),
-                               envir = globalenv()
-    )
-    }
-    if(!obs_unc){assign(paste0("A",mon),
-                        matrix(res_cov, 
-                               nrow = dim(res_cov)[1]),
-                        envir = globalenv())
-    }
-    
-    PCA = irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
-    
-    if(oriented){
-      for(d in 2:max_PCA_depth){
-        if(sum((PCA$u[,1]-PCA$u[,d])^2) > sum((PCA$u[,1]+PCA$u[,d])^2)) PCA$u[,d] = -PCA$u[,d]     
-      }
-    }
-    
-    assign(paste0("PCA",mon), PCA, envir = globalenv())
-    print(paste0("Month ",mon," complete"))
+    assign(paste0("A",mon),
+           matrix(res_cov, 
+                  nrow = dim(res_cov)[1]),
+           envir = globalenv())
   }
+  
+  PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
+  
+  if(oriented){
+    for(d in 2:max_PCA_depth){
+      if(sum((PCA$u[,1]-PCA$u[,d])^2) > sum((PCA$u[,1]+PCA$u[,d])^2)) PCA$u[,d] = -PCA$u[,d]     
+    }
+  }
+  
+  assign(paste0("PCA",mon), PCA, envir = globalenv())
+  print(paste0("Month ",mon," complete"))
 }
 
 
-# ---- for issuing PCA forecasts: ----
 
+#' Forecast using PCA
+#' @export
 forecast_PCA = function(y = 1999, 
                         m = 7, 
                         PCA_depth = 5,  #accepts 0, then the mean of the bias corrected 
@@ -358,8 +374,3 @@ forecast_PCA = function(y = 1999,
   
   return(fc_land)
 }
-
-#--------------------
-
-
-

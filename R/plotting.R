@@ -1,6 +1,4 @@
-
-#---- for coloring NA values
-
+#' @export
 image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 {
   newz.na <- zlim[2]+(zlim[2]-zlim[1])/length(col) # new z for NA
@@ -16,23 +14,7 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
   image.plot(x,y,z,zlim = zlim, col = col, breaks = breaks,...) 
 }
 
-
-quilt.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
-{
-  newz.na <- zlim[2]+(zlim[2]-zlim[1])/length(col) # new z for NA
-  
-  z[which(is.na(z))] <- newz.na 
-  
-  zlim[2] <- newz.na # we finally extend the z limits to include the new value 
-  
-  col <- c(col, na.color) # we construct the new color range by including: na.color 
-  
-  breaks = c(breaks,zlim[2])
-  
-  quilt.plot(x,y,z,zlim = zlim, col = col, breaks = breaks,...) 
-}
-
-
+#' @export
 plot_diagnostic = function( dt, 
                             model = "NorESM", 
                             mn = "",
@@ -110,80 +92,14 @@ plot_diagnostic = function( dt,
   
 }
 
-
-
-
-plot_diagnostic_senorge = function(dt,
-                                   rr= NULL,
-                                   set.white = NULL,
-                                   save.pdf = FALSE,
-                                   save.dir = "./figures/senorge/",
-                                   file.name = "diag_plot"){
-
-  #--- data ---
-  
-  lons = dt[,range(Lon)]
-  lats = dt[,range(Lat)]
-  
-  n_lon = length(dt[,Lon])
-  n_lat = length(dt[,Lat])
-  
-  if(is.null(rr))  rr = range(dt[,3],na.rm=TRUE)
-  
-  A = matrix(dt[[3]],  n_lon, n_lat)
-  
-  # --- scaling and colors ---
-  
-  # make color white for the value achieved by perfect calibration
-  
-  
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.lab = round(brk[brk.ind],2)
-  brk.at = brk[brk.ind]
-  if(is.null(set.white)){
-    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
-  }else{
-    zero.ind = min(which(brk > set.white))/length(brk)
-    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
-  }
-  #--- plotting ---
-  
-  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"))
-  
-  quilt.plot.na (dt[,Lon],dt[,Lat],dt[[3]],
-                 xlab="Longitude",ylab="Latitude",
-                 nrow = 180,
-                 ncol = 180,
-                 zlim=rr,
-                 xlim = lons,
-                 ylim = lats,
-                 breaks=brk,
-                 col=color,
-                 cex.main=1.8,cex.lab=1.4,
-                 cex.axis=1,
-                 axis.args=list(cex.axis=1,
-                                at = brk.at,
-                                label = brk.lab))
-  map("world", add = TRUE)
-
-  if(save.pdf) dev.off()
-  
-}
-
-
-
+#' Plot the system
+#'
+#' @param type 'res' plots residuals 'obs' observed SST 'ens' the raw ensemble with obs_num being the ensemble number, this is slow as it calls load_combined_wide 'for' forecasted SST using PCA generated noise, 'PC' the dth principal component (upscaled eigenvector) where d=depth 'PCsum' sum over the first d PCs 'mar_sd' marginal standard deviation computed for the first d PCs 'cal' plots moment estimates of the PIT, uses all years and months
+#' @export plot_system
+#' 
 plot_system = function( Y = 1999,
                           M = 7,
-                          type = "res",    #'res' plots residuals, 
-                                           #'obs' observed SST,
-                                           #'ens' the raw ensemble with obs_num being the ensemble number, this is slow as it calls load_combined_wide
-                                           #'for' forecasted SST using PCA generated noise,
-                                           #'PC' the dth principal component (upscaled eigenvector) where d=depth
-                                           #'PCsum' sum over the first d PCs
-                                           #'mar_sd' marginal standard deviation computed for the first d PCs
-                                           #'cal' plots moment estimates of the PIT, uses all years and months
-                                           
+                          type = "res",    
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
                                                 # type = 'obs' or 'res'
                           moment = 1, #only used for type = 'cal'
@@ -470,159 +386,5 @@ plot_system = function( Y = 1999,
   }
 }
 
-
-#-------------------------------
-
-
-plot_system_senorge = function( dt_senorge = NULL,
-                        Y = 1999,
-                        M = 7,
-                        type = "obs",     #'obs' observed temp,
-                                          #'ens' the raw ensemble with obs_num being the ensemble number,
-                                          #'bc' the bias corrected ensemble forecast
-                        ens_num = "mean",     # takes numbers from 1 to 15 or "mean", only used for 
-                        file_dir = "./figures/senorge/",
-                        data.dir = "./Data/PostClim/SFE/Derived/",
-                        lons = NULL,
-                        lats = NULL,
-                        rr = NULL,
-                        plot_title = NULL,
-                        print_figs = TRUE
-                        )
-{
-  if(is.null(dt_senorge)) {
-    dt = load_combined_wide(model = "senorge",bias = TRUE)
-  }else dt = copy(dt_senorge)
-  
-  if("lon" %in% colnames(dt)) setnames(dt,c("lon","lat"),c("Lon","Lat"))
-  dt = dt[year == Y][month == M]
-  print("data prep complete")
-  
-  #------- file name -----------
-  
-  file_out = paste0(file_dir,"sn_",type,"_y",Y,"_m",M)
-  
-  ## ---- prepare data ------
-  
-  if(type == "obs" ) dt = dt[,.(Lon,Lat,temp)]
-  
-  if(type == "ens"){ 
-      mn_ens = paste0(ens_num,". raw ensemble forecast")
-      if(ens_num == "mean") mn_ens = "mean raw ensemble forecast"
-      ens_ind = paste0("Ens",ens_num)
-      if(ens_num == "mean") ens_ind = "Ens_bar"
-    
-    dt = dt[,.(Lon,Lat, eval(parse(text = ens_ind)))]
-    setnames(dt,"V3", "Ens")
-  }
-  
-  if(type == "bc" ) dt = dt[,.(Lon,Lat,temp_hat)]
-  
-  
-  
-  #------- adjusting range -------
-  
-  if(is.null(rr)) {
-    rr = range(dt[[3]],na.rm = TRUE)
-    if(rr[1] == Inf) {rr=c(-100,100)
-      plot_title = "data missing"
-      }
-    }
-    
-  
-  #------- titles for plot -------
-  
-  if(!is.null(plot_title)){
-    mn = plot_title
-  }else{
-    if(type == "obs")     mn = paste0(" observed temperature ", M, " / ", Y)
-    if(type == "ens")     mn = paste0(mn_ens," ",M, " / ",Y)
-    if(type == "bc")      mn = paste0(" bias corrected forecast ", M, " / ", Y)
-  }
-  
-  ##------- Scaling and colors----------
-  
-  if (type %in% c("obs","ens","bc")){
-    brk = seq(rr[1],rr[2],length = 500)
-    brk.ind = round(seq(1,length(brk),length = 10))
-    brk.lab = round(brk[brk.ind],2)
-    brk.at = brk[brk.ind]
-    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
-  }
-  
-    ##--------------------------
-  
-  ##------- Scope ------------
-  if(is.null(lons)) lons = range(dt[,Lon])
-  if(is.null(lats)) lats = range(dt[,Lat])
-    
-  ##--------------------------
-  
-  ##------- Plot -----------
-  if(print_figs) pdf(paste0(file_out, ".pdf"))
-  
-  quilt.plot.na (dt[,Lon],dt[,Lat],dt[[3]],
-                   xlab="Longitude",ylab="Latitude",
-                   nrow = 180,
-                   ncol = 180,
-                   zlim=rr,
-                   xlim = lons,
-                   ylim = lats,
-                   main = mn,
-                   breaks=brk,
-                   col=color,
-                   cex.main=1.8,cex.lab=1.4,
-                   cex.axis=1,
-                   axis.args=list(cex.axis=1,
-                                  at = brk.at,
-                                  label = brk.lab))
-    map("world", add = TRUE)
-    dev.off()
-  
-}
-
-
-
-##------------------------
-
-
-
-plot_animation = function(dt,
-                          file_out = "./figures/system_animation.pdf")
-{
-
-  YM_all = dt[,unique(YM)]
-  if(print_figs){pdf(file_out)}else{X11()}
-
-  
-  for(j in 1:length(YM_all))
-  {
-    print(j)
-    YM_j = YM_all[j]
-    ##------- Setup --------
-    dt_sub = dt[YM == YM_j]
-    n_lon = length(dt_sub[,unique(Lon)])
-    n_lat = length(dt_sub[,unique(Lat)])
-    mn = paste0(dt_sub[,min(month)], "/",dt_sub[,min(year)])
-    ##----------------------
-    
-    ##----- Observation -------
-    A_obs = matrix(NA, n_lon,n_lat)
-    A_obs[ dt_sub[grid_id < length(A_obs), grid_id] ] = dt_sub[grid_id < length(A_obs),SST_bar] ## FIX
-    ##-------------------------
-
-    ##----- Ensemble -----------
-    A_ens = matrix(NA, n_lon,n_lat)
-    A_ens[ dt_sub[grid_id < length(A_ens), grid_id] ] = dt_sub[grid_id < length(A_ens),SST_hat_grid] ## FIX
-    ##-------------------------
-
-    ##----- Bias --------------
-    A_bias = A_obs - A_ens
-    image(A_bias,main = paste0(mn," bias"))
-  }
-
-  if(print_figs) dev.off()
-  
-}
    
   
