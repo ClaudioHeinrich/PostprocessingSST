@@ -12,7 +12,18 @@ y = 1985:2010
 
 setup_PCA(m = month, y = y, oriented = TRUE)
 
-vec = c(30,50)
+dist_fun_tn = function(value, mean, sd, truncate = -1.619995){ # distribution function for a truncated normal distribution evaluated at value; value, mean and sd need to be vectors of equal length
+    a=rep(0,times = length(value))
+    for(i in  1:length(value))
+      if(is.na(value[i])) { a[i] = NA
+      }else if(value[i] > truncate) {a[i] = pnorm(value[i], mean = mean[i], sd = sd[i])
+      } else a[i] =  runif(1, max = pnorm(truncate, mean = mean[i], sd = sd[i]))
+      return(a)
+    }
+
+
+
+vec = c(1,5,15,30)
 for(k in vec){
   print(paste0("k = ",k))
   

@@ -1,3 +1,11 @@
+rm(list = ls())
+
+library(SeasonalForecasting)
+library(data.table)
+library(maps)
+library(fields)
+setwd("~/NR/SFE")
+options(max.print = 1e3)
 
 
 #---- get example residual plots for the years and months specified in Yvec and Mvec ----
@@ -5,7 +13,7 @@
 dt = load_combined_wide(bias = TRUE)
 dt[,"res":= SST_hat - SST_bar]
 
-Yvec = c(2005,2007,2009)
+Yvec = 2004:2008
 Mvec = 9
 
 #--- get maximum range for uniform plotting scale ----
@@ -28,7 +36,7 @@ rr_sd = range(rr_sd)
 for(Y in Yvec){
   for(M in Mvec){
     
-    plot_system(Y = Y, M=M, type = "res", print_figs = FALSE, plot_title = paste0("Residual 0",M," / ",Y),rr = rr )
+    plot_system(Y = Y, M=M, type = "res", print_figs = TRUE, plot_title = paste0("Residual 0",M," / ",Y))
   }
 }
 

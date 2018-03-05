@@ -259,7 +259,7 @@ setup_PCA = function(dt=NULL,
            matrix(res_cov, 
                   nrow = dim(res_cov)[1]),
            envir = globalenv())
-  }
+  
   
   PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
   
@@ -269,8 +269,11 @@ setup_PCA = function(dt=NULL,
     }
   }
   
+  
   assign(paste0("PCA",mon), PCA, envir = globalenv())
   print(paste0("Month ",mon," complete"))
+
+  }
 }
 
 
@@ -362,7 +365,7 @@ forecast_PCA = function(y = 1999,
     }
     
     if(saveorgo & output_opts == "PC"){ 
-      save(fc_land, file = paste0(save.dir,"/PCA_",d,"PC.RData"))
+      save(fc_land, file = paste0(save.dir,"/PCA_",d,"PC_month",m,".RData"))
     }
     
     if(saveorgo & output_opts == "PCsum"){ 

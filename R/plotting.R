@@ -211,7 +211,7 @@ plot_system = function( Y = 1999,
   }
   
   if(type == "PC") {
-    file.name = paste0("PCA/PCA_",depth,"PC.RData")
+    file.name = paste0("PCA/PCA_",depth,"PC_month",M,".RData")
     load(paste0(data.dir,file.name))
     dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }

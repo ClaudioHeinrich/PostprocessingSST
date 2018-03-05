@@ -19,7 +19,7 @@ lon.max = 14.5
 lat.min = 30.5
 lat.max = 69.5
 
-dvec = c(1:35,40,45,50) # the number of principal components the variogram score is computed for
+dvec = c(1:50) # the number of principal components the variogram score is computed for
 
 p = 0.5 # power for variogram score
 
@@ -153,14 +153,23 @@ var_sc = rbindlist(var_sc)
 save.dir="./Data/PostClim/SFE/Derived/PCA/"
 save(var_sc, file = paste0(save.dir,"variogram_scores.RData"))
 
+
+
+
+
 # --- plots ---
+
+
+load(file = paste0(save.dir,"variogram_scores.RData"))
 
 plot.dir = "./figures/"
 
 mean_sc = var_sc[,mean(v_sc), by = PCs]
-mean_sc_all_years = var_sc_all_years[,mean(v_sc), by = PCs]
+#mean_sc_all_years = var_sc_all_years[,mean(v_sc), by = PCs]
 
-yrange = range(c(range(mean_sc[[2]]),range(mean_sc_all_years[[2]])))
+
+yrange = range(c(range(mean_sc[[2]])))
+#yrange = range(c(range(mean_sc[[2]]),range(mean_sc_all_years[[2]])))
 
 pdf(paste0(plot.dir,"mean_variogram_scores.pdf"))
 plot(x = mean_sc[[1]],
@@ -168,34 +177,34 @@ plot(x = mean_sc[[1]],
      ylim = yrange,
      type = "b",
      col = "blue",
-     main = "mean variogram scores for p=0.5",
-     xlab = "Principal Components",
+     main = "mean variogram score",
+     xlab = "number of principal components",
      ylab = "mean score"
 )
-lines( mean_sc_all_years[[1]], 
-       mean_sc_all_years[[2]],
-       type = "b",
-       col = "darkgreen")
+# lines( mean_sc_all_years[[1]], 
+#        mean_sc_all_years[[2]],
+#        type = "b",
+#        col = "darkgreen")
 
 #---- add minima -----
 abline(h = min(mean_sc[[2]]), lty = "dashed", col = adjustcolor("blue",alpha = .5))
-abline(h = min(mean_sc_all_years[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
+#abline(h = min(mean_sc_all_years[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
 
 min_loc = mean_sc[,which.min(V1)]
-min_loc_all_years = mean_sc_all_years[,which.min(V1)]
+#min_loc_all_years = mean_sc_all_years[,which.min(V1)]
 
 points(x = mean_sc[[1]][min_loc],
        y = mean_sc[[2]][min_loc],
        col = "blue",
        bg = "blue",
        pch = 21)
-points(x = mean_sc_all_years[[1]][min_loc_all_years],
-       y = mean_sc_all_years[[2]][min_loc_all_years],
-       col = "darkgreen",
-       bg = "darkgreen",
-       pch = 21)
+# points(x = mean_sc_all_years[[1]][min_loc_all_years],
+#        y = mean_sc_all_years[[2]][min_loc_all_years],
+#        col = "darkgreen",
+#        bg = "darkgreen",
+#        pch = 21)
 
-legend("topright",legend = c("1985 - 2000","all years"),lty = c(1,1),col = c("blue","darkgreen"))
+#legend("topright",legend = c("1985 - 2000","all years"),lty = c(1,1),col = c("blue","darkgreen"))
 dev.off()
 
 
