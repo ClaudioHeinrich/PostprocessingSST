@@ -15,7 +15,6 @@ options(max.print = 500)
 #------- set up ------
 
 m = 7
-
 training_years = 1985:2000
 
 
@@ -30,7 +29,6 @@ Lat_max = 70
 
 DT_complete = load_combined_wide(bias = TRUE)
 
-
 # --- modify data for fitting variogram with spacetime package ---
 
 library(sp) # SpatialPoints(), spDists(), SpatialPointsDataFrame(), spplot
@@ -42,9 +40,7 @@ DT = DT_complete[month == m & year %in% training_years &
                             .(Lon,Lat,year,month,YM, Res = SST_hat - SST_bar)]
 
 
-
 sp <- SpatialPoints(cbind(x=DT[YM == min(YM), Lon],y=DT[YM == min(YM), Lat]), proj4string = CRS("+proj=longlat +datum=WGS84"))
-
 
 # Convert YM into date
 
@@ -68,9 +64,6 @@ stfdf = STFDF(sp, time, data)
 
 ## calculate the distance matrix [km], full symmetric matrix
 Dist <- spDists(sp, longlat = T)
-dim(Dist)
-## [1] 5479 5479
-
 
 ## set the intervals
 up.Dist <- Dist[upper.tri(Dist, diag = F)] 
@@ -81,7 +74,7 @@ bound.id <- seq(1, length(up.Dist), length(up.Dist)/nintv)
 boundaries <- sort.up[bound.id]
 boundaries <- c(boundaries, max(up.Dist)) 
 
-png("boundaries.png")
+png("./figures/boundaries.png")
 plot(boundaries, main = nintv)
 dev.off()
 
@@ -106,7 +99,7 @@ head(empVgm, 3)
 #### -------------------------------------------------- 
 
 ## set the cutoff, here I use no cutoff
-cutoff <- 4300 #max(empVgm$dist) # 98.51869
+cutoff <- max(empVgm$dist) # 4300
 
 ## prepare empirical variograms for fitting
 spEmpVgm <- empVgm[empVgm$dist<=cutoff,]  
@@ -144,7 +137,7 @@ range(spEmpVgm$dist)
 ycuts <- seq(0, range(spEmpVgm$gamma)[2], 0.07)
 xcuts <- seq(0, range(spEmpVgm$dist)[2] , 150)
 
-png("Vgm.png")
+png("./figures/Vgm_uncensored.png")
 plot(spEmpVgm$dist,spEmpVgm$gamma, ylim=c(0,range(spEmpVgm$gamma)[2]), xlim = c(0,range(spEmpVgm$dist)[2]),
      ylab = "", xlab="", axes = FALSE, 
      main = paste0("Empirical and fitted semi-variograms for month",m) )
