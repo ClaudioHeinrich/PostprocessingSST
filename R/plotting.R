@@ -1,22 +1,59 @@
+
+#' Creates a plot on the globe with a specified color for NA entries
+#' 
+#' @param na.color The color for NA values.
+#' @param x,y,z,zlim,col,breaks,... Parameters passed on to image.plot. 
+#' 
+#' @return none
+#'
 #' @export
+#' 
+#' @author Claudio Heinrich
+#' @importFrom fields image.plot
+
+
 image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 {
   newz.na <- zlim[2]+(zlim[2]-zlim[1])/length(col) # new z for NA
   
-  z[which(is.na(z))] <- newz.na # we affect newz.outside
+  z[which(is.na(z))] <- newz.na 
   
-  zlim[2] <- newz.na # we finally extend the z limits to include the new value 
+  zlim[2] <- newz.na # we extend the z limits to include the new value 
   
-  col <- c(col, na.color) # we construct the new color range by including: na.color 
+  col <- c(col, na.color) # we construct the new color range by including na.color 
   
   breaks = c(breaks,zlim[2])
   
   image.plot(x,y,z,zlim = zlim, col = col, breaks = breaks,...) 
 }
 
+
+#' Diagnostic plotting function
+#' 
+#' @description Takes a data table of the form .(Lon,Lat,value) or .(Lat,Lon,value) and plots value on the globe
+#' 
+#' @param dt The data table containing the values for plotting.
+#' @param mn Title of the plot.
+#' @param save.pdf If TRUE the plot is saved as pdf (logical).
+#' @param save.dir,file.name Directory and file name for saving the plot, only used if save.pdf = TRUE (string).
+#' @param lons,lats Vectors with two entries containing min and max longitude and latitude for plotting rectangle.
+#'             If NULL, the entire globe is used.
+#' @param rr Range of the plot, if not specified the range of value is used.
+#' @param set.white Forces the blue-white-red color scheme to center white at the set value if specified.
+#'
+#' @return none
+#'  
 #' @export
+#' 
+#' @author Claudio Heinrich
+#' @examples \dontrun{
+#' dt = load_combined_wide()
+#' plot_diagnostic(dt[year == 1990 & month == 1,.(Lon,Lat,Ens_bar)])
+#' }
+#' 
+#' @importFrom fields designer.colors
+
 plot_diagnostic = function( dt, 
-                            model = "NorESM", 
                             mn = "",
                             save.pdf = FALSE,
                             save.dir = "./figures/",
@@ -28,8 +65,8 @@ plot_diagnostic = function( dt,
   {
   #--- get longitudes and latitudes
   
-  if(is.null(lons)) Lons = seq(-179.5,179.5,by = 1)
-  if(is.null(lats)) Lats = seq(-89.5,89.5,by = 1)
+  if(is.null(lons)) Lons = unique(dt[,Lon])
+  if(is.null(lats)) Lats = unique(dt[,Lat])
   
   if(!is.null(lons)){
     lon_min = floor(lons[1]+0.5)-0.5
@@ -92,16 +129,44 @@ plot_diagnostic = function( dt,
   
 }
 
-#' Plot the system
+#' Plots the system with various options 
 #'
-#' @param type 'res' plots residuals 'obs' observed SST 'ens' the raw ensemble with obs_num being the ensemble number, this is slow as it calls load_combined_wide 'for' forecasted SST using PCA generated noise, 'PC' the dth principal component (upscaled eigenvector) where d=depth 'PCsum' sum over the first d PCs 'mar_sd' marginal standard deviation computed for the first d PCs 'cal' plots moment estimates of the PIT, uses all years and months
-#' @export plot_system
+#' @param type Specifies the type of plot: \cr
+#'      'res' plots residuals \cr
+#'      'obs' observed SST \cr
+#'      'ens' the raw ensemble forecast \cr
+#'      'for' forecasted SST using PCA generated noise, \cr
+#'      'PC' the dth principal component (upscaled eigenvector) where d=depth \cr
+#'      'PCsum' sum over the first d PCs \cr
+#'      'mar_sd' marginal standard deviation for the PCA method using the first d PCs \cr
+#'      'cal' plots moment estimates of the PIT, uses all years and months.
+#' @param obs_num Index of used observation (if any) in the ensemble, also takes "mean".
+#' @param Y,M Year and month.
+#' @param depth Specifies the numbers of principal components to consider.
+#' @param moment Takes 1 or 2, only used for type = "cal", 1 plots mean, 2 plots SD of the PIT.
+#' @param file_dir,data.dir Directories for saving the plot and for loading the data.
+#' @param lons,lats Vector with two entries containing min and max longitude and latitude for plotting rectangle.
+#'             If NULL, the entire globe is used.
+#' @param rr Range of the plot. 
+#' @param plot_title The title of the plot.
+#' @param print_figs  If FALSE, the plot is displayed directly and no file is saved.
+#' @param png_out If TRUE, a .png is saved rather than a .pdf.
 #' 
-plot_system = function( Y = 1999,
-                          M = 7,
-                          type = "res",    
+#' @export 
+#' 
+#' @author Claudio Heinrich
+#' @examples \dontrun{
+#' setwd("~/NR/SFE")
+#' plot_system()}
+#'
+#' 
+#' @importFrom fields designer.colors
+
+plot_system = function(   type = "res",    
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
                                                 # type = 'obs' or 'res'
+                          Y = 1999,
+                          M = 7,
                           moment = 1, #only used for type = 'cal'
                           depth = 0,  
                           file_dir = "./figures/",
@@ -110,7 +175,6 @@ plot_system = function( Y = 1999,
                           lats = NULL,
                           rr = NULL,
                           plot_title = NULL,
-                          outside_control = FALSE,
                           print_figs = TRUE,
                           png_out = FALSE)
 {
@@ -346,7 +410,7 @@ plot_system = function( Y = 1999,
  
   
   ##------- Plot -----------
-  if(print_figs & !outside_control)  pdf(paste0(file_out, ".pdf"))
+  if(print_figs)  pdf(paste0(file_out, ".pdf"))
   
   
   image.plot.na(lon_all,lat_all,A,
@@ -362,10 +426,10 @@ plot_system = function( Y = 1999,
                             at = brk.at,
                             label = brk.lab))
   map("world", add = TRUE)
-  if(print_figs & !outside_control) dev.off()
+  if(print_figs ) dev.off()
   
   if(png_out){
-    if(print_figs & !outside_control)
+    if(print_figs)
     {
       png(paste0(file_out, ".png"))
       image.plot.na(lon_all,lat_all,A_res,

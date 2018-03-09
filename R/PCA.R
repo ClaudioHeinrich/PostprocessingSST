@@ -2,11 +2,15 @@
 #'
 #' @param dt The wide data.table
 #' @param Y training years.  So this will use all years in order to form the covariance matrix
-#' @param M training months the PCA should be computed for
-#' @param save.dir Where we save
-#' @param obs.num The number of observations in the observational product
-#' @param ens.num The number of ensemble members
+#' @param M training months the PCA should be computed for.
+#' @param save.dir Where we save.
+#' @param obs.num The number of observations in the observational product.
+#' @param ens.num The number of ensemble members.
 #'
+#' @author Claudio Heinrich
+#' @examples 
+#' \dontrun{for_res_cov()}
+#' 
 #' @export
 for_res_cov = function(dt = NULL,
                        Y = 1985:2010,
@@ -57,18 +61,24 @@ for_res_cov = function(dt = NULL,
 }
 
 
-#' Sets up the PCA
+#' Helping function
+#' 
+#' @description Sets up for_unc_cov_combined.
 #'
-#' @param dt The wide data table
-#' @param m the month you want the PCA to be performed for
-#' @param y the years you want to perform the PCA for
-#' @param max_PCA_depth The total number of potential PCs
-#' @param cov.dir The directory with the covariances to be saved
-#' @param data.dir Save directory
-#' @param oriented tries to orient the eigenvectors in the same direction (e.g. for visualisation of PCs) if TRUE. This is done
-#' by multiplying the left  singular vectors by -1 if this 
-#' decreases the Euclidean distance to the 1st left singular vector
+#' @param dt The wide data table.
+#' @param M The months you want the PCA to be performed for.
+#' @param Y The years you want to perform the PCA for.
+#' @param save.dir The directory in which the covariances are saved.
+#' @param obs.num The number of observations in the observational product.
+#' @param ens.num The number of ensemble members.
+#' 
+#' @examples \dontrun{for_unc_cov(Y = 1985:1986)}
+#'
+#' @author Claudio Heinrich
+#' 
 #' @export
+
+
 for_unc_cov = function(dt = NULL,
                        Y = 1985:2010,
                        M = 1:12,
@@ -117,7 +127,18 @@ for_unc_cov = function(dt = NULL,
 }
 
 
+#' Creates and saves the covariance matrix for the residuals taking observation uncertainty into account.
+#'
+#' @param M Training months the PCA should be computed for.
+#' @param cov.dir Where the covariances are saved, should match save.dir of for_unc_cov.
+#' @param obs.num The number of observations in the observational product.
+#'
+#' @author Claudio Heinrich
+#' 
+#' @examples \dontrun{for_unc_cov_combined()}
+#' 
 #' @export
+
 for_unc_cov_combined = function(M = 1:12,
                                 cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                                 obs.num = 10){
@@ -145,9 +166,21 @@ for_unc_cov_combined = function(M = 1:12,
 }
 
 
-
-
+#' Creates and saves the covariance matrix for the observation for modelling only observation uncertainty.
+#'
+#' @param M Training months the PCA should be computed for.
+#' @param save.dir The directory in which the covariances are saved.
+#' @param obs.num The number of observations in the observational product.
+#' @param ens.num The number of ensemble members.
+#' @param load_reduced_data If FALSE, the reduced data table dt_reduced is computed and saved in data.dir, which takes time. If TRUE, the data table is loaded.
+#' @param data.dir Where everything is saved.
+#'
+#' @examples \dontrun{obs_unc_cov()}
+#'
+#' @author Claudio Heinrich
+#' 
 #' @export
+
 obs_unc_cov = function(M = 1:12,
                        save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                        obs.num = 10,
@@ -208,17 +241,21 @@ obs_unc_cov = function(M = 1:12,
 #'
 #' @importFrom irlba irlba
 #' 
-#' @param dt The data.table of ensemble forecasts and associated observations
+#' @param dt The data.table of ensemble forecasts and associated observations including bias estimate, is loaded if NULL.
 #' @param m Integer vector. Which month(s) to process.
 #' @param y Integer vector. Which year(s) to process.
-#' @param max_PCA_depth Integer. How many principal components should we consider at a maximum
+#' @param max_PCA_depth Integer. How many principal components should we consider at a maximum.
 #' @param cov_dir String.  Where should we store the Covariance matrices?
 #' @param data_dir String. Where should the data be stored?
-#' @param oriented tries to orient the eigenvectors in the same direction (e.g. for visualisation of PCs) if TRUE. This is done  by multiplying the left  singular vectors by -1 if this decreases the Euclidean distance to the 1st left singular vector
+#' @param oriented orients the eigenvectors in the same direction (e.g. for visualisation of PCs) if TRUE. This is done  by multiplying the left  singular vectors by -1 if this decreases the Euclidean distance to the 1st left singular vector
+#' 
+#' @examples \dontrun{setup_PCA(m = 7)}
+#' 
+#' @author Claudio Heinrich
 #' @export
 setup_PCA = function(dt=NULL,
-                     m=7,
-                     y = 1999,
+                     m=1:12,
+                     y = 2001:2010,
                      max_PCA_depth = 100,
                      cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                      data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
@@ -274,34 +311,47 @@ setup_PCA = function(dt=NULL,
   print(paste0("Month ",mon," complete"))
 
   }
+  print("setup complete")
 }
 
 
 
 #' Forecast using PCA
+#' 
+#' @description Generates forecasts and related stuff for the PCA post-processing approach, \cr
+#'      requires setup_PCA to be run with the corresponding year(s), month(s), and with max_PCA_depth >= PCA_depth
+#' 
+#' @param y,m Integer vectors containing year(s) and month(s).
+#' @param output_opts,PCA_depth One of the following: \cr
+#'      "forecast", generates a forecast for (y,m) perturbed by PCA-noise generated by d = PCA_depth principal components, d=0 returns the (unperturbed) bias corrected ensemble mean as forecast\cr
+#'      "mar_sd", returns the approximate marginal standard deviation for d PCs, \cr 
+#'      "PC", returns the dth principal component (upscaled eigenvector), \cr
+#'      "PCsum", returns the sum over the first d PCs, \cr
+#'           if saveorgo = TRUE, PCA_depth accepts integer vectors.
+#' @param saveorgo Logical, whether we save or not. 
+#' @param save.dir The directory to save in.
+#' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature
+#' 
+#' @return data table containing a column with output_opts as name, if output_opts = "forecast" it contains additionally a column with the noise.
+#' 
+#' @examples \dontrun{forecast_PCA(y = 1999, m = 7)}
+#' 
+#' @author Claudio Heinrich        
+#' 
 #' @export
-forecast_PCA = function(y = 1999, 
-                        m = 7, 
-                        PCA_depth = 5,  #accepts 0, then the mean of the bias corrected 
+forecast_PCA = function(y, m, 
+                        output_opts = "forecast", 
+                        PCA_depth = 15,  #accepts 0, then the mean of the bias corrected 
                         #ensemble is returned. If saveorgo = TRUE, PCA_depth can be
                         #a vector
-                        save.dir="./Data/PostClim/SFE/Derived/PCA",
-                        cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                        data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        output_opts = "forecast", # also takes "mar_sd", then the approximate marginal 
-                        # variance is returned, 
-                        # or "PC" where the dth Eigenvector
-                        # is returned (d=PCA_depth)
-                        # or "PCsum" where the sum over the first d PCs is returned
                         saveorgo = TRUE,
-                        truncate = TRUE,
-                        max_PCA_depth = 100) {
+                        save.dir="./Data/PostClim/SFE/Derived/PCA",
+                        truncate = TRUE) {
   
   # Check whether setup_PCA has been run, beware that setup_PCA has been called with the right parameters
   
-  if(! exists("land_grid_id")) setup_PCA(m = m, max_PCA_depth = max_PCA_depth)
-  print("setup complete")
-  
+  if(! exists("land_grid_id")) stop("You need to run setup_PCA() first.")
+    
   fc = fc[year %in% y][month %in% m]
   land_grid_id = land_grid_id[year %in% y][month %in% m]
   
@@ -337,14 +387,13 @@ forecast_PCA = function(y = 1999,
     }
     
     if(output_opts == "mar_sd" | output_opts == "PC" | output_opts == "PCsum"){
-      fc[, "forecast" := no]
-      #because the plotting functions plot the forecast
+      fc[, eval(quote(output_opts)) := no]
     }
     
     #-------- truncate negative temperatures
     
-    if(truncate & output_opts %in% c("forecast","PC")) fc[forecast < -1.619995, forecast := -1.619995]
-    if(truncate & output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < -1.619995, forecast := 0]
+    if(truncate & output_opts %in% c("forecast","PC")) fc[eval(quote(output_opts)) < -1.619995, eval(quote(output_opts)) := -1.619995]
+    if(truncate & output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < -1.619995, eval(quote(output_opts)) := 0]
     
     #-------- add land --------------
     

@@ -1,9 +1,9 @@
-Package: SeasonalForecasting
+Package: PostProcessing
 Type: Package
-Title: Seasonal Forecasting
+Title: PostProcessing
 Version: 1.0
 Date: 2017-08-24
-Author: Alex Lenkoski
+Authors@R: c(person("Alex", "Lenkoski", email = "alex@nr.no", role="cre"))
 Maintainer: Alex Lenkoski <alex@nr.no>
 Description: This does seasonal forecasting
 License: GPL (>= 2)
