@@ -10,8 +10,8 @@ library(SeasonalForecasting)
 
 setwd("~/NR/SFE")
 options(max.print = 500)
-
-
+print("hello world")
+print("How are you?")
 #------- set up ------
 
 m = 7
