@@ -392,9 +392,11 @@ forecast_PCA = function(y, m,
     
     #-------- truncate negative temperatures
     
-    if(truncate & output_opts %in% c("forecast","PC")) fc[eval(quote(output_opts)) < -1.619995, eval(quote(output_opts)) := -1.619995]
-    if(truncate & output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < -1.619995, eval(quote(output_opts)) := 0]
-    
+    if(truncate){
+        tr.value = fc[,min(SST_hat)]
+        if( output_opts %in% c("forecast","PC")) fc[eval(quote(output_opts)) < tr.value, eval(quote(output_opts)) := tr.value]
+        if(output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < tr.value, eval(quote(output_opts)) := 0]
+    }
     #-------- add land --------------
     
     fc_land <- list()
