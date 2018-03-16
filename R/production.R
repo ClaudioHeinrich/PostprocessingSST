@@ -19,15 +19,42 @@ make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
 #' @param vintage Which vintage are we using, often "mr" for most recent
 #' @param data.dir The root directory that stores our data
 #' @param grid_mapping_loc The location where the precomputed grid alignment object is stored.
+#' @param output_loc The folder where the output should be stored. If \code{NULL} then put in the same location as \code{data.dir}
+#' @param output_name The name of the output file.  If \code{NULL} then \code{paste0("dt_combine_",vintage,"_wide.RData")} will be used
+#' @param lat_box The upper and lower bounds for the latitude.  By default the entire globe is used.
+#' @param lon_box The upper and lower bounds for the longitude.  By default the entire globe is used.
 #'
 #' @export
 make_combined_wide_dataset = function(y_start = 1985,
                                       y_stop = 2010,
                                       vintage = "mr",
                                       data.dir = "~/PostClimDataNoBackup/",
-                                      grid_mapping_loc = "./Data/PostClim/SFE/Derived/")
+                                      grid_mapping_loc = "~/PostClimDataNoBackup/SFE/Derived/",
+                                      output_loc = "~/PostClimDataNoBackup/SFE/Derived/",
+                                      output_name = NULL,
+                                      lat_box = c(-Inf,Inf),
+                                      lon_box = c(-Inf,Inf))
 {
 
+  ##--- Error check
+  if(lat_box[1] >= lat_box[2])
+  {
+    stop(paste("In make_combined_wide_data lat_box[1] is",
+               round(lat_box[1],3),
+               "while lat_box[2] is ", round(lat_box[2],3),
+               "the order should be reversed"))
+  }
+
+  if(lon_box[1] >= lon_box[2])
+  {
+    stop(paste("In make_combined_wide_data lon_box[1] is",
+               round(lon_box[1],3),
+               "while lon_box[2] is ", round(lon_box[2],3),
+               "the order should be reversed"))
+  }
+
+
+  
   ##----- Load Grid Mapping ---
   ff = paste0(grid_mapping_loc,"dt_map.RData")
   if(file.exists(ff))
@@ -39,7 +66,7 @@ make_combined_wide_dataset = function(y_start = 1985,
   }
   ##--------------------------
 
- ##------ Loop ----------
+  ##------ Loop ----------
   dt_combine_all = list()
   k = 1
   for(y in y_start:y_stop)
@@ -62,14 +89,21 @@ make_combined_wide_dataset = function(y_start = 1985,
   dt[, YM := year * 12 + month]
   setkey(dt, "YM", "Lon", "Lat")
   ##------------------------
+
+  ##---- Restrict ---
+  dt = dt[ (Lon >= lon_box[1]) & (Lon <= lon_box[2]) & (Lat >= lat_box[1]) & (Lat <= lat_box[2])]
   
   ##----- Should I save or should I go? -----
   if(is.null(data.dir))
   {
     return(dt)
   }else{
-    save(dt,
-        file = paste0(data.dir,"./SFE/Derived/dt_combine_",vintage,"_wide.RData"))
+    if(is.null(output_name))
+    {
+      output_name = paste0("dt_combine_",vintage,"_wide.RData")
+    }
+    f_name = paste0(output_loc,"/",output_name)
+    save(dt,file = f_name)
     return(1)
   }
   ##-------------------------------------------

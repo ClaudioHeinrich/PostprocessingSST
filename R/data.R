@@ -232,17 +232,23 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
 #'
 #' @return A data.table containing all data for the parameters specified, provided these data have been rendered.
 #' @export
-load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/", 
+load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/SFE/Derived/", 
                               vintage = "mr", 
-                              bias = FALSE
+                              bias = FALSE,
+                              output_name = NULL
                               )
 {
-  if(bias)
-  {
-    file = paste0(data.dir,"/SFE/Derived/dt_combine_wide_bias.RData")
-  } else {
-    file = paste0(data.dir,"/SFE/Derived/dt_combine_",vintage,"_wide.RData")
-  }
+  if(is.null(output_name))
+    {
+      if(bias)
+      {
+        file = paste0(data.dir,"/dt_combine_wide_bias.RData")
+      } else {
+        file = paste0(data.dir,"/dt_combine_",vintage,"_wide.RData")
+      }
+    }else{
+      file = paste0(data.dir,"/",output_name)
+    }
   load(file)
   return(dt)
 }
