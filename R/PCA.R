@@ -4,7 +4,6 @@
 #' @param Y training years.  So this will use all years in order to form the covariance matrix
 #' @param M training months the PCA should be computed for.
 #' @param save.dir Where we save.
-#' @param obs.num The number of observations in the observational product.
 #' @param ens.num The number of ensemble members.
 #'
 #' @author Claudio Heinrich
@@ -16,8 +15,7 @@ for_res_cov = function(dt = NULL,
                        Y = 1985:2010,
                        M = 1:12,
                        save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       obs.num = 10,
-                       ens.num = 9
+                       ens.size = 9
 ){  
   
   if(is.null(dt))
@@ -26,32 +24,29 @@ for_res_cov = function(dt = NULL,
     dt = load_combined_wide(bias = TRUE)
   }
   
-  
   year.num = max(Y)-min(Y)+1
   
   for(mon in M){
     print(paste0("month =",mon))  
     
     dt_PCA = copy(dt)
-    trash = c(paste0("SST", 1:obs.num),"SST_sd","Ens_sd")
-    dt_PCA = dt_PCA[,(trash):=NULL]
     dt_PCA = dt_PCA[month == mon & year %in% Y,]
     
-    for(ens in  1:ens.num){
+    for(ens in  1:ens.size){
       print(paste0("ensemble =",ens))  
       dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-SST_bar]
     }
     dt_PCA = dt_PCA[,"res_mean" := mean(SST_hat- SST_bar), by =  grid_id]
     
     sqrt_cov_mat = c()
-    for( ens in 1:ens.num){
+    for( ens in 1:ens.size){
       sqrt_cov_mat = c(sqrt_cov_mat, 
                        na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
     }
     sqrt_cov_mat = matrix(sqrt_cov_mat,
                           nrow = length(na.omit(dt_PCA[,res_mean]))/year.num)
     
-    res_cov = sqrt_cov_mat/(sqrt(year.num*ens.num -1))
+    res_cov = sqrt_cov_mat/(sqrt(year.num*ens.size -1))
     
     save(res_cov, file = paste0(save.dir,"CovRes_mon",mon,".RData"))
     
@@ -247,7 +242,6 @@ obs_unc_cov = function(M = 1:12,
 #' @param max_PCA_depth Integer. How many principal components should we consider at a maximum.
 #' @param cov_dir String.  Where should we store the Covariance matrices?
 #' @param data_dir String. Where should the data be stored?
-#' @param oriented orients the eigenvectors in the same direction (e.g. for visualisation of PCs) if TRUE. This is done  by multiplying the left  singular vectors by -1 if this decreases the Euclidean distance to the 1st left singular vector
 #' 
 #' @examples \dontrun{setup_PCA(m = 7)}
 #' 
@@ -256,10 +250,8 @@ obs_unc_cov = function(M = 1:12,
 setup_PCA = function(dt=NULL,
                      m=1:12,
                      y = 2001:2010,
-                     max_PCA_depth = 100,
-                     cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                     data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                     oriented = TRUE)
+                     max_PCA_depth = 75,
+                     cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/")
 {
   
   if(is.null(dt))
@@ -271,10 +263,7 @@ setup_PCA = function(dt=NULL,
     dt = dt[year %in% y & month %in% m,]
   }
   
-  print("loading and data reduction complete")
-  
-  
-  #find land grid ids:
+    #find land grid ids:
   
   land_grid_id <<- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
                       .(Lon,Lat,grid_id,month,year)]
@@ -299,12 +288,6 @@ setup_PCA = function(dt=NULL,
   
   
   PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max_PCA_depth)
-  
-  if(oriented){
-    for(d in 2:max_PCA_depth){
-      if(sum((PCA$u[,1]-PCA$u[,d])^2) > sum((PCA$u[,1]+PCA$u[,d])^2)) PCA$u[,d] = -PCA$u[,d]     
-    }
-  }
   
   
   assign(paste0("PCA",mon), PCA, envir = globalenv())
@@ -393,8 +376,9 @@ forecast_PCA = function(y, m,
     #-------- truncate negative temperatures
     
     if(truncate){
-        tr.value = fc[,min(SST_hat)]
-        if( output_opts %in% c("forecast","PC")) fc[eval(quote(output_opts)) < tr.value, eval(quote(output_opts)) := tr.value]
+        tr.value = fc[,min(SST_bar)]
+        if( output_opts == "forecast") fc[forecast < tr.value, forecast := tr.value]
+        if( output_opts == "PC") fc[PC < tr.value, PC := tr.value]
         if(output_opts %in% c("mar_sd","PCsum")) fc[SST_hat < tr.value, eval(quote(output_opts)) := 0]
     }
     #-------- add land --------------

@@ -51,7 +51,8 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #' plot_diagnostic(dt[year == 1990 & month == 1,.(Lon,Lat,Ens_bar)])
 #' }
 #' 
-#' @importFrom fields designer.colors
+#' @importFrom fields designer.colors 
+#' @importFrom maps maps
 
 plot_diagnostic = function( dt, 
                             mn = "",
@@ -161,6 +162,7 @@ plot_diagnostic = function( dt,
 #'
 #' 
 #' @importFrom fields designer.colors
+#' @importFrom maps maps
 
 plot_system = function(   type = "res",    
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
