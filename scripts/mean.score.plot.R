@@ -8,12 +8,20 @@ options(max.print = 1e3)
 
 #---- get global mean scores for a range of parameters and save them ---
 
-test_bias_correct = function(method = "gwa", # also accepts ema
+
+
+test_bias_correct = function(dt = NULL,
+                             method = c("sma","ema"),
+                             scores = c("RMSE","CRPS"),
                              saveorgo = TRUE,
-                             save.dir = "~/PostClimDataNoBackup/SFE/Derived/"
+                             save.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                             file.out = paste0(save.dir,"glob.scores.bc.RData")
+                             
 ){
 
-  dt = load_combined_wide()
+  if(is.null(dt)) {
+    dt = load_combined_wide()
+  }
   
   file.out = paste0(save.dir,"glob.scores.bc.",method,".","NorESM",".RData")
   

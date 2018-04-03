@@ -41,15 +41,16 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
 #' @param year Integer.  The year you are interested in.
 #' @param month Integer.  The month
 #' @param vintage One of Jan, Apr, Jul, Oct or mr.  If mr, the vintage closest to the given month is used.
-#' @param data.dir String.  The root directory that stores the data.  Data are then assumed stored in \code{/SFE/NorCPM_Ocean/}
+#' @param data.dir String.  The root directory that stores the data.  Data are then assumed stored in \code{SFE/NorCPM_Ocean/}
 #'
 #' @examples
 #' ##load_ensemble(1990,1)
 #'
 #' @export
 load_ensemble = function(year,
-                         month,vintage = "mr",
-                         data.dir = "~/PostClimDataNoBackup")
+                         month,
+                         vintage = "mr",
+                         data.dir = "~/PostClimDataNoBackup/")
 {
 
   ##------ Setup ----------
@@ -71,8 +72,8 @@ load_ensemble = function(year,
   ##-----------------------------------------
 
   ##-------- Find target run ----------------
-  filedir <- paste0(data.dir,"/SFE/NorCPM_Ocean/")
-  ff_all = system(paste0("ls ",filedir,"*_mem01.*.",year,"-",month,"*"), intern = TRUE)
+  filedir <- paste0(data.dir,"SFE/NorCPM_Ocean/")
+  ff_all = system(paste0("ls ",filedir,"*_mem01.micom.hm.",year,"-",month,".nc"), intern = TRUE)
   
   if (vintage == "mr") {ff_use = tail(ff_all,1)
   } else if (vintage == "2r") {ff_use = rev(ff_all)[2]

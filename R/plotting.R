@@ -34,12 +34,14 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #' 
 #' @param dt The data table containing the values for plotting.
 #' @param mn Title of the plot.
-#' @param save.pdf If TRUE the plot is saved as pdf (logical).
+#' @param save.pdf If TRUE, the plot is saved as pdf.
 #' @param save.dir,file.name Directory and file name for saving the plot, only used if save.pdf = TRUE (string).
 #' @param lons,lats Vectors with two entries containing min and max longitude and latitude for plotting rectangle.
 #'             If NULL, the entire globe is used.
 #' @param rr Range of the plot, if not specified the range of value is used.
 #' @param set.white Forces the blue-white-red color scheme to center white at the set value if specified.
+#' @param col.scheme Either of "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
+#' @param stretch_par Numeric. Only used when save.pdf == TRUE. Stretches the pdf output. Default is NULL, where it is streched to #lons/#lats.
 #'
 #' @return none
 #'  
@@ -51,7 +53,8 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #' plot_diagnostic(dt[year == 1990 & month == 1,.(Lon,Lat,Ens_bar)])
 #' }
 #' 
-#' @importFrom fields designer.colors
+#' @importFrom fields designer.colors 
+#' @importFrom maps map
 
 plot_diagnostic = function( dt, 
                             mn = "",
@@ -61,7 +64,9 @@ plot_diagnostic = function( dt,
                             lons = NULL,
                             lats = NULL,
                             rr = NULL,
-                            set.white = NULL)
+                            set.white = NULL,
+                            col.scheme = "bwr",
+                            stretch_par = NULL)
   {
   #--- get longitudes and latitudes
   
@@ -88,6 +93,10 @@ plot_diagnostic = function( dt,
   n_lat = length(Lats)
   
   if(is.null(rr))  rr = range(dt[,3],na.rm=TRUE)
+  if(!is.null(rr)){
+    dt[dt[[3]]<min(rr),3] = min(rr)
+    dt[dt[[3]]> max(rr),3] = max(rr)
+  }
   
   A = matrix(dt[[3]],  n_lon, n_lat)
   
@@ -100,15 +109,27 @@ plot_diagnostic = function( dt,
   brk.ind = round(seq(1,length(brk),length = 10))
   brk.lab = round(brk[brk.ind],2)
   brk.at = brk[brk.ind]
-  if(is.null(set.white)){
-  color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
-  }else{
-     zero.ind = min(which(brk > set.white))/length(brk)
-     color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
+  
+  if(col.scheme == "bwr"){
+    if(is.null(set.white)){
+    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+    }else{
+       zero.ind = min(which(brk > set.white))/length(brk)
+       color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
+    }
   }
+  if(col.scheme == "wr"){
+    color <- designer.colors(n=length(brk)-1, col = c("white","darkred"))
+  }
+  if(col.scheme == "wb"){
+    color <- designer.colors(n=length(brk)-1, col = c("white","blue"))
+  }
+    
   #--- plotting ---
   
-  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"))
+  if (is.null(strech_par)) stretch_par = n_lat/n_lon
+  
+  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"),width = 7,height = stretch_par * 7)
   
   image.plot.na(Lons,Lats,A,
                   xlab="Longitude",ylab="Latitude",
@@ -128,6 +149,8 @@ plot_diagnostic = function( dt,
   if(save.pdf) dev.off()
   
 }
+
+
 
 #' Plots the system with various options 
 #'
@@ -161,6 +184,7 @@ plot_diagnostic = function( dt,
 #'
 #' 
 #' @importFrom fields designer.colors
+#' @importFrom maps map
 
 plot_system = function(   type = "res",    
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
