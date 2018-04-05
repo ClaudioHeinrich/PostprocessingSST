@@ -40,6 +40,7 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #'             If NULL, the entire globe is used.
 #' @param rr Range of the plot, if not specified the range of value is used.
 #' @param set.white Forces the blue-white-red color scheme to center white at the set value if specified.
+#' @param stretch_par Numeric. Only used when save.pdf == TRUE. Stretches the (by default square) pdf output.
 #'
 #' @return none
 #'  
@@ -52,7 +53,7 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #' }
 #' 
 #' @importFrom fields designer.colors 
-#' @importFrom maps maps
+#' @importFrom maps map
 
 plot_diagnostic = function( dt, 
                             mn = "",
@@ -62,7 +63,8 @@ plot_diagnostic = function( dt,
                             lons = NULL,
                             lats = NULL,
                             rr = NULL,
-                            set.white = NULL)
+                            set.white = NULL,
+                            stretch_par = 1)
   {
   #--- get longitudes and latitudes
   
@@ -109,7 +111,7 @@ plot_diagnostic = function( dt,
   }
   #--- plotting ---
   
-  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"))
+  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"),width = 7,height = stretch_par * 7)
   
   image.plot.na(Lons,Lats,A,
                   xlab="Longitude",ylab="Latitude",
@@ -162,7 +164,7 @@ plot_diagnostic = function( dt,
 #'
 #' 
 #' @importFrom fields designer.colors
-#' @importFrom maps maps
+#' @importFrom maps map
 
 plot_system = function(   type = "res",    
                           obs_num = "mean",     # takes numbers from 1 to 9 or "mean", only used for 
