@@ -74,7 +74,7 @@ make_combined_wide_dataset = function(y_start = 1985,
     for(m in 1:12)
     {
       print(c(y,m))
-      dt_ens = load_ensemble(y,m,vintage)
+      dt_ens = load_ensemble(y,m,vintage,data.dir = data.dir)
       dt_obs = load_observations(y,m)
       dt_combine_all[[k]] = combine_data_wide(dt_ens, dt_obs, dt_map)
       dt_combine_all[[k]][,year:=y]
