@@ -6,9 +6,11 @@
 ###########################################################################
 
 
-# This script is a version of the current master.NAO script with some stuff left out and some minor modifications.
-# Models are trained on April vintage instead of most recent and have a gap in the data of 7 years prior to the forecast, which we take into account for bias modelling.
-# PCA uses all data available until 2010.
+#Issues the forecast for SST for summer 2018 in the northern atlantic ocean.
+
+# This script is based on the master.NAO script with some stuff left out and some minor modifications.
+# The model is trained on April vintage instead of the most recent vintage and assumes a gap in the data of 7 years 
+# prior to the forecast. PCA uses all data available until 2010.
 
 
 rm(list = ls())
@@ -23,10 +25,12 @@ library(vegan)
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
-# box for analysis, name abbreviation for saved files and directories
+# box for analysis, months for the forecast, and name abbreviation for saved files and directories
 
-lat_box = c(30,70)
-lon_box = c(-60,20)
+lat_box = c(40,85)
+lon_box = c(-30,60)
+
+months = 4:9
 
 name_abbr = "Apr18" 
 
@@ -41,18 +45,18 @@ dir.create(plot.dir, showWarnings = FALSE)
 ### construct and load wide data set ###
 ########################################
 
-# this function also attaches the forecast issued in March 2018:
 
-make_combined_wide_dataset_SFc2018 = function(y_start = 1985,
-                                      y_stop = 2010,
-                                      vintage = "Apr",
-                                      data.dir = "~/PostClimDataNoBackup/SFE/FcApr2018/",
-                                      grid_mapping_loc = "~/PostClimDataNoBackup/SFE/Derived/",
-                                      output_loc = save.dir, 
-                                      output_name = paste0("dt_combine_",name_abbr,"_wide.RData"),
-                                      lat_box = lat_box,
-                                      lon_box = lon_box)
-{
+
+y_start = 1986 # starting at 1985 gives an issue with choosing the April vintage
+y_stop = 2010
+vintage = "Apr"
+data.dir = "~/PostClimDataNoBackup/SFE/FcApr2018/"
+grid_mapping_loc = "~/PostClimDataNoBackup/SFE/Derived/"
+output_loc = save.dir 
+output_name = paste0("dt_combine_",name_abbr,"_wide.RData")
+
+
+# --- here comes a variation on the function make_combined_wide() ---
   
   ##----- Load Grid Mapping ---
   ff = paste0(grid_mapping_loc,"dt_map.RData")
@@ -70,7 +74,7 @@ make_combined_wide_dataset_SFc2018 = function(y_start = 1985,
   k = 1
   for(y in y_start:y_stop)
   {
-    for(m in 1:12)
+    for(m in months)
     {
       print(c(y,m))
       dt_ens = load_ensemble(y,m,vintage,data.dir = data.dir)
@@ -85,7 +89,7 @@ make_combined_wide_dataset_SFc2018 = function(y_start = 1985,
   # attach 2018 forecast
   
   y = 2018
-  for(m in 3:12)
+  for(m in months)
   {
     print(c(y,m))
     dt_ens = load_ensemble(y,m,vintage,data.dir = data.dir)
@@ -99,36 +103,29 @@ make_combined_wide_dataset_SFc2018 = function(y_start = 1985,
   ##------------------------
   
   ##--------- Combine -----
-  dt = rbindlist(dt_combine_all)
-  dt[, YM := year * 12 + month]
-  setkey(dt, "YM", "Lon", "Lat")
+  DT = rbindlist(dt_combine_all)
+  DT[, YM := year * 12 + month]
+  setkey(DT, "YM", "Lon", "Lat")
   ##------------------------
   
   ##---- Restrict ---
-  dt = dt[ (Lon >= lon_box[1]) & (Lon <= lon_box[2]) & (Lat >= lat_box[1]) & (Lat <= lat_box[2])]
+  DT = DT[ (Lon >= lon_box[1]) & (Lon <= lon_box[2] )& (Lat >= lat_box[1]) & (Lat <= lat_box[2])]
   
   ##----- Should I save or should I go? -----
-  if(is.null(data.dir))
-  {
-    return(dt)
-  }else{
+  
     if(is.null(output_name))
     {
       output_name = paste0("dt_combine_",vintage,"_wide.RData")
     }
     f_name = paste0(output_loc,"/",output_name)
-    save(dt,file = f_name)
-    return(1)
-  }
+    save(DT,file = f_name)
+    
+
   ##-------------------------------------------
   
   
-}
 
-
-make_combined_wide_dataset_SFc2018()
-
-DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
+# load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
 
 
@@ -140,7 +137,7 @@ DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",
 ############### bias ###################
 
 
-### run bias analysis ###
+### run bias analysis - train moving averages subject on the 7 most recent years of data missing  ###
 
 validation_years = 2001:2010
 
@@ -260,6 +257,7 @@ if(sc_sma[,min(MSE)] < sc_ema[,min(MSE)]){
   opt_par = c("ema",sc_ema[,a][sc_sma[,which.min(MSE)]])
 }
 
+
 ### bias correction ###
 
 bias_correct(dt = DT,
@@ -281,7 +279,7 @@ DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",
 
 ###################  PCA  #######################
 
-training_years = 1985:2010
+training_years = 1986:2010
 eval_years = 2018
 
 ens.size = 9
@@ -295,19 +293,7 @@ for_res_cov(Y = training_years,dt = DT, save.dir = cov.dir,ens.size = ens.size)
 
 ############## set up PCA #######################
 
-setup_PCA(dt = DT, y = eval_years, cov.dir = cov.dir)
-
-#### a brief example ####
-
-ex_depth = 15
-ex_month = 1
-ex_year = 2001
-
-result = forecast_PCA(y=ex_year,m=ex_month,PCA_depth = ex_depth, saveorgo = FALSE)
-
-plot_diagnostic(result[,.(Lon,Lat,noise)], mn = paste0("Noise for ",ex_month,"/",ex_year," generated by ",ex_depth," PCs"))
-
-
+setup_PCA(dt = DT, y = eval_years,m = months, cov.dir = cov.dir)
 
 
 ###### Example plots of forecasted SST and anomalies w.r.t climatology #######
@@ -315,11 +301,11 @@ plot_diagnostic(result[,.(Lon,Lat,noise)], mn = paste0("Noise for ",ex_month,"/"
 opt_num_PCs = 17 # This is an educated guess: for 16 years training the results are best for 11 PCs and very good for 9 to 17 PCs, now we have 26 years of training.
 
 ex_depth = opt_num_PCs
-ex_months = 4:9
+ex_months = months
 ex_month_names = c("April","May","June","July","August","September")
 ex_year = 2018
 
-clim_years = 1985:2010 # the years to compute the climatology from
+clim_years = 1986:2010 # the years to compute the climatology from
 
 MC_sample_size = 30   # number of plots with independently generated noise
 
@@ -330,6 +316,9 @@ PCs = opt_num_PCs      # number of considered principal components
 
 #compute climatology
 climatology = DT[year %in% clim_years, clim := mean(SST_bar),by = .(grid_id,month)][year == min(year) ,.(Lon,Lat,month,clim)]
+#print climatology every year
+DT[year == 2018, clim := DT[year == min(clim_years),clim]]
+
 
 
 for(m in ex_months){
@@ -358,12 +347,15 @@ for(m in ex_months){
   }
   
   #forecast plots:
-  
-  rr_sst = range(na.omit(DT_pca_plot[,.SD,.SDcols = c(paste0("fc",1:MC_sample_size))]))
+
+  trc = function (x){ 
+    truncation.value = -1.769995
+    x = truncation.value * (x < truncation.value) + x * (x >= truncation.value)
+    return(x)}
   
   for(i in 1:MC_sample_size){
-    plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i))))],
-                    rr = rr_sst,
+    plot_diagnostic(DT_pca_plot[,.(Lon,Lat,trc(eval(parse(text = paste0("fc",i)))))],
+                    #rr = rr_sst,
                     mn = paste0("SST forecast for ",ex_month_names[which(ex_months == m)]),
                     save.pdf = TRUE, 
                     save.dir = paste0(plot.dir,"/"),
@@ -371,20 +363,152 @@ for(m in ex_months){
                     stretch_par = .8)
   }
   
-  #anomaly plots
-  rr_clim = range(na.omit(DT_pca_plot[,.SD - clim,.SDcols = c(paste0("fc",1:MC_sample_size))]))
+  ### anomaly plots ###
   
   for(i in 1:MC_sample_size){
-    plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i)))-clim)],
-                    rr = rr_clim,
+    plot_diagnostic(DT_pca_plot[,.(Lon,Lat,trc(eval(parse(text = paste0("fc",i))))-clim)],
+                    rr = c(-3,3),
                     mn = paste0("Anomaly forecast for ",ex_month_names[which(ex_months == m)]),
                     save.pdf = TRUE, 
                     save.dir = paste0(plot.dir,"/"),
+                    set.white = 0,
                     file.name = paste0("m",m,"_afc",i),
                     stretch_par = .8)
   }
   
 }
 
+################## plots that Erik actually wants ######################
+
+month_vec = c("Apr.","May","June","July","Aug.","Sept.")
+
+# mean SST forecasts
+
+for (m in months){
+  DT_plot = DT[year == 2018 & month == m ,.(Lon,Lat,trc(SST_hat))]
+  plot_diagnostic(DT_plot,
+                  mn = paste0("SST forecast for ",month_vec[m-3]," 2018"),
+                  save.pdf = TRUE,
+                  save.dir = paste0(plot.dir,"/"),
+                  file.name = paste0("mean_SST_forecast_m",m),
+                  stretch_par = .8
+                  )
+}
+
+# mean anomaly forecasts
+
+for (m in months){
+  DT_plot = DT[year == 2018 & month == m ,.(Lon,Lat,trc(SST_hat)-clim)]
+  plot_diagnostic(DT_plot,
+                  mn = paste0("SST anomaly fc for ",month_vec[m-3]," 2018"),
+                  rr = c(-3,3),
+                  save.pdf = TRUE,
+                  save.dir = paste0(plot.dir,"/"),
+                  file.name = paste0("mean_ano_forecast_m",m),
+                  set.white = 0,
+                  stretch_par = .8
+  )
+}
 
 
+###### getting terciles of the empirical anomaly distribution ######
+
+q1 = 1/3
+q2 = 2/3
+
+# plot the percentage of ensemble members below q1 and above q2
+
+n=100
+
+DT_new = forecast_PCA_new(dt = DT,
+                          y = 2018,
+                          m = months,
+                          n=n,
+                          PCA_depth = opt_num_PCs,
+                          ens.member = FALSE,
+                          saveorgo = FALSE,
+                          cov.dir = cov.dir)
+
+rel_col_names = c("Lon","Lat","month",paste0("fc",1:n,"PC",opt_num_PCs)) 
+DT_new = DT_new[,.SD,.SDcols = rel_col_names]
+
+# get observations for climatology
+
+obs_years = 1986:2010
+
+prep_DT = DT[year < 2017 & month > 3,.(Lon,Lat,year,month,SST_bar)][,"name" := paste0("SST",year)]
+prep_DT[,SST_SD := sd(SST_bar),by = .(month,Lon,Lat)]
+
+SST_obs = dcast(prep_DT, Lon + Lat + month + SST_SD ~ name,value.var = "SST_bar")
+
+rowrank = function(A){# takes m x n matrix and returns vector of length m containing the ranks of the entries of the first column 
+  dA = dim(A)
+  a = c()
+  for( i  in 1:dA[1]){
+    a = c(a,rank(A[i,],na.last = "keep",ties.method = "random")[1])
+  }
+  return(a)
+  }
+
+setkey(SST_obs,month,Lon,Lat)
+setkey(DT_new,month,Lon,Lat)
+
+res_dt = merge(SST_obs,DT_new,all = TRUE)
+
+for(i in 1:n){
+  print(i)
+  col_names = c(paste0("fc",i,"PC",opt_num_PCs),paste0("SST",obs_years))
+  vec = c()
+  for(m in months){
+    vec = c(vec,rowrank(res_dt[month == m,.SD,.SDcols = col_names]))
+  }
+  res_dt[,paste0("rk",i):= vec]
+}
+
+
+
+# get the percentages
+threshold1 = q1 *  26 # 25 years of obs and 1 forecast
+threshold2 = q2 *  26 #
+
+results = res_dt[,sq1 := sum(.SD < threshold1),.SDcols = paste0("fc",1:n,"PC",opt_num_PCs),by = .(month,Lon,Lat)]
+results = res_dt[,sq2 := sum(.SD > threshold2),.SDcols = paste0("fc",1:n,"PC",opt_num_PCs),by = .(month,Lon,Lat)]
+
+
+
+below_t1 = res_dt[,rk1<threshold1]
+for(i in 2:n){below_t1 = below_t1 + res_dt[,eval(parse(text = paste0("rk",i)))<threshold1]
+}
+
+above_t2 = res_dt[,rk1>threshold2]
+for(i in 2:n){above_t2 = above_t2 + res_dt[,eval(parse(text = paste0("rk",i)))>threshold2]
+}
+
+results[,below_t1:= below_t1][,above_t2:= above_t2]
+
+results[SST_SD < 0.2 & !is.na(below_t1),below_t1 := (threshold1+threshold2)/2]
+results[SST_SD < 0.2 & !is.na(above_t2),above_t2 := (threshold1+threshold2)/2]
+
+
+
+for(m in months){
+  plot_diagnostic(results[month == m,.(Lon,Lat,below_t1)],
+                mn = paste0("percent below first tercile, ",month_vec[m-3]," 2018"),
+                save.pdf = TRUE,
+                col.scheme = "wb",
+                save.dir = paste0(plot.dir,"/"),
+                file.name = paste0("below_first_tercile_m",m),
+                stretch_par = .8)
+  
+  plot_diagnostic(results[month == m,.(Lon,Lat,above_t2)],
+                  mn = paste0("percent above second tercile, ",month_vec[m-3]," 2018"),
+                  save.pdf = TRUE,
+                  save.dir = paste0(plot.dir,"/"),
+                  col.scheme = "wr",
+                  file.name = paste0("above_second_tercile_m",m),
+                  stretch_par = .8)
+  
+}
+
+
+ 

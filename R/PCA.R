@@ -412,3 +412,155 @@ forecast_PCA = function(y, m,
   
   return(fc_land)
 }
+
+
+
+
+#' New forecasts using PCA
+#' 
+#' @description Generates forecasts for the PCA post-processing approach, \cr
+#'      does not require setup_PCA to be run first.
+#'      Creates output samples, see n below, and can use ensemble members plus noise as forecast. 
+#' 
+#' @param dt the data table, if NULL, it is loaded.
+#' @param y,m Integer vectors containing year(s) and month(s).
+#' @param n Integer. Size of the desired forecast ensemble. 
+#' @param PCA_depth Integer vector containing the numbers of considered principal components. Is allowed to contain 0 which refers to the forecast without noise.
+#' @param ens.member Logical. If FALSE, the noise is added to the ensemble mean. 
+#' @param ens.size Integer. Only needed if ens.member == TRUE. Size of the NWP ensemble.
+#' @param saveorgo Logical, whether we save or not. 
+#' @param save.dir The directory to save in.
+#' @param cov.dir Where the PCA covariance matrices are stored.
+#' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature
+#' 
+#' @return data table containing n columns with noise and n columns with forecasts.
+#' 
+#' @examples \dontrun{forecast_PCA_new(y = 1999, m = 7)}
+#' 
+#' @author Claudio Heinrich        
+#' 
+#' @export
+
+forecast_PCA_new = function(dt,
+                            y,
+                            m,
+                            n = 1, 
+                            PCA_depth = 15,  
+                            ens.member = TRUE,
+                            ens.size = 9,
+                            saveorgo = TRUE,
+                            save.dir = "./Data/PostClim/SFE/Derived/PCA/",
+                            file.name = "forecastPCA",
+                            cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                            truncate = TRUE) {
+  
+  
+  if(is.null(dt))
+  {
+    print("load and prepare data")
+    dt = load_combined_wide(bias = TRUE)
+    trash = c(paste0("SST",1:10))
+    dt[, (trash):=NULL]
+    dt = dt[year %in% y & month %in% m,]
+  }
+  
+  #find land grid ids:
+  
+  land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
+                      .(Lon,Lat,grid_id,month,year)]
+  fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = c("Lon","Lat","grid_id","month","year","YM","SST_hat","SST_bar",paste0("Ens",1:ens.size),"Ens_bar","Bias_Est")])
+  
+  
+  
+  #get covariance matrices
+  
+  print("data preparation complete - getting covariance matrices next:")
+  
+  for(mon in m){
+      load(file = paste0(cov.dir,"CovRes_mon",mon,".RData"))
+      
+      assign(paste0("A",mon),
+             matrix(res_cov, nrow = dim(res_cov)[1]))
+      
+      
+      PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max(PCA_depth))
+      
+      
+      assign(paste0("PCA",mon), PCA)
+      print(paste0("Month ",mon," complete"))
+      
+    }
+  
+  
+  print("setting up PCA complete - moving to forecasting")
+  
+  
+  #----- generate noise ------------
+  
+  for (d in PCA_depth){
+    
+    print(paste0("Depth of PCA: ",d))
+    
+    no <- c()
+    
+    for(mon in m){
+      A <- eval(parse(text = paste0("A",mon)))
+      PCA <- eval(parse(text = paste0("PCA",mon)))
+      eigen_vectors <- PCA$u[,1:d]
+      sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
+      
+      for(year in y){
+        
+        if(d == 0)  {
+          a <- matrix(0,nrow =  dim(PCA$u)[1],ncol = n)
+        }else{
+          a = eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n)
+        }
+            
+        no <- rbind(no, a)
+      }
+      
+    }
+    
+    for(i in 1:n) {
+      
+      fc = fc[,  paste0("no",i,"PC",d):= no[,i]]
+      
+      if(ens.member){
+      ens_mem = sample.int(ens.size,1) 
+      
+      fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), .SDcols = c(paste0("Ens",ens_mem),"Bias_Est",paste0("no",i,"PC",d))]
+      }else{
+        fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), 
+              .SDcols = c("Ens_bar","Bias_Est",paste0("no",i,"PC",d))]
+      }
+      
+      if(truncate){
+        trc = function (x){ 
+          truncation.value = -1.769995
+          x = truncation.value * (x < truncation.value) + x * (x >= truncation.value)
+          return(x)}
+        
+        fc[, paste0("fc",i,"PC",d) := lapply(.SD,trc), .SDcols = paste0("fc",i,"PC",d) ]
+        }  
+      }
+  }
+
+    
+    #-------- add land --------------
+    
+    fc_land <- list()
+    fc_land[[1]] = fc
+    fc_land[[2]] = land_grid_id
+    fc_land = rbindlist(fc_land, fill = TRUE)
+    fc_land = fc_land[ order(year,month,grid_id)]
+    
+    
+    #-------- save -------
+    
+    if(saveorgo){ 
+      save(fc_land, file = paste0(save.dir,file.name,".RData"))
+    }
+  return(fc_land)
+}
+
