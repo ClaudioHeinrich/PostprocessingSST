@@ -4,7 +4,7 @@
 #'
 #' @param l length of the averaging window.
 #' @param vec,years vectors of the same length, vec[i] contains the value corresponding to year years[i]
-#' @skip Integer. If skip = n > 0 the moving average skips the most recent n realizations. Useful if realizations in the most recent past are missing.
+#' @skip Integer. If skip = n > 0 the moving average skips the most recent n years. Useful if realizations in the most recent past are missing.
 #'                                    
 #' @return a vector of the same length as the input vectors. At location j it contains the average of the values contained in vec that fall into the period of the last l years (excluding the present). First entry is 0.
 #'
@@ -20,11 +20,11 @@ sim_mov_av = function( l,vec, years, skip = 0 ){
   
   sma = rep(0,length(vec))
   
-  for (i in (2 + skip):length(vec)){
+  for (i in 2 + skip :length(vec)){
     year_ind = which(all_years == years[i])
-    weight_vec = (year_ind - which(all_years %in% years[1:(i-1-skip)])) <= l + skip
+    weight_vec = ((year_ind - which(all_years %in% years[1:(i-1)])) <= l ) & ((year_ind - which(all_years %in% years[1:(i-1)])) > skip)
     if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
-    sma[i] = sum(weight_vec*vec[1:(i-1-skip)])
+    sma[i] = sum(weight_vec*vec[1:(i-1)])
   }
   return(sma)
 }
@@ -35,7 +35,7 @@ sim_mov_av = function( l,vec, years, skip = 0 ){
 #' @param vec,years vectors of the same length, vec[i] contains the value corresponding to year years[i]
 #'                  
 #' @return a vector of the same length as the input vectors. At location j it contains the average of the past entries of vec, weighted by exp(-a*d) where d is the distance to the current year. First entry is 0.
-#' @skip Integer. If skip = n > 0 the moving average skips the most recent n realizations. Useful if realizations in the most recent past are missing.
+#' @skip Integer. If skip = n > 0 the moving average skips the most recent n years. Useful if realizations in the most recent past are missing.
 #'
 #' @author Claudio Heinrich
 #' @examples exp_mov_av(.1, rnorm(10), c(1990,1993,1995:2002))
@@ -131,7 +131,7 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 #' @param eval_years Numerical vector. The years for evaluating the score.
 #' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
 #' @param save.dir,file.name Directory and name for the saved file.
-#' @skip Integer. If skip = n > 0 the moving average skips the most recent n realizations. Useful if realizations in the most recent past are missing.
+#' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
 #'                   
 #'                   
 #' @return The data table with corrected SST_hat and new column Bias_Est.

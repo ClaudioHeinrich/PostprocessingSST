@@ -73,7 +73,7 @@ load_ensemble = function(year,
 
   ##-------- Find target run ----------------
   filedir <- paste0(data.dir,"SFE/NorCPM_Ocean/")
-  ff_all = system(paste0("ls ",filedir,"*_mem01.micom.hm.",year,"-",month,"*"), intern = TRUE)
+  ff_all = system(paste0("ls ",filedir,"*_mem01.micom.hm.",year,"-",month,".nc"), intern = TRUE)
   
   if (vintage == "mr") {ff_use = tail(ff_all,1)
   } else if (vintage == "2r") {ff_use = rev(ff_all)[2]
