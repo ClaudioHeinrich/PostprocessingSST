@@ -3,8 +3,8 @@
 #' @param dt The wide data.table
 #' @param Y training years.  So this will use all years in order to form the covariance matrix
 #' @param M training months the PCA should be computed for.
-#' @param save.dir Where we save.
-#' @param ens.num The number of ensemble members.
+#' @param save_dir Where we save.
+#' @param ens_size The number of ensemble members.
 #'
 #' @author Claudio Heinrich
 #' @examples 
@@ -14,8 +14,8 @@
 for_res_cov = function(dt = NULL,
                        Y = 1985:2010,
                        M = 1:12,
-                       save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       ens.size = 9
+                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                       ens_size = 9
 ){  
   
   if(is.null(dt))
@@ -32,23 +32,23 @@ for_res_cov = function(dt = NULL,
     dt_PCA = copy(dt)
     dt_PCA = dt_PCA[month == mon & year %in% Y,]
     
-    for(ens in  1:ens.size){
+    for(ens in  1:ens_size){
       print(paste0("ensemble =",ens))  
       dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-SST_bar]
     }
     dt_PCA = dt_PCA[,"res_mean" := mean(SST_hat- SST_bar), by =  grid_id]
     
     sqrt_cov_mat = c()
-    for( ens in 1:ens.size){
+    for( ens in 1:ens_size){
       sqrt_cov_mat = c(sqrt_cov_mat, 
                        na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
     }
     sqrt_cov_mat = matrix(sqrt_cov_mat,
                           nrow = length(na.omit(dt_PCA[,res_mean]))/year.num)
     
-    res_cov = sqrt_cov_mat/(sqrt(year.num*ens.size -1))
+    res_cov = sqrt_cov_mat/(sqrt(year.num*ens_size -1))
     
-    save(res_cov, file = paste0(save.dir,"CovRes_mon",mon,".RData"))
+    save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
     
     rm(dt_PCA)
   }
@@ -63,9 +63,9 @@ for_res_cov = function(dt = NULL,
 #' @param dt The wide data table.
 #' @param M The months you want the PCA to be performed for.
 #' @param Y The years you want to perform the PCA for.
-#' @param save.dir The directory in which the covariances are saved.
-#' @param obs.num The number of observations in the observational product.
-#' @param ens.num The number of ensemble members.
+#' @param save_dir The directory in which the covariances are saved.
+#' @param obs_size The number of observations in the observational product.
+#' @param ens_size The number of ensemble members.
 #' 
 #' @examples \dontrun{for_unc_cov(Y = 1985:1986)}
 #'
@@ -77,9 +77,9 @@ for_res_cov = function(dt = NULL,
 for_unc_cov = function(dt = NULL,
                        Y = 1985:2010,
                        M = 1:12,
-                       save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       obs.num = 10,
-                       ens.num = 9
+                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                       obs_size = 10,
+                       ens_size = 9
                        ){
   
   if(is.null(dt)) dt = load_combined_wide(bias = TRUE)
@@ -89,32 +89,32 @@ for_unc_cov = function(dt = NULL,
   for(mon in M){
     print(paste0("month =",mon))  
     
-    for (obs in 1:obs.num){
+    for (obs in 1:obs_size){
       
       print(paste0("obs =",obs))
       
       dt_PCA = dt[month == mon,]
-      trash = c(paste0("SST", 1:obs.num),"SST_sd","SST_bar","Ens_sd")
+      trash = c(paste0("SST", 1:obs_size),"SST_sd","SST_bar","Ens_sd")
       trash = trash[! trash == paste0("SST",obs)]
       dt_PCA = dt_PCA[,(trash):=NULL,]
       
-      for(ens in  1:ens.num){
+      for(ens in  1:ens_size){
         dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-eval(parse(text = paste0("SST",obs)))]
         dt_PCA = dt_PCA[, paste0("Ens",ens):=NULL]
       }
       dt_PCA = dt_PCA[,"res_mean" := mean(Ens_bar +Bias_Est- eval(parse(text = paste0("SST",obs)))), by =  grid_id]
       
       sqrt_cov_mat = c()
-      for( ens in 1:ens.num){
+      for( ens in 1:ens_size){
         sqrt_cov_mat = c(sqrt_cov_mat, 
                          na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
       }
       sqrt_cov_mat = matrix(sqrt_cov_mat,
                             nrow = length(na.omit(dt_PCA[,res_mean]))/year.num,
-                            ncol = year.num*ens.num) 
-      sqrt_cov_mat = sqrt_cov_mat/(sqrt(year.num*ens.num -1))
+                            ncol = year.num*ens_size) 
+      sqrt_cov_mat = sqrt_cov_mat/(sqrt(year.num*ens_size -1))
       
-      save(sqrt_cov_mat, file = paste0(save.dir,"CovFU_mon",mon,"_obs",obs,".RData"))
+      save(sqrt_cov_mat, file = paste0(save_dir,"CovFU_mon",mon,"_obs",obs,".RData"))
       
       rm(dt_PCA)
     }
@@ -125,8 +125,8 @@ for_unc_cov = function(dt = NULL,
 #' Creates and saves the covariance matrix for the residuals taking observation uncertainty into account.
 #'
 #' @param M Training months the PCA should be computed for.
-#' @param cov.dir Where the covariances are saved, should match save.dir of for_unc_cov.
-#' @param obs.num The number of observations in the observational product.
+#' @param cov_dir Where the covariances are saved, should match save_dir of for_unc_cov.
+#' @param obs_size The number of observations in the observational product.
 #'
 #' @author Claudio Heinrich
 #' 
@@ -135,17 +135,17 @@ for_unc_cov = function(dt = NULL,
 #' @export
 
 for_unc_cov_combined = function(M = 1:12,
-                                cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                                obs.num = 10){
+                                cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                                obs_size = 10){
   
   for(mon in M){
-    load(file = paste0(cov.dir,"CovFU_mon",mon,"_obs",1,".RData"))
+    load(file = paste0(cov_dir,"CovFU_mon",mon,"_obs",1,".RData"))
     
     cov_for_unc = sqrt_cov_mat
     
-    if (obs.num > 1){
-      for(obs in 2:obs.num){
-        load(file = paste0(cov.dir,"CovFU_mon",mon,"_obs",obs,".RData"))
+    if (obs_size > 1){
+      for(obs in 2:obs_size){
+        load(file = paste0(cov_dir,"CovFU_mon",mon,"_obs",obs,".RData"))
         cov_for_unc = matrix(c(cov_for_unc,sqrt_cov_mat),
                              nrow = dim(cov_for_unc)[1],
                              ncol = dim(cov_for_unc)[2] + dim(sqrt_cov_mat)[2]
@@ -154,9 +154,9 @@ for_unc_cov_combined = function(M = 1:12,
       }
     }
     
-    cov_for_unc = cov_for_unc/sqrt(obs.num)
+    cov_for_unc = cov_for_unc/sqrt(obs_size)
     
-    save(cov_for_unc, file = paste0(cov.dir,"Cov_FU_mon",mon,".RData"))
+    save(cov_for_unc, file = paste0(cov_dir,"Cov_FU_mon",mon,".RData"))
   }
 }
 
@@ -164,11 +164,11 @@ for_unc_cov_combined = function(M = 1:12,
 #' Creates and saves the covariance matrix for the observation for modelling only observation uncertainty.
 #'
 #' @param M Training months the PCA should be computed for.
-#' @param save.dir The directory in which the covariances are saved.
-#' @param obs.num The number of observations in the observational product.
-#' @param ens.num The number of ensemble members.
-#' @param load_reduced_data If FALSE, the reduced data table dt_reduced is computed and saved in data.dir, which takes time. If TRUE, the data table is loaded.
-#' @param data.dir Where everything is saved.
+#' @param save_dir The directory in which the covariances are saved.
+#' @param obs_size The number of observations in the observational product.
+#' @param ens_size The number of ensemble members.
+#' @param load_reduced_data If FALSE, the reduced data table dt_reduced is computed and saved in data_dir, which takes time. If TRUE, the data table is loaded.
+#' @param data_dir Where everything is saved.
 #'
 #' @examples \dontrun{obs_unc_cov()}
 #'
@@ -177,11 +177,11 @@ for_unc_cov_combined = function(M = 1:12,
 #' @export
 
 obs_unc_cov = function(M = 1:12,
-                       save.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       obs.num = 10,
-                       ens.num = 9,
+                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                       obs_size = 10,
+                       ens_size = 9,
                        load_reduced_data = TRUE,
-                       data.dir = "~/PostClimDataNoBackup/SFE/PCACov/"
+                       data_dir = "~/PostClimDataNoBackup/SFE/PCACov/"
 ){
   
   #--- bring out the trash, reshape and save ---
@@ -195,20 +195,20 @@ obs_unc_cov = function(M = 1:12,
     dt_reduced <- dt[,c(paste0("Ens", 1:9),"Ens_bar","SST_sd","Ens_sd"):=NULL,]
     dt_reduced = dt_reduced[,"obs_mean_y" := mean( SST_bar, na.rm = TRUE), by = .(month, grid_id)]
     dt_reduced = dt_reduced[,"SST_bar":=NULL,]
-    dt_reduced = melt(dt_reduced, measure.vars = paste0("SST",1:obs.num))
+    dt_reduced = melt(dt_reduced, measure.vars = paste0("SST",1:obs_size))
     dt_reduced = dt_reduced[,"cov_vec" :=  value - obs_mean_y , by = .(month, grid_id)]
-    save(dt_reduced, file = paste0(data.dir,"../Derived/dt_reduced_PCA.RData"))
+    save(dt_reduced, file = paste0(data_dir,"../Derived/dt_reduced_PCA.RData"))
     print("reduced data saved")
   }
   
   #---- compute empirical covariance matrices
   
-  load(file = paste0(data.dir,"../Derived/dt_reduced_PCA.RData"))
+  load(file = paste0(data_dir,"../Derived/dt_reduced_PCA.RData"))
   dt_reduced_water = na.omit(dt_reduced)
   y_range = range(dt_reduced_water[,year])
   num_y = y_range[2]-y_range[1]+1
   cov_size_row = length(unique(dt_reduced_water[,grid_id]))
-  cov_size_col = num_y * obs.num
+  cov_size_col = num_y * obs_size
   
   
   for(mon in M){
@@ -219,7 +219,7 @@ obs_unc_cov = function(M = 1:12,
                        byrow = FALSE)/sqrt(cov_size_col-1)
     
     # the empirical covariance matrix is cov_obs_unc %*% t(cov_obs_unc), but does not need to be computed
-    save(cov_obs_unc, file = paste0(data.dir,"/CovOU_mon",mon,".RData"))
+    save(cov_obs_unc, file = paste0(data_dir,"/CovOU_mon",mon,".RData"))
   }
 }
 
@@ -251,7 +251,7 @@ setup_PCA = function(dt=NULL,
                      m=1:12,
                      y = 2001:2010,
                      max_PCA_depth = 75,
-                     cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/")
+                     cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/")
 {
   
   if(is.null(dt))
@@ -279,7 +279,7 @@ setup_PCA = function(dt=NULL,
                                         #get covariance matrices
   
   for(mon in m){
-    load(file = paste0(cov.dir,"CovRes_mon",mon,".RData"))
+    load(file = paste0(cov_dir,"CovRes_mon",mon,".RData"))
     
     assign(paste0("A",mon),
            matrix(res_cov, 
@@ -312,7 +312,7 @@ setup_PCA = function(dt=NULL,
 #'      "PCsum", returns the sum over the first d PCs, \cr
 #'           if saveorgo = TRUE, PCA_depth accepts integer vectors.
 #' @param saveorgo Logical, whether we save or not. 
-#' @param save.dir The directory to save in.
+#' @param save_dir The directory to save in.
 #' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature
 #' 
 #' @return data table containing a column with output_opts as name, if output_opts = "forecast" it contains additionally a column with the noise.
@@ -328,7 +328,7 @@ forecast_PCA = function(y, m,
                         #ensemble is returned. If saveorgo = TRUE, PCA_depth can be
                         #a vector
                         saveorgo = TRUE,
-                        save.dir="./Data/PostClim/SFE/Derived/PCA",
+                        save_dir="./Data/PostClim/SFE/Derived/PCA",
                         truncate = TRUE) {
   
   # Check whether setup_PCA has been run, beware that setup_PCA has been called with the right parameters
@@ -393,18 +393,18 @@ forecast_PCA = function(y, m,
     #-------- save -------
     
     if(saveorgo & output_opts == "forecast"){ 
-      save(fc_land, file = paste0(save.dir,"/fc_",d,"pc_",y,"_",m,".RData"))
+      save(fc_land, file = paste0(save_dir,"/fc_",d,"pc_",y,"_",m,".RData"))
     }
     if(saveorgo & output_opts == "mar_sd"){ 
-      save(fc_land, file = paste0(save.dir,"/PCA_mar_sd",d,"_m",m,".RData"))
+      save(fc_land, file = paste0(save_dir,"/PCA_mar_sd",d,"_m",m,".RData"))
     }
     
     if(saveorgo & output_opts == "PC"){ 
-      save(fc_land, file = paste0(save.dir,"/PCA_",d,"PC_month",m,".RData"))
+      save(fc_land, file = paste0(save_dir,"/PCA_",d,"PC_month",m,".RData"))
     }
     
     if(saveorgo & output_opts == "PCsum"){ 
-      save(fc_land, file = paste0(save.dir,"/PCA_",d,"sum.RData"))
+      save(fc_land, file = paste0(save_dir,"/PCA_",d,"sum.RData"))
     }
     
     
@@ -426,11 +426,11 @@ forecast_PCA = function(y, m,
 #' @param y,m Integer vectors containing year(s) and month(s).
 #' @param n Integer. Size of the desired forecast ensemble. 
 #' @param PCA_depth Integer vector containing the numbers of considered principal components. Is allowed to contain 0 which refers to the forecast without noise.
-#' @param ens.member Logical. If FALSE, the noise is added to the ensemble mean. 
-#' @param ens.size Integer. Only needed if ens.member == TRUE. Size of the NWP ensemble.
+#' @param ens_member Logical. If FALSE, the noise is added to the ensemble mean. 
+#' @param ens_size Integer. Only needed if ens_member == TRUE. Size of the NWP ensemble.
 #' @param saveorgo Logical, whether we save or not. 
-#' @param save.dir The directory to save in.
-#' @param cov.dir Where the PCA covariance matrices are stored.
+#' @param save_dir The directory to save in.
+#' @param cov_dir Where the PCA covariance matrices are stored.
 #' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature
 #' 
 #' @return data table containing n columns with noise and n columns with forecasts.
@@ -446,12 +446,12 @@ forecast_PCA_new = function(dt,
                             m,
                             n = 1, 
                             PCA_depth = 15,  
-                            ens.member = TRUE,
-                            ens.size = 9,
+                            ens_member = TRUE,
+                            ens_size = 9,
                             saveorgo = TRUE,
-                            save.dir = "./Data/PostClim/SFE/Derived/PCA/",
-                            file.name = "forecastPCA",
-                            cov.dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                            save_dir = "./Data/PostClim/SFE/Derived/PCA/",
+                            file_name = "forecastPCA",
+                            cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                             truncate = TRUE) {
   
   
@@ -468,7 +468,9 @@ forecast_PCA_new = function(dt,
   
   land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
                       .(Lon,Lat,grid_id,month,year)]
-  fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = c("Lon","Lat","grid_id","month","year","YM","SST_hat","SST_bar",paste0("Ens",1:ens.size),"Ens_bar","Bias_Est")])
+  SD_cols = c("Lon","Lat","grid_id","month","year","YM",
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est")
+  fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
   
   
   
@@ -477,7 +479,7 @@ forecast_PCA_new = function(dt,
   print("data preparation complete - getting covariance matrices next:")
   
   for(mon in m){
-      load(file = paste0(cov.dir,"CovRes_mon",mon,".RData"))
+      load(file = paste0(cov_dir,"CovRes_mon",mon,".RData"))
       
       assign(paste0("A",mon),
              matrix(res_cov, nrow = dim(res_cov)[1]))
@@ -526,8 +528,8 @@ forecast_PCA_new = function(dt,
       
       fc = fc[,  paste0("no",i,"PC",d):= no[,i]]
       
-      if(ens.member){
-      ens_mem = sample.int(ens.size,1) 
+      if(ens_member){
+      ens_mem = sample.int(ens_size,1) 
       
       fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), .SDcols = c(paste0("Ens",ens_mem),"Bias_Est",paste0("no",i,"PC",d))]
       }else{
@@ -559,7 +561,7 @@ forecast_PCA_new = function(dt,
     #-------- save -------
     
     if(saveorgo){ 
-      save(fc_land, file = paste0(save.dir,file.name,".RData"))
+      save(fc_land, file = paste0(save_dir,file_name,".RData"))
     }
   return(fc_land)
 }

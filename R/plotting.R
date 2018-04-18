@@ -34,14 +34,14 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #' 
 #' @param dt The data table containing the values for plotting.
 #' @param mn Title of the plot.
-#' @param save.pdf If TRUE, the plot is saved as pdf.
-#' @param save.dir,file.name Directory and file name for saving the plot, only used if save.pdf = TRUE (string).
+#' @param save_pdf If TRUE, the plot is saved as pdf.
+#' @param save_dir,file_name Directory and file name for saving the plot, only used if save_pdf = TRUE (string).
 #' @param lons,lats Vectors with two entries containing min and max longitude and latitude for plotting rectangle.
 #'             If NULL, the entire globe is used.
 #' @param rr Range of the plot, if not specified the range of value is used.
-#' @param set.white Forces the blue-white-red color scheme to center white at the set value if specified.
-#' @param col.scheme Either of "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
-#' @param stretch_par Numeric. Only used when save.pdf == TRUE. Stretches the pdf output. Default is NULL, where it is streched to #lons/#lats.
+#' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
+#' @param col_scheme Either of "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
+#' @param stretch_par Numeric. Only used when save_pdf == TRUE. Stretches the pdf output. Default is NULL, where it is stretched to #lons/#lats.
 #'
 #' @return none
 #'  
@@ -58,14 +58,14 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 
 plot_diagnostic = function( dt, 
                             mn = "",
-                            save.pdf = FALSE,
-                            save.dir = "./figures/",
-                            file.name = "diag_plot",
+                            save_pdf = FALSE,
+                            save_dir = "./figures/",
+                            file_name = "diag_plot",
                             lons = NULL,
                             lats = NULL,
                             rr = NULL,
-                            set.white = NULL,
-                            col.scheme = "bwr",
+                            set_white = NULL,
+                            col_scheme = "bwr",
                             stretch_par = NULL)
   {
   #--- get longitudes and latitudes
@@ -110,26 +110,26 @@ plot_diagnostic = function( dt,
   brk.lab = round(brk[brk.ind],2)
   brk.at = brk[brk.ind]
   
-  if(col.scheme == "bwr"){
-    if(is.null(set.white)){
+  if(col_scheme == "bwr"){
+    if(is.null(set_white)){
     color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
     }else{
-       zero.ind = min(which(brk > set.white))/length(brk)
+       zero.ind = min(which(brk > set_white))/length(brk)
        color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
     }
   }
-  if(col.scheme == "wr"){
+  if(col_scheme == "wr"){
     color <- designer.colors(n=length(brk)-1, col = c("white","darkred"))
   }
-  if(col.scheme == "wb"){
+  if(col_scheme == "wb"){
     color <- designer.colors(n=length(brk)-1, col = c("white","blue"))
   }
     
   #--- plotting ---
   
-  if (is.null(strech_par)) stretch_par = n_lat/n_lon
+  if (is.null(stretch_par)) stretch_par = n_lat/n_lon
   
-  if(save.pdf) pdf(paste0(save.dir,file.name,".pdf"),width = 7,height = stretch_par * 7)
+  if(save_pdf) pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
   
   image.plot.na(Lons,Lats,A,
                   xlab="Longitude",ylab="Latitude",
@@ -146,7 +146,7 @@ plot_diagnostic = function( dt,
                                label = brk.lab))
       map("world", add = TRUE)
   
-  if(save.pdf) dev.off()
+  if(save_pdf) dev.off()
   
 }
 
@@ -167,7 +167,7 @@ plot_diagnostic = function( dt,
 #' @param Y,M Year and month.
 #' @param depth Specifies the numbers of principal components to consider.
 #' @param moment Takes 1 or 2, only used for type = "cal", 1 plots mean, 2 plots SD of the PIT.
-#' @param file_dir,data.dir Directories for saving the plot and for loading the data.
+#' @param file_dir,data_dir Directories for saving the plot and for loading the data.
 #' @param lons,lats Vector with two entries containing min and max longitude and latitude for plotting rectangle.
 #'             If NULL, the entire globe is used.
 #' @param rr Range of the plot. 
@@ -194,7 +194,7 @@ plot_system = function(   type = "res",
                           moment = 1, #only used for type = 'cal'
                           depth = 0,  
                           file_dir = "./figures/",
-                          data.dir = "./Data/PostClim/SFE/Derived/",
+                          data_dir = "./Data/PostClim/SFE/Derived/",
                           lons = NULL,
                           lats = NULL,
                           rr = NULL,
@@ -264,8 +264,8 @@ plot_system = function(   type = "res",
   if(type == "res" | type == "for"){
   
       dir.name = "./Data/PostClim/SFE/Derived/PCA"
-      file.name = paste0("/fc_",depth,"pc_",Y,"_",M,".RData")
-      load(paste0(dir.name,file.name))
+      file_name = paste0("/fc_",depth,"pc_",Y,"_",M,".RData")
+      load(paste0(dir.name,file_name))
       dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
       
       mn_for = paste0(" FC depth ",depth)
@@ -293,28 +293,28 @@ plot_system = function(   type = "res",
     
   
   if(type == "mar_sd") {
-    file.name = paste0("PCA/PCA_mar_sd",depth,"_m",M,".RData")
-    load(paste0(data.dir,file.name))
+    file_name = paste0("PCA/PCA_mar_sd",depth,"_m",M,".RData")
+    load(paste0(data_dir,file_name))
     dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }
   
   if(type == "PC") {
-    file.name = paste0("PCA/PCA_",depth,"PC_month",M,".RData")
-    load(paste0(data.dir,file.name))
+    file_name = paste0("PCA/PCA_",depth,"PC_month",M,".RData")
+    load(paste0(data_dir,file_name))
     dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }
   
   if(type == "PCsum") {
-    file.name = paste0("PCA/PCA_",depth,"sum.RData")
-    load(paste0(data.dir,file.name))
+    file_name = paste0("PCA/PCA_",depth,"sum.RData")
+    load(paste0(data_dir,file_name))
     dt_for = fc_land[Lon %in% Lons & Lat %in% Lats]
   }
   
   if(type == "cal"){
-    file.name = paste0("PCA/cal",depth,"_mom",moment,".RData")
-    if(depth == 0) file.name = paste0("PCA/cal_ens_mom",moment,".RData")
-    if(depth == -1) file.name = paste0("PCA/cal_clim_mom",moment,".RData")
-    load(paste0(data.dir,file.name))
+    file_name = paste0("PCA/cal",depth,"_mom",moment,".RData")
+    if(depth == 0) file_name = paste0("PCA/cal_ens_mom",moment,".RData")
+    if(depth == -1) file_name = paste0("PCA/cal_clim_mom",moment,".RData")
+    load(paste0(data_dir,file_name))
   }
   
   
