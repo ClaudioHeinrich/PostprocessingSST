@@ -34,11 +34,11 @@ months = 4:9
 
 name_abbr = "Apr18" 
 
-save.dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr)
-dir.create(save.dir, showWarnings = FALSE)
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr)
+dir.create(save_dir, showWarnings = FALSE)
 
-plot.dir = paste0("./figures/", name_abbr)
-dir.create(plot.dir, showWarnings = FALSE)
+plot_dir = paste0("./figures/", name_abbr)
+dir.create(plot_dir, showWarnings = FALSE)
 
 
 ########################################
@@ -50,9 +50,9 @@ dir.create(plot.dir, showWarnings = FALSE)
 y_start = 1986 # starting at 1985 gives an issue with choosing the April vintage
 y_stop = 2010
 vintage = "Apr"
-data.dir = "~/PostClimDataNoBackup/SFE/FcApr2018/"
+data_dir = "~/PostClimDataNoBackup/SFE/FcApr2018/"
 grid_mapping_loc = "~/PostClimDataNoBackup/SFE/Derived/"
-output_loc = save.dir 
+output_loc = save_dir 
 output_name = paste0("dt_combine_",name_abbr,"_wide.RData")
 
 
@@ -77,7 +77,7 @@ output_name = paste0("dt_combine_",name_abbr,"_wide.RData")
     for(m in months)
     {
       print(c(y,m))
-      dt_ens = load_ensemble(y,m,vintage,data.dir = data.dir)
+      dt_ens = load_ensemble(y,m,vintage,data_dir = data_dir)
       dt_obs = load_observations(y,m)
       dt_combine_all[[k]] = combine_data_wide(dt_ens, dt_obs, dt_map)
       dt_combine_all[[k]][,year:=y]
@@ -92,7 +92,7 @@ output_name = paste0("dt_combine_",name_abbr,"_wide.RData")
   for(m in months)
   {
     print(c(y,m))
-    dt_ens = load_ensemble(y,m,vintage,data.dir = data.dir)
+    dt_ens = load_ensemble(y,m,vintage,data_dir = data_dir)
     dt_obs = load_observations(2010,1) # hacked - we don't have an observation for 2018, so we just attach any observation
     dt_combine_all[[k]] = combine_data_wide(dt_ens, dt_obs, dt_map)
     dt_combine_all[[k]][,year:=y]
@@ -125,7 +125,7 @@ output_name = paste0("dt_combine_",name_abbr,"_wide.RData")
   
   
 
-# load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
+# load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
 
 
@@ -160,7 +160,7 @@ dummy_function = function(k){
 sc_sma = mclapply(X = 1:(num.years-1), FUN = dummy_function, mc.cores = 8)
 sc_sma = rbindlist(sc_sma)
 
-save(sc_sma, file = paste0(save.dir,"/scores.bc.sma.Rdata"))
+save(sc_sma, file = paste0(save_dir,"/scores.bc.sma.Rdata"))
 
 # for exponential moving averages
 
@@ -182,20 +182,20 @@ dummy_function = function(k){
 sc_ema = mclapply(X = 1:length(par.vec), FUN = dummy_function,mc.cores = 8)
 sc_ema = rbindlist(sc_ema)
 
-save(sc_ema, file = paste0(save.dir,"/scores.bc.ema.Rdata"))
+save(sc_ema, file = paste0(save_dir,"/scores.bc.ema.Rdata"))
 
 
 #### plotting scores for different ways of bias correction ####
 
-load(paste0(save.dir,"/scores.bc.sma.Rdata"))
-load(paste0(save.dir,"/scores.bc.ema.Rdata"))
+load(paste0(save_dir,"/scores.bc.sma.Rdata"))
+load(paste0(save_dir,"/scores.bc.ema.Rdata"))
 
 # ensure that they are plotted on the the same range
 y_range = range(c(sc_sma[,sqrt(MSE)],sc_ema[,sqrt(MSE)]))  
 
 ## plot for sma ##
 
-pdf(paste0(plot.dir,"/mean_scores_sma.pdf"))
+pdf(paste0(plot_dir,"/mean_scores_sma.pdf"))
 plot(x = sc_sma[,win_length],
      y = sc_sma[,sqrt(MSE)],
      ylim = y_range,
@@ -221,7 +221,7 @@ dev.off()
 
 ## plot for ema ##
 
-pdf(paste0(plot.dir,"/mean_scores_ema.pdf"))
+pdf(paste0(plot_dir,"/mean_scores_ema.pdf"))
 plot(x = sc_ema[,a],
      y = sc_ema[,sqrt(MSE)],
      ylim = y_range,
@@ -263,11 +263,11 @@ if(sc_sma[,min(MSE)] < sc_ema[,min(MSE)]){
 bias_correct(dt = DT,
              method = opt_par[1],
              par_1 = as.double(opt_par[2]),
-             save.dir = paste0(save.dir,"/"),
-             file.name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"),
+             save_dir = paste0(save_dir,"/"),
+             file_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"),
              skip = 7)
 
-DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))
+DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))
 
 
 
@@ -282,18 +282,18 @@ DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",
 training_years = 1986:2010
 eval_years = 2018
 
-ens.size = 9
+ens_size = 9
 
 ##### compute and save principal components #####
 
-cov.dir = paste0(save.dir,"/PCACov")
-dir.create(cov.dir, showWarnings = FALSE)
+cov_dir = paste0(save_dir,"/PCACov")
+dir.create(cov_dir, showWarnings = FALSE)
 
-for_res_cov(Y = training_years,dt = DT, save.dir = cov.dir,ens.size = ens.size)
+for_res_cov(Y = training_years,dt = DT, save_dir = cov_dir,ens_size = ens_size)
 
 ############## set up PCA #######################
 
-setup_PCA(dt = DT, y = eval_years,m = months, cov.dir = cov.dir)
+setup_PCA(dt = DT, y = eval_years,m = months, cov_dir = cov_dir)
 
 
 ###### Example plots of forecasted SST and anomalies w.r.t climatology #######
@@ -308,8 +308,6 @@ ex_year = 2018
 clim_years = 1986:2010 # the years to compute the climatology from
 
 MC_sample_size = 30   # number of plots with independently generated noise
-
-ens.size = 9   # size of forecast ensemble
 
 PCs = opt_num_PCs      # number of considered principal components
 
@@ -332,14 +330,14 @@ for(m in ex_months){
   no.dt = as.data.table(no.dt)
   setnames(no.dt,paste0("no",1:MC_sample_size))
   
-  DT_pca_plot = no.dt[,c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens.size)) := 
-                        DT[year == ex_year & month == m, c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens.size)),
+  DT_pca_plot = no.dt[,c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)) := 
+                        DT[year == ex_year & month == m, c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)),
                            with = FALSE]]
   DT_pca_plot[,clim := climatology[month == m, clim]]
   
   # choose random ensemble members (REM) and generate forecast as REM + bias + noise
   
-  ens_mem = sample.int(ens.size,MC_sample_size,replace = TRUE)
+  ens_mem = sample.int(ens_size,MC_sample_size,replace = TRUE)
   for(i in 1:MC_sample_size){
     dummy_dt = DT_pca_plot[,.SD,.SDcols = c(paste0("no",i),paste0("Ens",ens_mem[i]),"Bias_Est")]
     forecast = dummy_dt[[1]] + dummy_dt[[2]] + dummy_dt[[3]]
@@ -357,9 +355,9 @@ for(m in ex_months){
     plot_diagnostic(DT_pca_plot[,.(Lon,Lat,trc(eval(parse(text = paste0("fc",i)))))],
                     #rr = rr_sst,
                     mn = paste0("SST forecast for ",ex_month_names[which(ex_months == m)]),
-                    save.pdf = TRUE, 
-                    save.dir = paste0(plot.dir,"/"),
-                    file.name = paste0("m",m,"_fc",i),
+                    save_pdf = TRUE, 
+                    save_dir = paste0(plot_dir,"/"),
+                    file_name = paste0("m",m,"_fc",i),
                     stretch_par = .8)
   }
   
@@ -369,10 +367,10 @@ for(m in ex_months){
     plot_diagnostic(DT_pca_plot[,.(Lon,Lat,trc(eval(parse(text = paste0("fc",i))))-clim)],
                     rr = c(-3,3),
                     mn = paste0("Anomaly forecast for ",ex_month_names[which(ex_months == m)]),
-                    save.pdf = TRUE, 
-                    save.dir = paste0(plot.dir,"/"),
-                    set.white = 0,
-                    file.name = paste0("m",m,"_afc",i),
+                    save_pdf = TRUE, 
+                    save_dir = paste0(plot_dir,"/"),
+                    set_white = 0,
+                    file_name = paste0("m",m,"_afc",i),
                     stretch_par = .8)
   }
   
@@ -388,9 +386,9 @@ for (m in months){
   DT_plot = DT[year == 2018 & month == m ,.(Lon,Lat,trc(SST_hat))]
   plot_diagnostic(DT_plot,
                   mn = paste0("SST forecast for ",month_vec[m-3]," 2018"),
-                  save.pdf = TRUE,
-                  save.dir = paste0(plot.dir,"/"),
-                  file.name = paste0("mean_SST_forecast_m",m),
+                  save_pdf = TRUE,
+                  save_dir = paste0(plot_dir,"/"),
+                  file_name = paste0("mean_SST_forecast_m",m),
                   stretch_par = .8
                   )
 }
@@ -402,10 +400,10 @@ for (m in months){
   plot_diagnostic(DT_plot,
                   mn = paste0("SST anomaly fc for ",month_vec[m-3]," 2018"),
                   rr = c(-3,3),
-                  save.pdf = TRUE,
-                  save.dir = paste0(plot.dir,"/"),
-                  file.name = paste0("mean_ano_forecast_m",m),
-                  set.white = 0,
+                  save_pdf = TRUE,
+                  save_dir = paste0(plot_dir,"/"),
+                  file_name = paste0("mean_ano_forecast_m",m),
+                  set_white = 0,
                   stretch_par = .8
   )
 }
@@ -425,9 +423,9 @@ DT_new = forecast_PCA_new(dt = DT,
                           m = months,
                           n=n,
                           PCA_depth = opt_num_PCs,
-                          ens.member = FALSE,
+                          ens_member = FALSE,
                           saveorgo = FALSE,
-                          cov.dir = cov.dir)
+                          cov_dir = cov_dir)
 
 rel_col_names = c("Lon","Lat","month",paste0("fc",1:n,"PC",opt_num_PCs)) 
 DT_new = DT_new[,.SD,.SDcols = rel_col_names]
@@ -494,18 +492,18 @@ results[SST_SD < 0.2 & !is.na(above_t2),above_t2 := (threshold1+threshold2)/2]
 for(m in months){
   plot_diagnostic(results[month == m,.(Lon,Lat,below_t1)],
                 mn = paste0("percent below first tercile, ",month_vec[m-3]," 2018"),
-                save.pdf = TRUE,
-                col.scheme = "wb",
-                save.dir = paste0(plot.dir,"/"),
-                file.name = paste0("below_first_tercile_m",m),
+                save_pdf = TRUE,
+                col_scheme = "wb",
+                save_dir = paste0(plot_dir,"/"),
+                file_name = paste0("below_first_tercile_m",m),
                 stretch_par = .8)
   
   plot_diagnostic(results[month == m,.(Lon,Lat,above_t2)],
                   mn = paste0("percent above second tercile, ",month_vec[m-3]," 2018"),
-                  save.pdf = TRUE,
-                  save.dir = paste0(plot.dir,"/"),
-                  col.scheme = "wr",
-                  file.name = paste0("above_second_tercile_m",m),
+                  save_pdf = TRUE,
+                  save_dir = paste0(plot_dir,"/"),
+                  col_scheme = "wr",
+                  file_name = paste0("above_second_tercile_m",m),
                   stretch_par = .8)
   
 }

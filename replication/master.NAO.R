@@ -25,18 +25,18 @@ lon_box = c(-60,15)
 
 name_abbr = "NAO" 
 
-save.dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr)
-dir.create(save.dir, showWarnings = FALSE)
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr)
+dir.create(save_dir, showWarnings = FALSE)
 
-plot.dir = paste0("./figures/", name_abbr)
-dir.create(plot.dir, showWarnings = FALSE)
+plot_dir = paste0("./figures/", name_abbr)
+dir.create(plot_dir, showWarnings = FALSE)
 
 ### construct and load wide data set ###
 
 # this one takes time, avoid if possible:
-# make_combined_wide_dataset(lat_box = lat_box, lon_box = lon_box, output_loc = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
+# make_combined_wide_dataset(lat_box = lat_box, lon_box = lon_box, output_loc = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
                            
-DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
+DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
 
 
@@ -54,7 +54,7 @@ validation_years = 2001:2010
 
 # for simple moving averages
 
-num.years = DT[,range(year)][2] - DT[,range(year)][1] + 1
+num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
 
 sc_sma = list()
 dummy_function = function(k){
@@ -67,44 +67,44 @@ dummy_function = function(k){
         sc_sma[[k]] = temp[,"win_length" := k]
       }
 
-sc_sma = mclapply(X = 1:(num.years-1), FUN = dummy_function, mc.cores = 8)
+sc_sma = mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = 8)
 sc_sma = rbindlist(sc_sma)
 
-save(sc_sma, file = paste0(save.dir,"/scores.bc.sma.Rdata"))
+save(sc_sma, file = paste0(save_dir,"/scores.bc.sma.Rdata"))
     
 # for exponential moving averages
 
-par.vec = seq(0.05,0.4,length.out = 24)
+par_vec = seq(0.05,0.4,length.out = 24)
       
 sc_ema = list()
 
 dummy_function = function(k){
             temp = bias_correct(dt = DT, 
                                 method = "ema",
-                                par_1 = par.vec[k], 
+                                par_1 = par_vec[k], 
                                 scores = TRUE,
                                 eval_years = validation_years,
                                 saveorgo = FALSE)
-      sc_ema[[k]] = temp[,"a" := par.vec[k]]
+      sc_ema[[k]] = temp[,"a" := par_vec[k]]
       }
 
-sc_ema = mclapply(X = 1:length(par.vec), FUN = dummy_function,mc.cores = 8)
+sc_ema = mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = 8)
 sc_ema = rbindlist(sc_ema)
 
-save(sc_ema, file = paste0(save.dir,"/scores.bc.ema.Rdata"))
+save(sc_ema, file = paste0(save_dir,"/scores.bc.ema.Rdata"))
 
 
 #### plotting scores for different ways of bias correction ####
 
-load(paste0(save.dir,"/scores.bc.sma.Rdata"))
-load(paste0(save.dir,"/scores.bc.ema.Rdata"))
+load(paste0(save_dir,"/scores.bc.sma.Rdata"))
+load(paste0(save_dir,"/scores.bc.ema.Rdata"))
 
 # ensure that they are plotted on the the same range
 y_range = range(c(sc_sma[,sqrt(MSE)],sc_ema[,sqrt(MSE)]))  
 
 ## plot for sma ##
 
-pdf(paste0(plot.dir,"/mean_scores_sma.pdf"))
+pdf(paste0(plot_dir,"/mean_scores_sma.pdf"))
 plot(x = sc_sma[,win_length],
      y = sc_sma[,sqrt(MSE)],
      ylim = y_range,
@@ -130,7 +130,7 @@ dev.off()
 
 ## plot for ema ##
 
-pdf(paste0(plot.dir,"/mean_scores_ema.pdf"))
+pdf(paste0(plot_dir,"/mean_scores_ema.pdf"))
 plot(x = sc_ema[,a],
      y = sc_ema[,sqrt(MSE)],
      ylim = y_range,
@@ -171,25 +171,25 @@ if(sc_sma[,min(MSE)] < sc_ema[,min(MSE)]){
 bias_correct(dt = DT,
              method = opt_par[1],
              par_1 = as.double(opt_par[2]),
-             save.dir = paste0(save.dir,"/"),
-             file.name = paste0("dt_combine_",name_abbr,"_wide_bc.RData")
+             save_dir = paste0(save_dir,"/"),
+             file_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData")
              )
 
-DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))
+DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))
 
 
 
 ############### variance ###################
     
                     
-### variance analysis ###
+### variance analysis  - incomplete ###
 
 validation_years = 2001:2010
 
 
 # using simple moving averages
 
-num.years = DT[,range(year)][2] - DT[,range(year)][1] + 1
+num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
 
 sc_sma_var = list()
 dummy_function = function(k){
@@ -202,45 +202,45 @@ dummy_function = function(k){
   sc_sma_var[[k]] = temp[,"win_length" := k]
 }
 
-sc_sma_var = mclapply(X = 1:(num.years-1), FUN = dummy_function, mc.cores = 8)
+sc_sma_var = mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = 8)
 sc_sma_var = rbindlist(sc_sma_var)
 
-save(sc_sma_var, file = paste0(save.dir,"/scores.bc.sd.sma.Rdata"))
+save(sc_sma_var, file = paste0(save_dir,"/scores.bc.sd.sma.Rdata"))
 
 
 # for exponential moving averages
 
-par.vec = seq(0.01,0.4,length.out = 24)
+par_vec = seq(0.01,0.4,length.out = 24)
 
 sc_ema_var = list()
 
 dummy_function = function(k){
   temp = sd_est(dt = DT[year > min(year),], 
                       method = "ema",
-                      par_1 = par.vec[k], 
+                      par_1 = par_vec[k], 
                       scores = TRUE,
                       eval_years = validation_years,
                       saveorgo = FALSE)
-  sc_ema_var[[k]] = temp[,"a" := par.vec[k]]
+  sc_ema_var[[k]] = temp[,"a" := par_vec[k]]
 }
 
-sc_ema_var = mclapply(X = 1:length(par.vec), FUN = dummy_function,mc.cores = 8)
+sc_ema_var = mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = 8)
 sc_ema_var = rbindlist(sc_ema_var)
 
-save(sc_ema_var, file = paste0(save.dir,"/scores.bc.sd.ema.Rdata"))
+save(sc_ema_var, file = paste0(save_dir,"/scores.bc.sd.ema.Rdata"))
 
 
 #### plotting scores for different ways of bias correction ####
 
-load(paste0(save.dir,"/scores.bc.sd.sma.Rdata"))
-load(paste0(save.dir,"/scores.bc.sd.ema.Rdata"))
+load(paste0(save_dir,"/scores.bc.sd.sma.Rdata"))
+load(paste0(save_dir,"/scores.bc.sd.ema.Rdata"))
 
 # ensure that they are plotted on the the same range
 y_range = range(c(sc_sma_var[,CRPS],sc_ema_var[,CRPS]))  
 
 ## plot for sma ##
 
-pdf(paste0(plot.dir,"/mean_scores_sd_sma.pdf"))
+pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
 plot(x = sc_sma_var[,win_length],
      y = sc_sma_var[,CRPS],
      ylim = y_range,
@@ -266,7 +266,7 @@ dev.off()
 
 ## plot for ema ##
 
-pdf(paste0(plot.dir,"/mean_scores_sd_ema.pdf"))
+pdf(paste0(plot_dir,"/mean_scores_sd_ema.pdf"))
 plot(x = sc_ema_var[,a],
      y = sc_ema_var[,CRPS],
      ylim = y_range,
@@ -307,11 +307,11 @@ if(sc_sma_var[,min(CRPS)] < sc_ema_var[,min(CRPS)]){
 sd_est(dt = DT,
              method = opt_par[1],
              par_1 = as.double(opt_par[2]),
-             save.dir = paste0(save.dir,"/"),
-             file.name = paste0("dt_combine_",name_abbr,"_wide_bc_sd.RData")
+             save_dir = paste0(save_dir,"/"),
+             file_name = paste0("dt_combine_",name_abbr,"_wide_bc_sd.RData")
 )
 
-DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc_sd.RData"))
+DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc_sd.RData"))
 
 
 
@@ -325,18 +325,18 @@ DT = load_combined_wide(data.dir = save.dir, output_name = paste0("dt_combine_",
 training_years = 1985:2000
 eval_years = 2001:2010
 
-ens.size = 9
+ens_size = 9
 
 ##### compute and save principal components #####
 
-cov.dir = paste0(save.dir,"/PCACov")
-dir.create(cov.dir, showWarnings = FALSE)
+cov_dir = paste0(save_dir,"/PCACov")
+dir.create(cov_dir, showWarnings = FALSE)
 
-for_res_cov(Y = training_years,dt = DT, save.dir = cov.dir,ens.size = ens.size)
+for_res_cov(Y = training_years,dt = DT, save_dir = cov_dir,ens_size = ens_size)
 
 ############## set up PCA #######################
 
-setup_PCA(dt = DT, y = eval_years, cov.dir = cov.dir)
+setup_PCA(dt = DT, y = eval_years, cov_dir = cov_dir)
 
 #### a brief example ####
 
@@ -367,7 +367,7 @@ score_by_month = function(month){
   
   # for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
   
-  setup_PCA(dt = DT, m=month,cov.dir = cov.dir)
+  setup_PCA(dt = DT, m=month,cov_dir = cov_dir)
   PCA <- eval(parse(text = paste0("PCA",month)))
   PCA_DT = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
   
@@ -473,16 +473,16 @@ var_sc = mclapply(X = months, FUN = score_by_month, mc.cores = 12)
 
 var_sc = rbindlist(var_sc)
 
-save(var_sc, file = paste0(save.dir,"/variogram_scores.RData"))
+save(var_sc, file = paste0(save_dir,"/variogram_scores.RData"))
 
 
 # --- plot variograms ---
 
-load(file = paste0(save.dir,"/variogram_scores.RData"))
+load(file = paste0(save_dir,"/variogram_scores.RData"))
 
 mean_sc = var_sc[,mean(v_sc), by = PCs]
 
-pdf(paste0(plot.dir,"/mean_variogram_scores.pdf"))
+pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
 plot(x = mean_sc[[1]],
      y = mean_sc[[2]],
      type = "b",
@@ -558,7 +558,7 @@ bd.rank <- function(x)
 
 # The data table should have the key variable (most commonly YM) as first column and the ranks of the observations as second
 
-rhist.dt <- function(B, ens.size, breaks = seq(0, ens.size + 1, length.out = min(ens.size + 1,20)), hist_xlab="", hist_ylab="", hist_ylim=NULL)
+rhist.dt <- function(B, ens_size, breaks = seq(0, ens_size + 1, length.out = min(ens_size + 1,20)), hist_xlab="", hist_ylab="", hist_ylim=NULL)
 {
   hist(as.vector(B[[2]]),breaks = breaks, main="",xlab=hist_xlab,ylab=hist_ylab,axes=FALSE,col="gray80",border="gray60",ylim=hist_ylim)
   abline(a=length(B[[1]])/length(breaks), b=0, lty=2, col="gray30")
@@ -575,28 +575,28 @@ rhist.dt <- function(B, ens.size, breaks = seq(0, ens.size + 1, length.out = min
 validation_years = 2001:2010  # validation years
 validation_months = 1:12       # validation months
 MC_sample_size = 100   # how often we generate PCA noise
-ens.size = 9   #size of forecast ensemble
+ens_size = 9   #size of forecast ensemble
 
 PCvec = c(5,opt_num_PCs,50)      # number of considered principal components
 
 for(PCs in PCvec){
 
   print(paste0("computing RHs for ",PCs," principal components."))
-  no.dt = list()
+  no_dt = list()
   for(i in 1:MC_sample_size){
     print(paste0("generating Monte Carlo sample ",i,"/",MC_sample_size))
-    no.dt[[i]] = forecast_PCA(m = validation_months, y = validation_years, PCA_depth = PCs, saveorgo = FALSE)[,noise]
+    no_dt[[i]] = forecast_PCA(m = validation_months, y = validation_years, PCA_depth = PCs, saveorgo = FALSE)[,noise]
   }
-  no.dt = as.data.table(no.dt)
+  no_dt = as.data.table(no_dt)
   
-  setnames(no.dt,paste0("no",1:MC_sample_size))
+  setnames(no_dt,paste0("no",1:MC_sample_size))
 
-  DT_pca = no.dt[,c("year","month","YM","SST_bar","Bias_Est",paste0("Ens",1:ens.size)) := DT[year %in% validation_years & month %in% validation_months,c("year","month","YM","SST_bar","Bias_Est",paste0("Ens",1:ens.size)),with = FALSE]]
+  DT_pca = no_dt[,c("year","month","YM","SST_bar","Bias_Est",paste0("Ens",1:ens_size)) := DT[year %in% validation_years & month %in% validation_months,c("year","month","YM","SST_bar","Bias_Est",paste0("Ens",1:ens_size)),with = FALSE]]
 
 
   #choose random ensemble members (REM) and generate forecast as REM + bias + noise
 
-  ens_mem = sample.int(ens.size,MC_sample_size,replace = TRUE)
+  ens_mem = sample.int(ens_size,MC_sample_size,replace = TRUE)
   for(i in 1:MC_sample_size){
     dummy_dt = DT_pca[,.SD,.SDcols = c(paste0("no",i),paste0("Ens",ens_mem[i]),"Bias_Est")]
     forecast = dummy_dt[[1]] + dummy_dt[[2]] + dummy_dt[[3]]
@@ -610,38 +610,38 @@ for(PCs in PCvec){
   
   drm = dim(ranks.matrix)
   
-  YM.ind = 0
+  YM_ind = 0
   
   for(yearmonth in ym){
     print(paste0("YM = ",yearmonth,"/",ym[length(ym)]))
-    YM.ind = YM.ind + 1
+    YM_ind = YM_ind + 1
     fc_obs_mat = na.omit(DT_pca[YM == yearmonth,.SD,.SDcols = c("SST_bar",paste0("fc",1:MC_sample_size))])
     
     # get ranks
-    ranks.matrix[YM.ind,2:drm[2]] = c(mst.rank(as.matrix(fc_obs_mat)),
+    ranks.matrix[YM_ind,2:drm[2]] = c(mst.rank(as.matrix(fc_obs_mat)),
                                       avg.rank(as.matrix(fc_obs_mat)),
                                       bd.rank(as.matrix(fc_obs_mat)))
     rm(fc_obs_mat)
   }
   
-  names.vec = c("YM","mst.rk.obs",paste0("mst.r.",1:MC_sample_size),
+  names_vec = c("YM","mst.rk.obs",paste0("mst.r.",1:MC_sample_size),
                 "av.rk.obs",paste0("av.r.",1:MC_sample_size),
                 "bd.rk.obs",paste0("bd.rk",1:MC_sample_size))
   
   ranks = data.table(ranks.matrix)
   
-  setnames(ranks, names.vec)
+  setnames(ranks, names_vec)
   
   # --- save ---
   
-  save(ranks,file = paste0(save.dir,"/ranks_pca_em_",PCs,"pcs.Rdata"))
+  save(ranks,file = paste0(save_dir,"/ranks_pca_em_",PCs,"pcs.Rdata"))
   
   # ---- plotting ----
-  pdf(file=paste0(plot.dir,"/rks_pca_em_",PCs,"pcs.pdf"),width=8,height=2,points=12)
+  pdf(file=paste0(plot_dir,"/rks_pca_em_",PCs,"pcs.pdf"),width=8,height=2,points=12)
   par(mfrow=c(1,3),mex=0.5,oma = c(0,0,2.5,0),mar=c(2.5,2.5,2.5,2.5)+0.1,mgp=c(0.5,0,0))
-  rhist.dt(ranks[,.(YM,mst.rk.obs)], ens.size = MC_sample_size,  hist_xlab = "minimum spanning tree")
-  rhist.dt(ranks[,.(YM,av.rk.obs)], ens.size = MC_sample_size, hist_xlab = "average")
-  rhist.dt(ranks[,.(YM,bd.rk.obs)], ens.size = MC_sample_size, hist_xlab = "band depth")
+  rhist.dt(ranks[,.(YM,mst.rk.obs)], ens_size = MC_sample_size,  hist_xlab = "minimum spanning tree")
+  rhist.dt(ranks[,.(YM,av.rk.obs)], ens_size = MC_sample_size, hist_xlab = "average")
+  rhist.dt(ranks[,.(YM,bd.rk.obs)], ens_size = MC_sample_size, hist_xlab = "band depth")
   
   title(paste0("RHs for forecast by ",PCs," pcs"),outer = TRUE)
   dev.off()
@@ -662,7 +662,7 @@ clim_years = 1985:2009 # the years to compute the climatology from
 
 MC_sample_size = 10   # number of plots with independently generated noise
 
-ens.size = 9   #size of forecast ensemble
+ens_size = 9   #size of forecast ensemble
 
 PCs = opt_num_PCs      # number of considered principal components
 
@@ -676,21 +676,21 @@ for(m in ex_months){
   print(paste0("month = ",m))
     
     #generate noise:
-    no.dt = list()
+    no_dt = list()
     for(i in 1:MC_sample_size){
-      no.dt[[i]] = forecast_PCA(m = m, y = ex_year, PCA_depth = PCs, saveorgo = FALSE)[,.(Lon,Lat,noise), keyby = .(Lon,Lat)][,noise]
+      no_dt[[i]] = forecast_PCA(m = m, y = ex_year, PCA_depth = PCs, saveorgo = FALSE)[,.(Lon,Lat,noise), keyby = .(Lon,Lat)][,noise]
     }
-    no.dt = as.data.table(no.dt)
-    setnames(no.dt,paste0("no",1:MC_sample_size))
+    no_dt = as.data.table(no_dt)
+    setnames(no_dt,paste0("no",1:MC_sample_size))
     
-    DT_pca_plot = no.dt[,c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens.size)) := 
-                          DT[year == ex_year & month == m, c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens.size)),
+    DT_pca_plot = no_dt[,c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)) := 
+                          DT[year == ex_year & month == m, c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)),
                              with = FALSE]]
     DT_pca_plot[,clim := climatology[month == m, clim]]
     
     # choose random ensemble members (REM) and generate forecast as REM + bias + noise
     
-    ens_mem = sample.int(ens.size,MC_sample_size,replace = TRUE)
+    ens_mem = sample.int(ens_size,MC_sample_size,replace = TRUE)
     for(i in 1:MC_sample_size){
       dummy_dt = DT_pca_plot[,.SD,.SDcols = c(paste0("no",i),paste0("Ens",ens_mem[i]),"Bias_Est")]
       forecast = dummy_dt[[1]] + dummy_dt[[2]] + dummy_dt[[3]]
@@ -705,9 +705,9 @@ for(m in ex_months){
       plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i))))],
                       rr = rr_sst,
                       mn = paste0("SST forecast for ",ex_month_names[which(ex_months == m)]),
-                      save.pdf = TRUE, 
-                      save.dir = paste0(plot.dir,"/"),
-                      file.name = paste0("m",m,"_fc",i),
+                      save_pdf = TRUE, 
+                      save_dir = paste0(plot_dir,"/"),
+                      file_name = paste0("m",m,"_fc",i),
                       stretch_par = .8)
     }
     
@@ -718,9 +718,9 @@ for(m in ex_months){
       plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i)))-clim)],
                       rr = rr_clim,
                       mn = paste0("Anomaly forecast for ",ex_month_names[which(ex_months == m)]),
-                      save.pdf = TRUE, 
-                      save.dir = paste0(plot.dir,"/"),
-                      file.name = paste0("m",m,"_afc",i),
+                      save_pdf = TRUE, 
+                      save_dir = paste0(plot_dir,"/"),
+                      file_name = paste0("m",m,"_afc",i),
                       stretch_par = .8)
     }
     

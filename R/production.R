@@ -17,9 +17,9 @@ make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
 #' @param y_start The first year for which we have obs/ens data
 #' @param y_stop The final year for which we have obs/ens data
 #' @param vintage Which vintage are we using, often "mr" for most recent
-#' @param data.dir The root directory that stores our data
+#' @param data_dir The root directory that stores our data
 #' @param grid_mapping_loc The location where the precomputed grid alignment object is stored.
-#' @param output_loc The folder where the output should be stored. If \code{NULL} then put in the same location as \code{data.dir}
+#' @param output_loc The folder where the output should be stored. If \code{NULL} then put in the same location as \code{data_dir}
 #' @param output_name The name of the output file.  If \code{NULL} then \code{paste0("dt_combine_",vintage,"_wide.RData")} will be used
 #' @param lat_box The upper and lower bounds for the latitude.  By default the entire globe is used.
 #' @param lon_box The upper and lower bounds for the longitude.  By default the entire globe is used.
@@ -28,7 +28,7 @@ make_grid_mapping = function(out.file = "./Data/PostClim/SFE/Derived")
 make_combined_wide_dataset = function(y_start = 1985,
                                       y_stop = 2010,
                                       vintage = "mr",
-                                      data.dir = "~/PostClimDataNoBackup/",
+                                      data_dir = "~/PostClimDataNoBackup/",
                                       grid_mapping_loc = "~/PostClimDataNoBackup/SFE/Derived/",
                                       output_loc = "~/PostClimDataNoBackup/SFE/Derived/",
                                       output_name = NULL,
@@ -74,7 +74,7 @@ make_combined_wide_dataset = function(y_start = 1985,
     for(m in 1:12)
     {
       print(c(y,m))
-      dt_ens = load_ensemble(y,m,vintage,data.dir = data.dir)
+      dt_ens = load_ensemble(y,m,vintage,data_dir = data_dir)
       dt_obs = load_observations(y,m)
       dt_combine_all[[k]] = combine_data_wide(dt_ens, dt_obs, dt_map)
       dt_combine_all[[k]][,year:=y]
@@ -94,7 +94,7 @@ make_combined_wide_dataset = function(y_start = 1985,
   dt = dt[ (Lon >= lon_box[1]) & (Lon <= lon_box[2]) & (Lat >= lat_box[1]) & (Lat <= lat_box[2])]
   
   ##----- Should I save or should I go? -----
-  if(is.null(data.dir))
+  if(is.null(data_dir))
   {
     return(dt)
   }else{
@@ -112,7 +112,7 @@ make_combined_wide_dataset = function(y_start = 1985,
 }
 
 #' @export
-make_NorCPM_wide_again_precip_2mtemp = function(save.dir = "~/PostClimDataNoBackup/SFE/Derived/",
+make_NorCPM_wide_again_precip_2mtemp = function(save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
                                                 data.names = c("dt_combine_mr_wide_new.RData","dt_prect_NorCPM_wide.RData","dt_2mtemp_NorCPM_wide.RData")){
   
   data = fread("~/PostClimDataNoBackup/SFE/NorCPM_2mTemp/wide_data")
@@ -195,13 +195,13 @@ make_NorCPM_wide_again_precip_2mtemp = function(save.dir = "~/PostClimDataNoBack
   
   dt = data[,.SD,.SDcols = c("Lon","Lat", paste0("SST",1:10), "SST_bar","SST_sd", paste0("Ens",1:9),"Ens_bar","Ens_sd","grid_id","year","month","YM","sst_noaa")]
   dt[,,.SDcols =  c(paste0("SST",1:10), "SST_bar","SST_sd","Ens_bar","Ens_sd")]
-  save(dt, file = paste0(save.dir,data.names[1]))
+  save(dt, file = paste0(save_dir,data.names[1]))
   
   dt_prect = data[,.SD,.SDcols = c("Lon","Lat",paste0("prect",1:9),"prect_bar","prect_sd","grid_id","year","month","YM")]
-  save(dt_prect, file = paste0(save.dir,data.names[2]))
+  save(dt_prect, file = paste0(save_dir,data.names[2]))
   
   dt_2mtemp = data[,.SD,.SDcols = c("Lon","Lat",paste0("ts",1:9),"ts_bar","ts_sd","grid_id","year","month","YM")]
-  save(dt_2mtemp, file = paste0(save.dir,data.names[3]))
+  save(dt_2mtemp, file = paste0(save_dir,data.names[3]))
   
 }
 

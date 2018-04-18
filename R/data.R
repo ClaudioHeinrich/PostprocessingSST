@@ -41,7 +41,7 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
 #' @param year Integer.  The year you are interested in.
 #' @param month Integer.  The month
 #' @param vintage One of Jan, Apr, Jul, Oct or mr.  If mr, the vintage closest to the given month is used.
-#' @param data.dir String.  The root directory that stores the data.  Data are then assumed stored in \code{SFE/NorCPM_Ocean/}
+#' @param data_dir String.  The root directory that stores the data.  Data are then assumed stored in \code{SFE/NorCPM_Ocean/}
 #'
 #' @examples
 #' ##load_ensemble(1990,1)
@@ -50,7 +50,7 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
 load_ensemble = function(year,
                          month,
                          vintage = "mr",
-                         data.dir = "~/PostClimDataNoBackup/")
+                         data_dir = "~/PostClimDataNoBackup/")
 {
 
   ##------ Setup ----------
@@ -72,7 +72,7 @@ load_ensemble = function(year,
   ##-----------------------------------------
 
   ##-------- Find target run ----------------
-  filedir <- paste0(data.dir,"SFE/NorCPM_Ocean/")
+  filedir <- paste0(data_dir,"SFE/NorCPM_Ocean/")
   ff_all = system(paste0("ls ",filedir,"*_mem01.micom.hm.",year,"-",month,".nc"), intern = TRUE)
   
   if (vintage == "mr") {ff_use = tail(ff_all,1)
@@ -226,14 +226,14 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
 #'
 #' @description Given a pre-rendered dataset, this loads it from the correct location
 #'
-#' @param data.dir Root location of the data
+#' @param data_dir Root location of the data
 #' @param vintage Indication of which vintage we are using, most likely 'mr'
 #' @param bias Boolean. Should the bias corrected ensemble be loaded?
 #' @param model String.  Currently taking values \code{NorESM} or \code{senorge} to indicate whether the NorESM or senorge data are of interest
 #'
 #' @return A data.table containing all data for the parameters specified, provided these data have been rendered.
 #' @export
-load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/SFE/Derived/", 
+load_combined_wide = function(data_dir = "~/PostClimDataNoBackup/SFE/Derived/", 
                               vintage = "mr", 
                               bias = FALSE,
                               output_name = NULL
@@ -243,12 +243,12 @@ load_combined_wide = function(data.dir = "~/PostClimDataNoBackup/SFE/Derived/",
     {
       if(bias)
       {
-        file = paste0(data.dir,"/dt_combine_wide_bias.RData")
+        file = paste0(data_dir,"/dt_combine_wide_bias.RData")
       } else {
-        file = paste0(data.dir,"/dt_combine_",vintage,"_wide.RData")
+        file = paste0(data_dir,"/dt_combine_",vintage,"_wide.RData")
       }
     }else{
-      file = paste0(data.dir,"/",output_name)
+      file = paste0(data_dir,"/",output_name)
     }
   load(file)
   return(dt)

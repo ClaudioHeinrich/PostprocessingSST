@@ -130,7 +130,7 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 #' @param scores Logical. If true, the MSE is returned.
 #' @param eval_years Numerical vector. The years for evaluating the score.
 #' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
-#' @param save.dir,file.name Directory and name for the saved file.
+#' @param save_dir,file_name Directory and name for the saved file.
 #' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
 #'                   
 #'                   
@@ -150,8 +150,8 @@ bias_correct = function(dt = NULL,
                         scores = FALSE,
                         eval_years = 2001:2010,
                         saveorgo = TRUE,
-                        save.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        file.name = "dt_combine_wide_bias.RData",
+                        save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                        file_name = "dt_combine_wide_bias.RData",
                         skip = 0){
   
   if(is.null(dt)) dt = load_combined_wide(bias = FALSE) 
@@ -174,7 +174,7 @@ bias_correct = function(dt = NULL,
   dt[,"SST_hat" := Ens_bar + Bias_Est]
   
   if(saveorgo){
-    save(dt, file = paste0(save.dir,file.name))
+    save(dt, file = paste0(save_dir,file_name))
   }
   
   if(scores){
@@ -194,7 +194,7 @@ bias_correct = function(dt = NULL,
 #' @param scores Logical. If true, the CRPS is returned.
 #' @param eval_years Numerical vector. The years for evaluating the score.
 #' @param saveorgo Logical. If TRUE, the data table with new column SD_hat is saved.
-#' @param save.dir,file.name Directory and name for the saved file.
+#' @param save_dir,file_name Directory and name for the saved file.
 #'                   
 #' @return The data table dt containing a new column SD_hat.
 #'
@@ -212,8 +212,8 @@ sd_est = function(dt = NULL,
                         scores = FALSE,
                         eval_years = 2001:2010,
                         saveorgo = TRUE,
-                        save.dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        file.name = "dt_combine_wide_bias_var.RData"){
+                        save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                        file_name = "dt_combine_wide_bias_var.RData"){
   
   if(is.null(dt)) {
     dt = load_combined_wide(bias = TRUE)[year > 1985,] # first year the bias estimate is 0 and (obs-fc)^2 is not a good approximation for the variance
@@ -233,7 +233,7 @@ sd_est = function(dt = NULL,
   }
   
   if(saveorgo){
-    save(dt, file = paste0(save.dir,file.name))
+    save(dt, file = paste0(save_dir,file_name))
   }
   
   if(scores){
