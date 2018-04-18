@@ -186,6 +186,10 @@ DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",
 
 validation_years = 2001:2010
 
+ens_sd_est(dt = DT[year > min(year),], # for the first year the forecast is not bias corrected and (obs - fc)^2 is not a good approximation for the variance
+           ens_size = ens_size,
+           save_dir = save_dir,
+           file_name = paste0("dt_combine_",name_abbr,"_wide_bc_sd.RData"))
 
 # using simple moving averages
 
@@ -193,7 +197,7 @@ num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
 
 sc_sma_var = list()
 dummy_function = function(k){
-  temp = sd_est(dt = DT[year > min(year),], # for the first year the forecast is not bias corrected and (obs - fc)^2 is not a good approximation for the variance
+  temp = sd_est(dt = DT, 
                       method = "sma", 
                       par_1 = k,
                       scores = TRUE,
@@ -215,7 +219,7 @@ par_vec = seq(0.01,0.4,length.out = 24)
 sc_ema_var = list()
 
 dummy_function = function(k){
-  temp = sd_est(dt = DT[year > min(year),], 
+  temp = sd_est(dt = DT, 
                       method = "ema",
                       par_1 = par_vec[k], 
                       scores = TRUE,

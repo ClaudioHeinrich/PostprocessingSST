@@ -120,6 +120,42 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
   return(glob_mean_sc)
 }
 
+#' sets up the estimation of marginal variance by computing the ensemble variance by location, month and year.
+#'
+#' @param dt The data table containing the estimated bias.
+#' @param ens_size integer. Size of the ensemble.
+#' @param saveorgo logical. Do we save the data table?
+#' @param save_dir,file_name character strings. Directory and file name for saving.
+#' 
+#' @return the data table dt with a new column labelled 'var_bar'
+#' 
+#' @author Claudio Heinrich
+#' 
+#' @examples 
+#' \dontrun{load_combined_wide()
+#'          ens_sd_est(dt)}
+#'          
+#' @export
+
+
+
+ens_sd_est = function(dt, 
+                      ens_size = 9,
+                      saveorgo = TRUE,
+                      save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                      file_name = "dt_combine_wide_bias_sd.RData"){
+# get the average standard deviation of the ensemble members by year, month and grid_id
+
+dt = dt[,paste0("temp_",1:ens_size) := .SD + Bias_Est - SST_bar, .SDcols = paste0("Ens",1:ens_size),
+        by = .(grid_id, month,year)]
+
+dt = dt[,var_bar := sum(.SD^2)/ncol(.SD), .SDcols = paste0("temp_",1:ens_size),
+        by = .(grid_id, month,year)]
+
+dt[,paste0("temp_",1:ens_size) := NULL]
+return(dt)
+}
+
 
 
 #' Applies bias correction with a specified method to the data and saves or returns scores.
@@ -199,7 +235,7 @@ bias_correct = function(dt = NULL,
 #' @return The data table dt containing a new column SD_hat.
 #'
 #' @author Claudio Heinrich
-#' @examples \dontrun{sd_est(sd_est(saveorgo = FALSE))}
+#' @examples \dontrun{sd_est(saveorgo = FALSE)}
 #' 
 #' 
 #' @export
@@ -210,25 +246,31 @@ sd_est = function(dt = NULL,
                         par_1 = 16,   # if method == sma, par_1 is the length of window for the sma
                         # if method == ema, par_1 is the ratio of the exp. mov. av.
                         scores = FALSE,
+                        ens_mean = FALSE,
+                        ens_size = 9,
                         eval_years = 2001:2010,
                         saveorgo = TRUE,
                         save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
                         file_name = "dt_combine_wide_bias_var.RData"){
   
-  if(is.null(dt)) {
+  if(is.null(dt)) 
+    {
     dt = load_combined_wide(bias = TRUE)[year > 1985,] # first year the bias estimate is 0 and (obs-fc)^2 is not a good approximation for the variance
+  } else {
+    dt = dt[year >1985,]
   }
+  
   
   if(method == "sma"){
     dt = dt[,"SD_hat" := sqrt(sim_mov_av(l = par_1, 
-                              vec = (SST_bar - SST_hat)^2, 
+                              vec = var_bar, 
                               years = year)),
             by = .(grid_id, month)]
   }
   if (method == "ema"){
     dt = dt[,"SD_hat" := sqrt(exp_mov_av(a = par_1,
-                                      vec = (SST_bar - SST_hat)^2,
-                                      years = year)),
+                              vec = var_bar, 
+                              years = year)),
             by = .(grid_id, month)]
   }
   
