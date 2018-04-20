@@ -5,235 +5,240 @@
 
 rm(list = ls())
 
-library(SeasonalForecasting)
-
+library(PostProcessing)
+library(sp) # SpatialPoints(), spDists(), SpatialPointsDataFrame(), spplot
+library(spacetime)  # "STFDF" object
+library(gstat)  # variogramST(), fit.variogram()
+library(MASS) # mvrnorm
 
 setwd("~/NR/SFE")
 options(max.print = 500)
 
-#------- set up ------
-
-m = 7
-training_years = 1985:2000
 
 
-#fitting area for the variogram and area for plotting:
+#' preparation for geostationary forecasts
+#' 
+#' @description Estimates the variogram for the residuals assuming anexponential covariance model and saves the results.
+#' 
+#' 
+#' @param dt the data table, if NULL, it is loaded.
+#' @param training_years,m Integer vectors containing the year(s) and month(s) of the training dataset.
+#' @param ens_size Integer. Size of the NWP ensemble.
+#' @param saveorgo Logical, whether we save or not. 
+#' @param save_dir,file_name The directory to save in. The name of the file of the saved variogram for a given month is \code{file_name <month> .RData}.
+#' @param n_intv Integer. How many distance bins are considered for the empirical variogram.
+#' @param truncate Logical. The empirical variogram oftentimes is far from the fitted variogram for the 10% largest distances considered. If truncate == TRUE, those are ignored leading to a visually much better fit of the variogram.
+#' 
+#' @return data table containing n columns with noise and n columns with forecasts.
+#' 
+#' @examples \dontrun{ DT = load_combined_wide(data_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO", output_name = "dt_combine_NAO_wide_bc.RData") \cr
+#'                     geostationary_training(dt = DT)}
+#' 
+#' @author Claudio Heinrich        
+#' 
+#' @importFrom spacetime STFDF
+#' @importFrom sp SpatialPoints spDists SpatialPointsDataFrame
+#' @importFrom gstat variogramST fit.variogram
+#' 
+#' @export
 
-Lon_min = -60
-Lon_max = 15
-Lat_min = 30
-Lat_max = 70
 
-#loading data
+geostationary_training = function (dt = NULL,
+                                   training_years = 1986:2000,
+                                   m = 1:12,
+                                   ens_size = 9,
+                                   saveorgo = TRUE,
+                                   save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                                   file_name = "variogram_exp_m",
+                                   nintv = 100,
+                                   truncate = TRUE){
 
-DT_complete = load_combined_wide(bias = TRUE)
-
-# --- modify data for fitting variogram with spacetime package ---
-
-library(sp) # SpatialPoints(), spDists(), SpatialPointsDataFrame(), spplot
-library(spacetime)  # "STFDF" object
-library(gstat)  # variogramST(), fit.variogram()
-
-DT = DT_complete[month == m & year %in% training_years & 
-                            Lon >= Lon_min & Lon <= Lon_max & Lat >= Lat_min & Lat <= Lat_max,
-                            .(Lon,Lat,year,month,YM, Res = SST_hat - SST_bar)]
-
-
-sp <- SpatialPoints(cbind(x=DT[YM == min(YM), Lon],y=DT[YM == min(YM), Lat]), proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-# Convert YM into date
-
-time_convert = function(YM){
-  M = YM %% 12
-  M[M == 0] = 12
-  Y = (YM - M)/ 12
-  M[M < 10]  = paste0(0,M[M < 10])
-  as.Date(paste0(Y,"-",M,"-15"))
+  
+  if(is.null(dt))
+  {
+    print("load and prepare data")
+    dt = load_combined_wide(bias = TRUE)
+    dt = dt[year %in% training_years & month %in% m,]
+  }
+  
+  Lon_min  = dt[,range(Lon)][1]
+  Lon_max  = dt[,range(Lon)][2]
+  Lat_min  = dt[,range(Lat)][1]
+  Lat_max  = dt[,range(Lat)][2]
+  
+  
+  for(i in 1:ens_size){
+      dt = dt[,  paste0("Res",i) := .SD + Bias_Est - SST_bar,.SDcols = paste0("Ens",i)]
+  }
+  
+  
+  for(mon in m){
+    print(paste0("month = ",mon))
+    
+    DT = dt[month == mon, .SD,.SDcols = c("Lon","Lat","year","month","YM", paste0("Res",1:ens_size))]
+    
+    sp <- SpatialPoints(cbind(x=DT[YM == min(YM), Lon],y=DT[YM == min(YM), Lat]), proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    # Convert YM into date
+    
+    time_convert = function(YM){
+      M = YM %% 12
+      M[M == 0] = 12
+      Y = (YM - M)/ 12
+      M[M < 10]  = paste0(0,M[M < 10])
+      as.Date(paste0(Y,"-",M,"-15"))
+    }
+    
+    time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
+    
+    setkey(DT,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
+    random_pick = sample(ens_size,1)
+    data = DT[,.SD,.SDcols = paste0("Res",random_pick)] 
+    setnames(data,"Res")
+    
+    
+    stfdf = STFDF(sp, time, data)
+    
+    
+    #### Calculate the empirical semi-variogram
+    #### ----------------------------------------------
+    
+    ## calculate the distance matrix [km], full symmetric matrix
+    Dist <- spDists(sp, longlat = TRUE)
+    
+    ## set the intervals
+    up_Dist <- Dist[upper.tri(Dist, diag = FALSE)] 
+    sort_up <- sort(up_Dist)
+    
+    bound_id = seq(1,length(up_Dist),length.out = nintv + 1)
+    boundaries <- sort_up[bound_id]
+    
+    
+    
+    empVgm <- variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries,assumeRegular = TRUE, na.omit = TRUE) #"gstat"
+  
+    #### Fit to the Exponential semi-variogram function
+    #### -------------------------------------------------- 
+  
+    
+    ## set the cutoff - usually at least the last 10% of the variogram fit look quite bad
+    if(truncate) 
+    {
+      cutoff_ind  = ceiling(0.9*nintv)
+      cutoff = empVgm$dist[cutoff_ind]
+    }
+    
+  
+    ## prepare empirical variograms for fitting
+    spEmpVgm <- empVgm[empVgm$dist<=cutoff,]  
+    spEmpVgm <- spEmpVgm[spEmpVgm$timelag==0,]
+    sSpEmpVgm <- spEmpVgm[spEmpVgm$np!=0,] 
+    spEmpVgm <- sSpEmpVgm[,1:3] 
+    class(spEmpVgm) <- c("gstatVariogram", "data.frame")
+    spEmpVgm$dir.hor <- 0
+    spEmpVgm$dir.ver <- 0
+    
+    
+    ## Exponential semi-variogram function with nugget, see the 1st argument. 
+    ## Fixing "psill", fit "nugget" and "range", the 2nd arg.
+    ## Using fit.method = 7, the 3rd arg.
+    Mod <- fit.variogram(spEmpVgm, vgm("Exp"), fit.sills = c(T,F), fit.method = 7)
+    if(saveorgo)
+    {
+      save(Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))
+    }
+  }
 }
 
-time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
 
-data = DT[,.(Res)]
+#' geostationary forecasts 
+#' 
+#' @description Generates forecasts using a geostationary model with exponential covariance function for post-processing
+#'      Creates output samples, see n below, and uses ensemble members plus noise as forecast. 
+#' 
+#' @param dt the data table, if NULL, it is loaded.
+#' @param y,m Integer vectors containing year(s) and month(s).
+#' @param n Integer. Size of the desired forecast ensemble. 
+#' @param ens_size Integer. Size of the NWP ensemble.
+#' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature.
+#' @param saveorgo Logical, whether we save or not. 
+#' @param save_dir,file_name The directory to save in and the name of the saved file.
+#' @param data_dir,var_file_names Where the fitted variograms are stored.
+#' 
+#' @return data table containing n columns with noise and n columns with forecasts.
+#' 
+#' @examples \dontrun{ DT = load_combined_wide(data_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO", output_name = "dt_combine_NAO_wide_bc.RData") \cr
+#'                     forecast_geostat(dt = DT)}
+#' 
+#' @author Claudio Heinrich        
+#' 
+#' @importFrom MASS mvrnorm
+#' 
+#' @export
 
-stfdf = STFDF(sp, time, data)
-
-
-#### Calculate the empirical semi-variogram
-#### ----------------------------------------------
-
-## calculate the distance matrix [km], full symmetric matrix
-Dist <- spDists(sp, longlat = T)
-
-## set the intervals
-up.Dist <- Dist[upper.tri(Dist, diag = F)] 
-sort.up <- sort(up.Dist)
-
-nintv <- 150
-bound.id <- seq(1, length(up.Dist), length(up.Dist)/nintv)
-boundaries <- sort.up[bound.id]
-boundaries <- c(boundaries, max(up.Dist)) 
-
-png("./figures/boundaries.png")
-plot(boundaries, main = nintv)
-dev.off()
-
-
-empVgm <- variogramST(Res~1, stfdf, tlags=0, boundaries = boundaries,na.omit = TRUE) #"gstat"
-show(empVgm[1:3,])
-
-
-dim(empVgm)
-## 140  7
-head(empVgm, 3)
-##         np     dist      gamma   id timelag spacelag  avgDist
-## 2 16434600 2.593084 0.01181281 lag0       0 1.802588 2.593084
-## 3 15930300 4.567351 0.01421445 lag0       0 4.351693 4.567351
-## 4 16504200 5.896617 0.01516245 lag0       0 5.749505 5.896617
-
-#### ----------------------------------------------
-
-
-
-#### Fit to the Exponential semi-variogram function
-#### -------------------------------------------------- 
-
-## set the cutoff, here I use no cutoff
-cutoff <- max(empVgm$dist) # 4300
-
-## prepare empirical variograms for fitting
-spEmpVgm <- empVgm[empVgm$dist<=cutoff,]  
-spEmpVgm <- spEmpVgm[spEmpVgm$timelag==0,]
-sSpEmpVgm <- spEmpVgm[spEmpVgm$np!=0,] 
-spEmpVgm <- sSpEmpVgm[,1:3] 
-class(spEmpVgm) <- c("gstatVariogram", "data.frame")
-spEmpVgm$dir.hor <- 0
-spEmpVgm$dir.ver <- 0
-
-
-## Exponential semi-variogram function with nugget, see the 1st argument. 
-## Fixing "psill", fit "nugget" and "range", the 2nd arg.
-## Using fit.method = 7, the 3rd arg.
-Mod <- fit.variogram(spEmpVgm, vgm("Exp"), fit.sills = c(T,F), fit.method = 7)
-psill <- Mod$psill[2]
-range <- Mod$range[2]
-nugget <- Mod$psill[1]
-c(psill, range, nugget)
-## 9.650506e-02 1.011401e+02 8.779565e-03
-str(Mod)
-
-#### -------------------------------------------------
-
-
-
-#### Plot the fitted variogram on top of the empirical variograms
-#### --------------------------------------------------------------
-
-range(spEmpVgm$gamma)
-## 0.01181281 0.11760182
-range(spEmpVgm$dist)
-## 2.593084 98.518692
-
-ycuts <- seq(0, range(spEmpVgm$gamma)[2], 0.07)
-xcuts <- seq(0, range(spEmpVgm$dist)[2] , 150)
-
-png("./figures/Vgm_uncensored.png")
-plot(spEmpVgm$dist,spEmpVgm$gamma, ylim=c(0,range(spEmpVgm$gamma)[2]), xlim = c(0,range(spEmpVgm$dist)[2]),
-     ylab = "", xlab="", axes = FALSE, 
-     main = paste0("Empirical and fitted semi-variograms for month",m) )
-axis(1, at = xcuts)
-axis(2, at = ycuts)
-lines(variogramLine(vgm(psill,"Exp",range, nugget), maxdist=max(spEmpVgm$dist)),
-      col="blue", lwd=2)
-dev.off()
-#### ------------------------------------------------------------
-
-
-
-#### Simulation and plotting
-#### ----------------------------------------------
-
-
-
-Sigma <- psill*exp(-Dist/range)
-sills <- diag(Sigma) + nugget
-diag(Sigma) <- sills
-
-ns <- length(sp)
-
-# plot and save 5 example residuals with exponential covariance
-
-plotting_DT = DT_complete[month == m & year == min(training_years) & 
-                                                Lon >= Lon_min & Lon <= Lon_max & Lat >= Lat_min & Lat <= Lat_max,
-                                              .(Lon,Lat,year,month,YM, Res = SST_hat - SST_bar)]
-
-for(Ex in 1:5){
-  no <- mvrnorm(n=1, mu=rep(0,ns), Sigma=Sigma)
-  
-  plotting_DT[,noise := no]
-  plotting_DT[is.na(Res), noise := NA]
-  
-  
-  file.name =paste0( "Exp_cov_mon",m,"_ex",Ex)
-  plot_diagnostic(plotting_DT[,.(Lon,Lat,noise)],
-                  mn = paste0("exponential covariance res for June"),
-                  save.pdf = TRUE,file.name = file.name)
-  print(paste0("Example ",Ex," complete"))
+forecast_geostat = function(dt = NULL,
+                            n=100,
+                            y = 2001:2010,
+                            m = 1:12,
+                            ens_size = 9,
+                            truncate = TRUE,
+                            saveorgo = TRUE,
+                            save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                            file_name = "geostat_fc.RData",
+                            data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                            var_file_names = paste0("variogram_exp_m",m,".RData")){
+    
+    if(is.null(dt))
+    {
+      print("load and prepare data")
+      dt = load_combined_wide(bias = TRUE)
+    }
+    
+    SD_cols = c("Lon","Lat","grid_id","month","year","YM",
+                "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est")
+    
+    fc = dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols]
+    
+    
+    for(mon in m){
+    
+      # --- get variogram ---
+      
+      load(paste0(data_dir,var_file_names[which(mon == m)]))
+      
+      psill <- Mod$psill[2]
+      range <- Mod$range[2]
+      nugget <- Mod$psill[1]
+      
+      Sigma <- psill*exp(-Dist/range)
+      sills <- diag(Sigma) + nugget
+      diag(Sigma) <- sills
+      
+      ns <- length(sp)
+      
+      print(paste0("generating noise for month ",mon))
+      no <- MASS::mvrnorm(n=n*length(y), mu=rep(0,ns), Sigma=Sigma)
+      for (year in y){
+        for (i in 1:n){
+            y_ind = which(year == y)
+            yn_ind = (y_ind - 1)*n + i
+            fc[year == year & month == mon,  paste0("no",i):= no[yn_ind,]]
+            fc[year == year & month == mon & is.na(SST_hat) | is.na(SST_bar),paste0("no",i) := NA]
+            ens_mem = sample.int(ens_size,1) 
+            fc[year == year & month == mon,paste0("fc",i):= rowSums(.SD), .SDcols = c(paste0("Ens",ens_mem),"Bias_Est",paste0("no",i))]
+        }
+      }
+      
+      if(truncate){
+        for(i in 1:n){
+          fc[, paste0("fc",i) := lapply(.SD,trc), .SDcols = paste0("fc",i) ]
+        }
+      }  
+      
+      if(saveorgo){
+        save(fc,file = paste0(save_dir,file_name))
+      }
+    
+    }
+return(fc)
 }
-
-# plot and save example residuals observed in different (oos)-years
-
-ex_years = 2001:2006
-
-DT_oos = DT_complete[month == m & year %in% ex_years & 
-                                           Lon >= Lon_min & Lon <= Lon_max & Lat >= Lat_min & Lat <= Lat_max,
-                                         .(Lon,Lat,year,month,YM, Res = SST_hat - SST_bar)]
-
-for(Ex in ex_years){
-  
-  file.name =paste0( "Obs_res_mon",m,"_y",Ex)
-  plot_diagnostic(DT_oos[year == Ex,.(Lon,Lat,Res)],
-                  mn = paste0("Observed res for ",m," / ",Ex),
-                  save.pdf = TRUE,file.name = file.name)
-  print(paste0("Example ",Ex," complete"))
-}
-
-# plot and save example residuals generated by PCA
-
-PCs = 15
-
-setup_PCA(dt = DT_complete, m = m, y = ex_years, max_PCA_depth = 50)
-
-for(Ex in ex_years){
-  
-  Noise = forecast_PCA(y = Ex, m = m, PCA_depth = PCs,saveorgo = FALSE)[Lon >= Lon_min & 
-                                                                          Lon <= Lon_max & 
-                                                                          Lat >= Lat_min & 
-                                                                          Lat <= Lat_max,.(Lon,Lat,noise)]
-  
-  
-  file.name =paste0( "PCA_res_mon",m,"_y",Ex)
-  plot_diagnostic(Noise,
-                  mn = paste0("PCA res for ",m," / ",Ex),
-                  save.pdf = TRUE,file.name = file.name)
-  print(paste0("Example ",Ex," complete"))
-}
-
- 
-  
-#### Plot simulated residuals
-#### ------------------------------------------------------- 
-library(RColorBrewer)
-my.palette <- rev(brewer.pal(n = 11, name = "RdBu"))
-cont.palette <- colorRampPalette(my.palette)(1000000)
-
-range(wStar) 
-# -0.232786  1.1516399
-
-asSp <- SpatialPointsDataFrame(coords = sp, data = data.frame(wStar))
-out <- "wStar_June.png"
-png(out, width = 800, height = 500)
-spplot(asSp, col.regions = cont.palette, col="transparent", colorkey=T,
-       main="wStar in June",as.table=T, cuts=seq(-1.152,1.152,0.01))
-dev.off()
-
-#### --------------------------------------------------------

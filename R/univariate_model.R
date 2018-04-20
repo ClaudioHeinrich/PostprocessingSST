@@ -20,7 +20,7 @@ sim_mov_av = function( l,vec, years, skip = 0 ){
   
   sma = rep(0,length(vec))
   
-  for (i in 2 + skip :length(vec)){
+  for (i in (2 + skip) :length(vec)){
     year_ind = which(all_years == years[i])
     weight_vec = ((year_ind - which(all_years %in% years[1:(i-1)])) <= l ) & ((year_ind - which(all_years %in% years[1:(i-1)])) > skip)
     if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
@@ -75,6 +75,7 @@ exp_mov_av = function( a,vec, years, skip = 0 ){
 #' @author Claudio Heinrich
 #' @examples crps.na.rm(c(NA,rnorm(10)), 1,1)
 #' 
+#' @importFrom scoringRules crps
 #' 
 #' @export
 
@@ -146,9 +147,9 @@ ens_sd_est = function(dt,
                       file_name = "dt_combine_wide_bias_sd.RData"){
 # get the average standard deviation of the ensemble members by year, month and grid_id
 
-dt = dt[,paste0("temp_",1:ens_size) := .SD + Bias_Est - SST_bar, .SDcols = paste0("Ens",1:ens_size),
-        by = .(grid_id, month,year)]
-
+  for(i in 1:9){
+    dt = dt[,paste0("temp_",i) := .SD + Bias_Est - SST_bar,.SDcols = paste0("Ens",i)]
+  }
 dt = dt[,var_bar := sum(.SD^2)/ncol(.SD), .SDcols = paste0("temp_",1:ens_size),
         by = .(grid_id, month,year)]
 
@@ -256,9 +257,7 @@ sd_est = function(dt = NULL,
   if(is.null(dt)) 
     {
     dt = load_combined_wide(bias = TRUE)[year > 1985,] # first year the bias estimate is 0 and (obs-fc)^2 is not a good approximation for the variance
-  } else {
-    dt = dt[year >1985,]
-  }
+  } 
   
   
   if(method == "sma"){
