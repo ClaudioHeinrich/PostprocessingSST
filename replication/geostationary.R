@@ -3,16 +3,6 @@
 ##  Estimate a monthly Exponential semi-variogram function.
 #######################################################################
 
-rm(list = ls())
-
-library(PostProcessing)
-library(sp) # SpatialPoints(), spDists(), SpatialPointsDataFrame(), spplot
-library(spacetime)  # "STFDF" object
-library(gstat)  # variogramST(), fit.variogram()
-library(MASS) # mvrnorm
-
-setwd("~/NR/SFE")
-options(max.print = 500)
 
 
 

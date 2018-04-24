@@ -250,7 +250,7 @@ obs_unc_cov = function(M = 1:12,
 setup_PCA = function(dt=NULL,
                      m=1:12,
                      y = 2001:2010,
-                     max_PCA_depth = 75,
+                     max_PCA_depth = 50,
                      cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/")
 {
   
@@ -441,7 +441,7 @@ forecast_PCA = function(y, m,
 #' 
 #' @export
 
-forecast_PCA_new = function(dt,
+forecast_PCA_new = function(dt = NULL,
                             y,
                             m,
                             n = 1, 
@@ -556,13 +556,13 @@ forecast_PCA_new = function(dt,
     fc_land[[2]] = land_grid_id
     fc_land = rbindlist(fc_land, fill = TRUE)
     fc_land = fc_land[ order(year,month,grid_id)]
-    
+    fc = fc_land
     
     #-------- save -------
     
     if(saveorgo){ 
-      save(fc_land, file = paste0(save_dir,file_name,".RData"))
+      save(fc, file = paste0(save_dir,file_name,".RData"))
     }
-  return(fc_land)
+  return(fc)
 }
 

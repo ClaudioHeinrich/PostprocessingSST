@@ -19,45 +19,63 @@ lon.max = 14.5
 lat.min = 30.5
 lat.max = 69.5
 
-dvec = c(1:50) # the number of principal components the variogram score is computed for
-
-p = 0.5 # power for variogram score
+ # the number of principal components the variogram score is computed for
 
 eval_years = 2001:2010 # the years for which the score is computed
 
-## --------------------
+p = 0.5 # power for variogram score
 
-var_sc = list() 
+# var_sc_pc()
+# the function takes a data table with yearmonth obs and 
 
-score_by_month = function(month){
+
+
+#########################
+
+dvec = 1:50
+
+for(m in 1:12)
+{
+  setup_var_sc_PCA(m,DT,dvec = dvec,eval_years = eval_years,cov_dir = cov_dir,save_dir = save_dir)
+}
+var_sc_PCA(dvec = dvec,months = 1:12,eval_years = eval_years,save_dir = save_dir)
+
+
+#########################
+
+
+setup_var_sc_PCA = function(m,
+                              dt = NULL,
+                              dvec = c(1:10),
+                              cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                              ens_size = 9,
+                              eval_years = 2001:2010,
+                              saveorgo = TRUE,
+                              save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/"){
   
-  print(paste("starting month",month))
+  print(paste("starting month",m))
 
 # for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
 
-setup_PCA(y=year, m=month, oriented = TRUE)
-PCA <- eval(parse(text = paste0("PCA",month)))
+setup_PCA(dt = dt, y = 2010, m=m, cov_dir = cov_dir) # the year is irrelevant
+PCA <- eval(parse(text = paste0("PCA",m)))
 PCA_DT = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
 
 for(d in  dvec){
   PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
 }
 
-PCA_DT_small = PCA_DT[lon.min <= Lon][Lon <= lon.max][lat.min <= Lat][Lat <= lat.max,]
-  
- # build data table that contains pairs of coordinates within the region specified by lon.min/max and lat.min/max
+ # build data table that contains pairs of coordinates for all coordinates contained in dt
 
- dummy_dt = fc[year == min(year)][month == min(month)][lon.min <= Lon][Lon <= lon.max & 
-                      lat.min <= Lat][Lat <= lat.max,  .(Lon,Lat,grid_id)]
- setnames(dummy_dt,c("Lon1","Lat1","grid_id1"))
+ dt_coor_1 = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
+ setnames(dt_coor_1,c("Lon1","Lat1","grid_id1"))
  
  # add dummy key, do outer full merge with a duplicate, and remove key again
  
- dummy_dt[,"key" := 1]
- dummy_2 = copy(dummy_dt) 
- setnames(dummy_2,c("Lon2","Lat2","grid_id2","key"))
- 
- var_sc_prereq = merge(dummy_dt,dummy_2, by = "key",allow.cartesian = TRUE)
+ dt_coor_1[,"key" := 1]
+ dt_coor_2 = copy(dt_coor_1) 
+ setnames(dt_coor_2,c("Lon2","Lat2","grid_id2","key"))
+ var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
  var_sc_prereq[, "key" := NULL]
  
  
@@ -65,96 +83,242 @@ PCA_DT_small = PCA_DT[lon.min <= Lon][Lon <= lon.max][lat.min <= Lat][Lat <= lat
  ##--- for the predictive distribution with d principal components
   
   var_d = function(d,coor1,coor2){
-    i = match(coor1,PCA_DT_small[,grid_id])
-    j = match(coor2,PCA_DT_small[,grid_id])
+    i = match(coor1,PCA_DT[,grid_id])
+    j = match(coor2,PCA_DT[,grid_id])
     charvec = paste0("PC",1:d)
     sq_diff_sum=0
     for(sum_ind in 1:d){
-      sq_diff_sum = sq_diff_sum +(PCA_DT_small[,eval(parse(text = charvec[sum_ind]))][i] - 
-                                  PCA_DT_small[,eval(parse(text = charvec[sum_ind]))][j]  )^2
+      sq_diff_sum = sq_diff_sum +(PCA_DT[,eval(parse(text = charvec[sum_ind]))][i] - 
+                                  PCA_DT[,eval(parse(text = charvec[sum_ind]))][j]  )^2
     }
     return(sq_diff_sum)
   }
   
+  dummy_fct = function(d){
+    return( var_d(d,var_sc_prereq[,grid_id1],var_sc_prereq[,grid_id2]))
+    }
   
-  for(d in dvec){
-    var_sc_prereq[,(paste0("Var",d)) := var_d(d,grid_id1,grid_id2)]
-    print( paste0("computing variances for ",d," principal components complete"))
+  dummy_list = mclapply(dvec,dummy_fct,mc.cores = 10)
+  names(dummy_list) = paste0("Var",dvec)
+  dummy_list = rbindlist(list(dummy_list))
+  
+  var_sc_prereq = data.table(var_sc_prereq,dummy_list)
+  
+  print("getting variances of forecast distribution done, moving to obs differences")
+  
+  # attach differences of observed residuals
+  
+  dt = dt[month == m,]
+  
+  
+  obs_diff = function(y,coor1,coor2,k){
+    i = match(coor1,dt[year == y,grid_id])
+    j = match(coor2,dt[year == y,grid_id])
+    
+    abs_diff_obs = (abs(dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][i] - 
+                        dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][j]  ))
+    return(abs_diff_obs)
+  }
+  
+ 
+  for(y in eval_years)
+  {
+    print(paste0("year ",y))
+    k  = sample(ens_size,1)
+    var_sc_prereq[,(paste0("ObsDiff_y",y)) := obs_diff(y,grid_id1,grid_id2,k)]
   }
   
   
-  # --- now get the differences of residuals required for the variogram score
-   
-   obs_fc_data = load_combined_wide(bias = TRUE)
-   
-   obs_fc_data_small = obs_fc_data[lon.min <= Lon &
-                                     Lon <= lon.max &
-                                     lat.min <= Lat &
-                                     Lat <= lat.max &
-                                     month == month]
-
-   obs_diff = function(y,coor1,coor2){
-     i = match(coor1,obs_fc_data_small[,grid_id])
-     j = match(coor2,obs_fc_data_small[,grid_id])
-     
-     abs_diff_obs = (abs(obs_fc_data_small[year == y,SST_bar-SST_hat][i] - 
-                                     obs_fc_data_small[y == year,SST_bar-SST_hat][j]  ))
-     return(abs_diff_obs)
-   }
-   
-   
-   for(y in eval_years){
-     var_sc_prereq[,(paste0("ObsDif",y)) := obs_diff(y,grid_id1,grid_id2)]
-   }
-  
-
-   variogram_score = function(var_sc_prereq,
-                             p ,
-                             dvec,
-                             eval_years){
-    
-     var_sc = as.data.table(expand.grid(dvec,eval_years))
-     setnames(var_sc,c("PCs","year"))
-     setkey(var_sc,PCs)
-    
-      # get the p-th moment of a standard normal distribution
-      p_mom_sn = 2^(p/2)*gamma((p+1)/2)/sqrt(pi) 
-    
-      sc = c()
-      for (d in dvec){
-        print(paste0(d," principal components"))
-        for(y in eval_years){
-          print(paste0("year ",y))
-          sc = c(sc,sum(((var_sc_prereq[,get(paste0("Var",d))])^(p/2) * p_mom_sn - 
-                     (var_sc_prereq[,get(paste0("ObsDif",y))])^(p/2))^2))
-        }
-      }
-    
-      var_sc[,"v_sc" := sc]
-      return(var_sc)
-    }
-   
-   
-   
-   var_sc[[month]] = variogram_score(var_sc_prereq = var_sc_prereq,
-                                       p = p,
-                                       dvec = dvec,
-                                       eval_years = eval_years)[,"month" := month]
-   
-   
-#print(paste0("month ",month," complete"))
-
+  if(saveorgo)
+  {
+    save(var_sc_prereq,file = paste0(save_dir,"diff_var_by_PC_m",m,".RData"))
+  } else
+  {
+  return(var_sc_prereq)
+  }
 }
 
-var_sc = mclapply(X = months, FUN = score_by_month, mc.cores = 12)
-
-var_sc = rbindlist(var_sc)
-
-save.dir="./Data/PostClim/SFE/Derived/PCA/"
-save(var_sc, file = paste0(save.dir,"variogram_scores.RData"))
 
 
+  
+  # --- now get the differences of residuals required for the variogram score
+   
+   
+  #dt should be data table containing the columns .(year, grid_id1,grid_id2,fc_var, obs_diff) where year %in% eval_years and 
 
+   variogram_score = function(dt,
+                              p = 0.5,
+                              eval_years=2001:2010){
+     
+     
+     # get the p-th moment of a standard normal distribution
+     p_mom_sn = 2^(p/2)*gamma((p+1)/2)/sqrt(pi) 
+     
+     var_sc = sum(((dt[,fc_var])^(p/2) * p_mom_sn - 
+                      (dt[,obs_diff])^(p/2))^2)
+    
+     return(var_sc)
+   }
+     
+
+   
+var_sc_PCA = function(dvec = 1:50,
+                      p = 0.5,
+                     months = 1:12,
+                     eval_years = 2001:2010,
+                     saveorgo = TRUE,
+                     save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
+                     file_name = "var_sc_by_PC.RData"){
+   
+   
+   sc = list()
+   
+   for(m in months)
+   { print(paste0("month = ",m))
+     load(file = paste0(save_dir,"diff_var_by_PC_m",m,".RData"))
+     var_sc_by_PC = function(d){
+       return_data =  data.table(year = eval_years, d = d)
+       for(y in eval_years)
+       {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("Var",d),paste0("ObsDiff_y",y))]
+         setnames(dt_temp,c("fc_var","obs_diff"))
+         return_data[year == y, sc := variogram_score(dt_temp, p=p)]
+         return_data[year == y, sc := variogram_score(dt_temp, p=p)]
+       }
+     return_data[,month := m]
+     return(return_data)
+     }
+     sc_temp = mclapply(dvec,var_sc_by_PC,mc.cores = 12)
+     sc = c(sc,sc_temp)
+   }
+   sc = rbindlist(sc)
+   setkey(sc,d,year,month)
+   
+   if(saveorgo) 
+   {
+     save(sc, file = paste0(save_dir,file_name))
+   }
+}
+   
+   
+   
+setup_var_sc_geoStat = function(dt = NULL,
+                          months = 1:12,
+                          eval_years = 2001:2010,
+                          saveorgo = TRUE,
+                          save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
+                          file_name = "var_sc_geoStat.RData",
+                          data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                          var_file_names = paste0("variogram_exp_m",months,".RData"))
+{ if (is.null(dt))
+  {
+  load_combined_wide(var = TRUE)
+  }
+  
+  
+  # build data table that contains pairs of coordinates for all coordinates contained in dt
+  
+  dt_coor_1 = dt[YM == min(YM), .(Lon,Lat,grid_id)]
+  dt_coor_1[,grid_id_ind := match(grid_id,sort(grid_id))]
+  setkey(dt_coor_1,Lon,Lat) #ordering needs to be the same as in geostationary_training
+  setnames(dt_coor_1,c("Lon1","Lat1","grid_id1","grid_id_ind1"))
+  
+  # add dummy key, do outer full merge with a duplicate, and remove key again
+  
+  dt_coor_1[,"key" := 1]
+  dt_coor_2 = copy(dt_coor_1) 
+  setnames(dt_coor_2,c("Lon2","Lat2","grid_id2","grid_id_ind2","key"))
+  var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
+  var_sc_prereq[, "key" := NULL]
+  
+  ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
+  
+  load(paste0(data_dir,var_file_names[which(m == months)]))
+  
+  psill <- Mod$psill[2]
+  range <- Mod$range[2]
+  nugget <- Mod$psill[1]
+  
+  Sigma <- psill*exp(-Dist/range)
+  
+  dummy_vec = c()
+  for(i in 1:var_sc_prereq[,.N])
+  {if(i %% 10 == 0) print(i)
+    dummy_vec = c(dummy_vec, Sigma[var_sc_prereq[,grid_id_ind1][i],var_sc_prereq[,grid_id_ind2][i]])
+  }
+  var_sc_prereq[,Var := dummy_vec]
+  
+  
+  var_geostat = function(coor1,coor2){
+    i = match(coor1,PCA_DT[,grid_id])
+    j = match(coor2,PCA_DT[,grid_id])
+    charvec = paste0("PC",1:d)
+    sq_diff_sum=0
+    for(sum_ind in 1:d){
+      sq_diff_sum = sq_diff_sum +(PCA_DT[,eval(parse(text = charvec[sum_ind]))][i] - 
+                                    PCA_DT[,eval(parse(text = charvec[sum_ind]))][j]  )^2
+    }
+    return(sq_diff_sum)
+  }
+  
+  dummy_fct = function(d){
+    return( var_d(d,var_sc_prereq[,grid_id1],var_sc_prereq[,grid_id2]))
+  }
+  
+  dummy_list = mclapply(dvec,dummy_fct,mc.cores = 10)
+  names(dummy_list) = paste0("Var",dvec)
+  dummy_list = rbindlist(list(dummy_list))
+  
+  var_sc_prereq = data.table(var_sc_prereq,dummy_list)
+  
+  print("getting variances of forecast distribution done, moving to obs differences")
+  
+  # attach differences of observed residuals
+  
+  dt = dt[month == m,]
+  
+  
+  obs_diff = function(y,coor1,coor2,k){
+    i = match(coor1,dt[year == y,grid_id])
+    j = match(coor2,dt[year == y,grid_id])
+    
+    abs_diff_obs = (abs(dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][i] - 
+                          dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][j]  ))
+    return(abs_diff_obs)
+  }
+  
+  
+  for(y in eval_years)
+  {
+    print(paste0("year ",y))
+    k  = sample(ens_size,1)
+    var_sc_prereq[,(paste0("ObsDiff_y",y)) := obs_diff(y,grid_id1,grid_id2,k)]
+  }
+  
+  
+  if(saveorgo)
+  {
+    save(var_sc_prereq,file = paste0(save_dir,"diff_var_by_PC_m",m,".RData"))
+  } else
+  {
+    return(var_sc_prereq)
+  }
+  
+                          
+  for(m in months)
+  
+                          load(paste0(data_dir,var_file_names[which(m == months)]))
+                          
+                          psill <- Mod$psill[2]
+                          range <- Mod$range[2]
+                          nugget <- Mod$psill[1]
+                          
+                          Sigma <- psill*exp(-Dist/range)
+                          
+                          
+}  
+   
+   
+   
 
 
 # --- plots ---
