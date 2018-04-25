@@ -16,7 +16,7 @@
 #' @param ens_size Integer. Size of the NWP ensemble.
 #' @param saveorgo Logical, whether we save or not. 
 #' @param save_dir,file_name The directory to save in. The name of the file of the saved variogram for a given month is \code{file_name <month> .RData}.
-#' @param n_intv Integer. How many distance bins are considered for the empirical variogram.
+#' @param nintv Integer. How many distance bins are considered for the empirical variogram.
 #' @param truncate Logical. The empirical variogram oftentimes is far from the fitted variogram for the 10% largest distances considered. If truncate == TRUE, those are ignored leading to a visually much better fit of the variogram.
 #' 
 #' @return data table containing n columns with noise and n columns with forecasts.
@@ -81,7 +81,7 @@ geostationary_training = function (dt = NULL,
     
     time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
     
-    setkey(DT,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
+    setkey(DT,YM,Lat,Lon) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
     random_pick = sample(ens_size,1)
     data = DT[,.SD,.SDcols = paste0("Res",random_pick)] 
     setnames(data,"Res")
@@ -94,7 +94,7 @@ geostationary_training = function (dt = NULL,
     #### ----------------------------------------------
     
     ## calculate the distance matrix [km], full symmetric matrix
-    Dist <- spDists(sp, longlat = TRUE)
+    Dist <- sp::spDists(sp, longlat = TRUE)
     
     ## set the intervals
     up_Dist <- Dist[upper.tri(Dist, diag = FALSE)] 
@@ -135,7 +135,7 @@ geostationary_training = function (dt = NULL,
     Mod <- fit.variogram(spEmpVgm, vgm("Exp"), fit.sills = c(T,F), fit.method = 7)
     if(saveorgo)
     {
-      save(Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))
+      save(sp,stfdf,Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))
     }
   }
 }

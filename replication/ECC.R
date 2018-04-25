@@ -50,24 +50,24 @@ if(is.null(dt))
   
 # generate noise and marginally post-process each ensemble member
   
-na_cols = DT[ ,which(is.na(Bias_Est) |  is.na(Ens_bar) | is.na(var_bar) )]
+na_cols = dt[ ,which(is.na(Bias_Est) |  is.na(Ens_bar) | is.na(var_bar) )]
 
-length_norm = DT[ -na_cols,.N]
+length_norm = dt[ -na_cols,.N]
 
 for(i in 1:ens_size)
   {
-  norm_rv = rnorm(n = length_norm, mean = DT[-na_cols,eval(parse(text = paste0("Ens",i))) + Bias_Est], sd = DT[-na_cols,SD_hat])
-  DT[ -na_cols,paste0("fc",i) := norm_rv]
+  norm_rv = rnorm(n = length_norm, mean = dt[-na_cols,eval(parse(text = paste0("Ens",i))) + Bias_Est], sd = dt[-na_cols,SD_hat])
+  dt[ -na_cols,paste0("fc",i) := norm_rv]
   }
 
 #get rank order of the ensemble and reorder the post-processed ensemble to mach the rank order statistic of the ensemble
 
 
-rks_ens = DT[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("Ens",1:9)]
+rks_ens = dt[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("Ens",1:9)]
 
-rks_fc = DT[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("fc",1:9)]
+rks_fc = dt[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("fc",1:9)]
 
-fcs = as.matrix(DT[,.SD,.SDcols = paste0("fc",1:ens_size)])
+fcs = as.matrix(dt[,.SD,.SDcols = paste0("fc",1:ens_size)])
 
 num_row = nrow(fcs)
 
@@ -86,25 +86,18 @@ for(i in 1:num_row){
 ecc_fcs = data.table(ecc_fcs)
 setnames(ecc_fcs,paste0("ecc_fc",1:ens_size))
 
-DT = data.table(DT,ecc_fcs)
+dt = data.table(dt,ecc_fcs)
 
 if(saveorgo)
 {
-  save(DT, file = paste0(save_dir,file_name))
+  save(dt, file = paste0(save_dir,file_name))
 }
 
-return(DT)
+return(dt)
 
 }
 
 
 
-
-for(i in 1:ens_size){
-  name_1 = paste0("ecc_fc",i)
-  plot_diagnostic(DT[year == 2010 & month == 2,.SD,.SDcols = c("Lon","Lat",name_1)],mn = name_1)
-  name_2 = paste0("fc",i)
-  plot_diagnostic(DT[year == 2010 & month == 2,.SD,.SDcols = c("Lon","Lat",name_2)],mn = name_2)
-}
 
 

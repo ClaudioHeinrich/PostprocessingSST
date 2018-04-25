@@ -19,6 +19,7 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
 {
 
   dt_obs_grid = unique(dt_obs[,.(Lon,Lat)])
+  dt_ens_grid = unique(dt_ens[,.(Lon,Lat)])
   point_match = NULL
   for(j in 1:dim(dt_obs_grid)[1])
   {
@@ -229,6 +230,7 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
 #' @param data_dir Root location of the data
 #' @param vintage Indication of which vintage we are using, most likely 'mr'
 #' @param bias Boolean. Should the bias corrected ensemble be loaded?
+#' @param var Boolean. Should the data with estimated bias and variance be loaded? 
 #' @param model String.  Currently taking values \code{NorESM} or \code{senorge} to indicate whether the NorESM or senorge data are of interest
 #'
 #' @return A data.table containing all data for the parameters specified, provided these data have been rendered.
@@ -236,12 +238,16 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
 load_combined_wide = function(data_dir = "~/PostClimDataNoBackup/SFE/Derived/", 
                               vintage = "mr", 
                               bias = FALSE,
+                              var = FALSE,
                               output_name = NULL
                               )
 {
   if(is.null(output_name))
     {
-      if(bias)
+    if(var)
+    {
+      file = paste0(data_dir,"/dt_combine_wide_bc_var.RData")
+    }else if(bias)
       {
         file = paste0(data_dir,"/dt_combine_wide_bias.RData")
       } else {

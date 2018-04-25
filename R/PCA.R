@@ -469,7 +469,7 @@ forecast_PCA_new = function(dt = NULL,
   land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
                       .(Lon,Lat,grid_id,month,year)]
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est")
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","SD_hat")
   fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
   
   
