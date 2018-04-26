@@ -67,9 +67,15 @@ dim(Sigma)
 
 print("getting variances")
 
-dummy_vec = c()
-for(i in 1:var_sc_prereq[,.N])
-{if(i %% 10 == 0) print(paste0(i," / ",var_sc_prereq[,.N]))
-  dummy_vec = c(dummy_vec, Sigma[var_sc_prereq[,grid_id_ind1][i],var_sc_prereq[,grid_id_ind2][i]])
-}
-var_sc_prereq[,Var := dummy_vec]
+ddummy_vec = c()
+id_1 = var_sc_prereq[,grid_id_ind1]
+id_2 = var_sc_prereq[,grid_id_ind2]
+ff = id_1 + (id_2 - 1)*dim(Sigma)[1]
+a = Sigma[ff]
+var_sc_prereq[,Var:=Sigma[ff]]
+
+##for(i in 1:var_sc_prereq[,.N]){
+##    if(i %% 10 == 0) print(paste0(i," / ",var_sc_prereq[,.N]))
+##    dummy_vec = c(dummy_vec, Sigma[id_1[i], id_2[i]])
+##}
+##var_sc_prereq[,Var := dummy_vec]
