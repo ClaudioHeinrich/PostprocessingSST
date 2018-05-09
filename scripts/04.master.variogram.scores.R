@@ -111,6 +111,7 @@ print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(m
 #########################################
 
 geostat_dir = paste0(save_dir, "GeoStat/")
+dir.create(geostat_dir, showWarnings = FALSE)
 
 geostationary_training(dt = DT, save_dir = geostat_dir)
 
@@ -129,10 +130,12 @@ load(file = paste0(geostat_dir,"var_sc.RData"))
 ################ ECC ####################
 #########################################
 
+ECC_dir = paste0(save_dir,"ECC/")
+dir.create(ECC_dir, showWarnings = FALSE)
 
+forecast_ECC(dt = DT,save_dir = ECC_dir)
 
-
-
+setup_var_sc_ECC(eval_years = validation_years,data_dir = ECC_dir)
 
 
 ###########################################
@@ -187,11 +190,7 @@ points(x = mean_sc_nmc[[1]][opt_num_PCs],
 
 abline(h = sc[,mean(sc)], lty = "dashed", col = adjustcolor("darkred"))
 
-legend("topright",legend = c("PCA, mar.cor.var.","just PCA","geostat"),col = c("blue","darkred"),lty = c(1,2))
-
-
-
-
+legend("topright",legend = c("PCA, mar.cor.var.","just PCA","geostat"),col = c("blue","darkgreen","darkred"),lty = c(1,1,2))
 
 dev.off()
 

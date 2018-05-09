@@ -346,7 +346,9 @@ setup_var_sc_geoStat = function(dt = NULL,
   }
   
   
-  # build data table that contains pairs of coordinates for all coordinates contained in dt
+  # build data table that contains pairs of coordinates for all coordinates contained in dt that are not land_id
+  land_grid_id = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
+  dt = dt[-land_grid_id,]
   
   dt_coor_1 = dt[YM == min(YM), .(Lat,Lon,grid_id)]
   dt_coor_1[,grid_id_ind := match(grid_id,sort(grid_id))]
@@ -385,7 +387,6 @@ setup_var_sc_geoStat = function(dt = NULL,
     id_1 = var_sc_prereq[,grid_id_ind1]
     id_2 = var_sc_prereq[,grid_id_ind2]
     ff = id_1 + (id_2 - 1)*dim(Sigma)[1]
-    a = Sigma[ff]
     var_sc_prereq[,Var:=Sigma[ff]]
     
     
@@ -460,4 +461,110 @@ var_sc_geoStat = function(p = 0.5,
     return(sc)
   }
 }   
+
+########################################################
+####################### ECC: ###########################
+########################################################
+
+#' Setup for computing variogram scores for ECC
+#'
+#' @description the variogram score for requires the variances of all differences of 
+#' univariate projections X_i-X_j, as well as the differences of the corresponding observations obs_i-obs_j. This function computes 
+#' these values for the (exponential) geostationary post-processing method.
+#'
+#' @param dt optional. The wide data table.
+#' @param months the months considered.
+#' @param eval_years integer vector contining the years you want to use for validation.
+#' @param savedir the directory to save in.
+#' @param file_name the name of the saved file.
+#' @param data_dir where the data of the fitted geostationary model is stored.
+#' @param var_file_names character vector. Contains the names of the files containing the fitted variograms.
+#' @param finite_time logical. If finite_time == TRUE, the computation is sped up by randomly sampling \code{sample_size} (non-land) locations and only considering pairs of these locations.
+#' @param sample_size Integer. See \code{finite_time}.
+#' 
+#' @return A data table var_sc_prereq
+#' 
+#' @examples \dontrun{
+#' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
+#' geostat_dir = paste0(save_dir,"/GeoStat")
+#' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
+#' setup_var_sc_geoStat(dt = DT,eval_years = eval_years,data_dir = geostat_dir,save_dir = geostat_dir)
+#' }
+#'
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+setup_var_sc_ECC = function(dt = NULL,
+                            p = 0.5,
+                            months = 1:12,
+                            eval_years = 2001:2010,
+                            ens_size = 9,
+                            save_dir = "~/PostClimDataNoBackup/SFE/Derived/ECC/",
+                            file_name = "diff_var_ECC_m",
+                            data_dir = "./Data/PostClim/SFE/Derived/ECC/")
+{
+  if (is.null(dt))
+  {
+    load(file = paste0(data_dir,"ECC_fc.RData"))
+  }
+  
+  
+  # build data table that contains pairs of coordinates for all coordinates contained in dt that are not land_id
+  land_grid_id = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
+  dt = dt[-land_grid_id,]
+  
+  dt_coor_1 = dt[YM == min(YM), .(Lat,Lon,grid_id)]
+  dt_coor_1[,grid_id_ind := match(grid_id,sort(grid_id))]
+  setnames(dt_coor_1,c("Lat1","Lon1","grid_id1","grid_id_ind1"))
+  
+  # add dummy key, do outer full merge with a duplicate, and remove key again
+  
+  dt_coor_1[,"key" := 1]
+  dt_coor_2 = copy(dt_coor_1) 
+  setnames(dt_coor_2,c("Lat2","Lon2","grid_id2","grid_id_ind2","key"))
+  var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
+  var_sc_prereq[, "key" := NULL]
+  
+  # parallelize rest
+  setup_by_month = function(m)
+  {
+    dt = dt[month == m,]
+    print("getting variances")
+    
+    id_1 = var_sc_prereq[,grid_id_ind1]
+    id_2 = var_sc_prereq[,grid_id_ind2]
+    
+    for(y in eval_years)
+    {print(paste0("year = ",y))
+      dt_temp = dt[year == y,.SD,
+                   .SDcols = c(paste0("ecc_fc",1:ens_size),
+                               paste0("Ens",1:ens_size),
+                               "Bias_Est","SST_bar")]
+      mom_vec = 0
+      # get moment estimate:
+      for(i in 1:ens_size)
+      {
+        print(i) 
+        vec = dt_temp[,eval(parse(text = paste0("ecc_fc",i)))]
+        mom_vec = mom_vec + abs(vec[id_1]-vec[id_2])^p
+      }
+      mom_vec = mom_vec/ens_size
+      var_sc_prereq[,(paste0("mom_est_y",y)) := mom_vec]
+      
+      #get observation:
+      k  = sample(ens_size,1)
+      dt_temp[,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
+      vec = dt_temp[,obs_res]
+      var_sc_prereq[,(paste0("ObsDiff_y",y)) := abs(vec[id_1]-vec[id_2])^p]
+    }
+    
+    save(var_sc_prereq,file = paste0(save_dir,file_name,m,".RData"))
+    
+  }
+  # run the parallelized prepfunction by month:
+  parallel::mclapply(months, setup_by_month,mc.cores = 12) # setup_by_month saves a file for each run  
+}
+
+
 

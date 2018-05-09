@@ -3,15 +3,6 @@
 ############### Creates a postprocessed forecast by ECC ####################
 ############################################################################
 
-rm(list = ls())
-
-library(PostProcessing)
-
-setwd("~/NR/SFE")
-options(max.print = 500)
-
-
-
 
 #' ECC forecasts 
 #' 
