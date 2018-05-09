@@ -1,0 +1,163 @@
+################################################################################
+
+###################  master script part 2 - bias correct  ######################
+
+################################################################################
+
+# This script computes average scores for a range of different methods 
+# of bias correction. It then chooses and applies the optimal way of 
+# bias correction. It complements the data table DT by the two new 
+# columns Bias_Est and SST_hat (which is just Ens_bar + Bias_Est, truncated
+# at freezing temperature).
+#
+# 
+# Files generated:
+#   
+# Data files: "scores.bc.sma.RData", "scores.bc.ema.RData", "dt_combine_wide_bc.RData"
+# Plots: "mean_scores_sma.pdf", "mean_scores_ema.pdf"
+#
+# Requires previous run of 01.master.setup.R with the same value of name_abbr as below.
+
+
+
+##### setting up ######
+
+rm(list = ls())
+
+setwd("~/NR/SFE")
+options(max.print = 1e3)
+
+library(PostProcessing)
+library(data.table)
+
+name_abbr = "NAO" 
+
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+
+load(file = paste0(save_dir,"setup.RData"))
+
+
+###### run bias analysis for simple moving averages ######
+
+num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
+
+sc_sma = list()
+dummy_function = function(k){
+  temp = bias_correct(dt = DT, 
+                      method = "sma", 
+                      par_1 = k,
+                      scores = TRUE,
+                      eval_years = validation_years,
+                      saveorgo = FALSE)
+  sc_sma[[k]] = temp[,"win_length" := k]
+}
+
+sc_sma = parallel::mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = 8)
+sc_sma = rbindlist(sc_sma)
+
+save(sc_sma, file = paste0(save_dir,"scores.bc.sma.RData"))
+
+
+###### run bias analysis for exponential moving averages ######
+
+par_vec = seq(0.05,0.4,length.out = 24) 
+
+sc_ema = list()
+
+dummy_function = function(k){
+  temp = bias_correct(dt = DT, 
+                      method = "ema",
+                      par_1 = par_vec[k], 
+                      scores = TRUE,
+                      eval_years = validation_years,
+                      saveorgo = FALSE)
+  sc_ema[[k]] = temp[,"a" := par_vec[k]]
+}
+
+sc_ema = parallel::mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = 8)
+sc_ema = rbindlist(sc_ema)
+
+save(sc_ema, file = paste0(save_dir,"scores.bc.ema.Rdata"))
+
+
+###### plotting scores for different ways of bias correction ######
+
+load(paste0(save_dir,"scores.bc.sma.Rdata"))
+load(paste0(save_dir,"scores.bc.ema.Rdata"))
+
+# ensure that they are plotted on the the same range
+y_range = range(c(sc_sma[,sqrt(MSE)],sc_ema[,sqrt(MSE)]))  
+
+## plot for sma ##
+
+pdf(paste0(plot_dir,"mean_scores_sma.pdf"))
+plot(x = sc_sma[,win_length],
+     y = sc_sma[,sqrt(MSE)],
+     ylim = y_range,
+     type = "b",
+     col = "blue",
+     main = paste0("RMSE for ",name_abbr," bias correction by SMA"),
+     xlab = "window length",
+     ylab = "RMSE"
+)
+
+# highlight minimum and add minimum reference line 
+abline(h = sc_sma[,min(sqrt(MSE))], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+
+min_loc_RMSE = sc_sma[,which.min(MSE)]
+
+points(x = sc_sma[,win_length][min_loc_RMSE],
+       y = sc_sma[,sqrt(MSE)][min_loc_RMSE],
+       col = "blue",
+       bg = "blue",
+       pch = 21)
+
+dev.off()
+
+## plot for ema ##
+
+pdf(paste0(plot_dir,"mean_scores_ema.pdf"))
+plot(x = sc_ema[,a],
+     y = sc_ema[,sqrt(MSE)],
+     ylim = y_range,
+     type = "b",
+     col = "blue",
+     main = paste0("RMSE for ",name_abbr," bias correction by EMA"),
+     xlab = "weight parameter a",
+     ylab = "RMSE"
+)
+
+# highlight minimum and add minimum reference line 
+abline(h = sc_ema[,min(sqrt(MSE))], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+
+min_loc_RMSE = sc_ema[,which.min(MSE)]
+
+points(x = sc_ema[,a][min_loc_RMSE],
+       y = sc_ema[,sqrt(MSE)][min_loc_RMSE],
+       col = "blue",
+       bg = "blue",
+       pch = 21)
+
+dev.off()
+
+
+###### finding and applying optimal way of bias correcion ######
+
+if(sc_sma[,min(MSE)] < sc_ema[,min(MSE)]){
+  print(paste0("optimal bias correction uses simple moving averages with window length of ",sc_sma[,which.min(MSE)], " years, and achieves a RMSE of ",round(sc_sma[,sqrt(min(MSE))],3),
+               ". Best correction with exponential moving averages achieves a RMSE of ",round(sc_ema[,sqrt(min(MSE))],3),"."))
+  opt_par = c("sma",sc_sma[,which.min(MSE)])
+} else{
+  print(paste0("optimal bias correction uses exponential moving averages with parameter a = ",round(sc_ema[,a][sc_sma[,which.min(MSE)]],3),
+               ", and achieves a RMSE of ",round(sc_ema[,sqrt(min(MSE))],3),". Best correction with simple moving averages achieves a RMSE of ",round(sc_sma[,sqrt(min(MSE))],3),"."))
+  opt_par = c("ema",sc_ema[,a][sc_sma[,which.min(MSE)]])
+}
+
+bias_correct(dt = DT,
+             method = opt_par[1],
+             par_1 = as.double(opt_par[2]),
+             save_dir = save_dir,
+             file_name = paste0("dt_combine_wide_bc.RData"))
+
+
+

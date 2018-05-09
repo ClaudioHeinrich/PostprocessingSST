@@ -33,7 +33,6 @@ for_res_cov = function(dt = NULL,
     dt_PCA = dt_PCA[month == mon & year %in% Y,]
     
     for(ens in  1:ens_size){
-      print(paste0("ensemble =",ens))  
       dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-SST_bar]
     }
     dt_PCA = dt_PCA[,"res_mean" := mean(SST_hat- SST_bar), by =  grid_id]
@@ -256,8 +255,7 @@ setup_PCA = function(dt=NULL,
   
   if(is.null(dt))
   {
-    print("load and prepare data")
-    dt = load_combined_wide(bias = TRUE)
+    dt = load_combined_wide(var = TRUE)
     trash = c(paste0("SST",1:10),paste0("Ens",1:9))
     dt[, (trash):=NULL]
     dt = dt[year %in% y & month %in% m,]
@@ -267,13 +265,9 @@ setup_PCA = function(dt=NULL,
   
   land_grid_id <<- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
                       .(Lon,Lat,grid_id,month,year)]
-  print("finding land complete")
   
   
   fc <<- na.omit( dt[,.(Lon,Lat,grid_id,month,year,SST_hat,SST_bar)])
-  
-  
-  print("creating fc complete")
   
   
                                         #get covariance matrices
@@ -291,10 +285,8 @@ setup_PCA = function(dt=NULL,
   
   
   assign(paste0("PCA",mon), PCA, envir = globalenv())
-  print(paste0("Month ",mon," complete"))
-
   }
-  print("setup complete")
+  print("setup for PCA done.")
 }
 
 
@@ -444,7 +436,7 @@ forecast_PCA = function(y, m,
 forecast_PCA_new = function(dt = NULL,
                             y,
                             m,
-                            n = 1, 
+                            n = 10, 
                             PCA_depth = 15,  
                             ens_member = TRUE,
                             ens_size = 9,
@@ -469,9 +461,8 @@ forecast_PCA_new = function(dt = NULL,
   land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
                       .(Lon,Lat,grid_id,month,year)]
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","SD_hat")
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar")
   fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
-  
   
   
   #get covariance matrices
@@ -489,7 +480,6 @@ forecast_PCA_new = function(dt = NULL,
       
       
       assign(paste0("PCA",mon), PCA)
-      print(paste0("Month ",mon," complete"))
       
     }
   
@@ -510,13 +500,14 @@ forecast_PCA_new = function(dt = NULL,
       PCA <- eval(parse(text = paste0("PCA",mon)))
       eigen_vectors <- PCA$u[,1:d]
       sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
+      mar_sds <- sqrt(rowSums(eigen_vectors^2))
       
       for(year in y){
         
         if(d == 0)  {
           a <- matrix(0,nrow =  dim(PCA$u)[1],ncol = n)
-        }else{
-          a = eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n)
+        }else{var_correct = diag(fc[year == y,][month == mon,var_bar] / mar_sds)
+          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n)
         }
             
         no <- rbind(no, a)

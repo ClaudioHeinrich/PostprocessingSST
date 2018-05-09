@@ -67,7 +67,9 @@ geostationary_training = function (dt = NULL,
     
     DT = dt[month == mon, .SD,.SDcols = c("Lon","Lat","year","month","YM", paste0("Res",1:ens_size))]
     
-    sp <- SpatialPoints(cbind(x=DT[YM == min(YM), Lon],y=DT[YM == min(YM), Lat]), proj4string = CRS("+proj=longlat +datum=WGS84"))
+    sp <- sp::SpatialPoints(cbind(x=DT[YM == min(YM), Lon],
+                                  y=DT[YM == min(YM), Lat]), 
+                            proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
     
     # Convert YM into date
     
@@ -87,7 +89,7 @@ geostationary_training = function (dt = NULL,
     setnames(data,"Res")
     
     
-    stfdf = STFDF(sp, time, data)
+    stfdf = spacetime::STFDF(sp, time, data)
     
     
     #### Calculate the empirical semi-variogram
@@ -105,7 +107,7 @@ geostationary_training = function (dt = NULL,
     
     
     
-    empVgm <- variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries,assumeRegular = TRUE, na.omit = TRUE) #"gstat"
+    empVgm <- gstat::variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries,assumeRegular = TRUE, na.omit = TRUE) #"gstat"
   
     #### Fit to the Exponential semi-variogram function
     #### -------------------------------------------------- 
@@ -132,7 +134,7 @@ geostationary_training = function (dt = NULL,
     ## Exponential semi-variogram function with nugget, see the 1st argument. 
     ## Fixing "psill", fit "nugget" and "range", the 2nd arg.
     ## Using fit.method = 7, the 3rd arg.
-    Mod <- fit.variogram(spEmpVgm, vgm("Exp"), fit.sills = c(T,F), fit.method = 7)
+    Mod <- gstat::fit.variogram(spEmpVgm, gstat::vgm("Exp"), fit.sills = c(T,F), fit.method = 7)
     if(saveorgo)
     {
       save(sp,stfdf,Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))

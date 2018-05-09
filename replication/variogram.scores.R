@@ -1,47 +1,68 @@
 
-rm(list = ls())
-
-library(SeasonalForecasting)
-setwd("~/NR/SFE")
-options(max.print = 1e3)
+######################################################
+###### Functions for computing variogram scores ######
+######################################################
 
 
-
-# --- set parameters
-
-months = 1:12
-year = 1985:2010
-
-# specify window for scoring
-
-lon.min = -59.5
-lon.max = 14.5
-lat.min = 30.5
-lat.max = 69.5
-
- # the number of principal components the variogram score is computed for
-
-eval_years = 2001:2010 # the years for which the score is computed
-
-p = 0.5 # power for variogram score
-
-# var_sc_pc()
-# the function takes a data table with yearmonth obs and 
+#' Computing variogram scores
+#'
+#' @param dt a data table containing the columns .(year, grid_id1,grid_id2,fc_var, obs_diff) 
+#' @param p power for the variogram score.
+#' @param eval_years integer vector containing the years you want to use for validation, need to be contained in dt[,year]
+#' 
+#' @return a double var_sc
+#' 
+#' @author Claudio Heinrich
+#' 
+#' @export
 
 
-
-#########################
-
-dvec = 1:50
-
-for(m in 1:12)
-{
-  setup_var_sc_PCA(m,DT,dvec = dvec,eval_years = eval_years,cov_dir = cov_dir,save_dir = save_dir)
+variogram_score = function(dt,
+                           p = 0.5,
+                           eval_years=2001:2010){
+  
+  
+  # get the p-th moment of a standard normal distribution
+  p_mom_sn = 2^(p/2)*gamma((p+1)/2)/sqrt(pi) 
+  
+  var_sc = sum(((dt[,fc_var])^(p/2) * p_mom_sn - 
+                  (dt[,obs_diff])^(p/2))^2)
+  
+  return(var_sc)
 }
-var_sc_PCA(dvec = dvec,months = 1:12,eval_years = eval_years,save_dir = save_dir)
 
 
-#########################
+#####################################################
+####################### PCA: ########################
+#####################################################
+
+#' Setup for computing variogram scores 
+#'
+#' @description the variogram score for a multivariate normal forecast distribution X requires the variances of all differences of 
+#' univariate projections X_i-X_j, as well as the differences of the corresponding observations obs_i-obs_j. This function computes these values for 
+#' the PCA post-processing method for a range of considered numbers of PCs.
+#'
+#' @param m the months considered.
+#' @param dt optional. The wide data table.
+#' @param dvec integer vector. Contains the numbers of principal components we want to test for.
+#' @param cov_dir string. The covariance directory for the PCA.
+#' @param ens_size The number of ensemble members.
+#' @param eval_years integer vector contining the years you want to use for validation.
+#' @param saveorgo Logical. Should the results be saved?
+#' @param savedir the directory to save in.
+#' @param finite_time logical. If finite_time == TRUE, the computation is sped up by randomly sampling \code{sample_size} (non-land) locations and only considering pairs of these locations.
+#' @param sample_size Integer. See \code{finite_time}.
+#' 
+#' @return A data table var_sc_prereq
+#' 
+#' @examples \dontrun{
+#' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
+#' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
+#' setup_var_sc_PCA(m = 1, dt = DT)}
+#'
+#' @author Claudio Heinrich
+#' 
+#' @export
 
 
 setup_var_sc_PCA = function(m,
@@ -52,155 +73,189 @@ setup_var_sc_PCA = function(m,
                               eval_years = 2001:2010,
                               saveorgo = TRUE,
                               save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
-                              finite_time = TRUE,
+                              finite_time = FALSE,
                               sample_size = 500){
   
   print(paste("starting month",m))
-
-# for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
-
-setup_PCA(dt = dt, y = 2010, m=m, cov_dir = cov_dir) # the year is irrelevant
-PCA <- eval(parse(text = paste0("PCA",m)))
-PCA_DT = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
-
-for(d in  dvec){
-  PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
-}
-
-if (finite_time)
-{
-  # if dt contains too many locations computing variogram scores takes a long time. We compute a variogram for randomly sampled sample_size locations that are not land
-  na_grid_ids = dt[YM == min(YM)][is.na(SST_bar) | is.na(Ens_bar),grid_id]
   
-  if(dt[YM == min(YM)][!(grid_id %in% na_grid_ids),.N] <= sample_size)
+  # for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
+  
+  setup_PCA(dt = dt, y = 2010, m=m, cov_dir = cov_dir) # the year is irrelevant
+  PCA <- eval(parse(text = paste0("PCA",m)))
+  PCA_DT = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
+  
+  for(d in  dvec){
+    PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
+  }
+  
+  if (finite_time)
   {
-    dt = dt[!(grid_id %in% na_grid_ids),]
-    fc = fc[!(grid_id %in% na_grid_ids),]
-    PCA_DT = PCA_DT[!(grid_id %in% na_grid_ids),]
-  } else {
-    grid_id_sample = sample(dt[YM == min(YM)][!(grid_id %in% na_grid_ids),grid_id],sample_size)
+    # if dt contains too many locations computing variogram scores takes a long time. We compute a variogram for randomly sampled sample_size locations that are not land
+    na_grid_ids = dt[YM == min(YM)][is.na(SST_bar) | is.na(Ens_bar),grid_id]
     
-    dt = dt[grid_id %in% grid_id_sample,]
-    fc = fc[grid_id %in% grid_id_sample,]
-    PCA_DT = PCA_DT[grid_id %in% grid_id_sample,]
-  }
-  
-}
-
- # build data table that contains pairs of coordinates for all coordinates contained in dt
-
- dt_coor_1 = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
- setnames(dt_coor_1,c("Lon1","Lat1","grid_id1"))
- 
- # add dummy key, do outer full merge with a duplicate, and remove key again
- 
- dt_coor_1[,"key" := 1]
- dt_coor_2 = copy(dt_coor_1) 
- setnames(dt_coor_2,c("Lon2","Lat2","grid_id2","key"))
- var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
- var_sc_prereq[, "key" := NULL]
- 
- 
- ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
- ##--- for the predictive distribution with d principal components
-  
-  var_d = function(d,coor1,coor2){
-    i = match(coor1,PCA_DT[,grid_id])
-    j = match(coor2,PCA_DT[,grid_id])
-    charvec = paste0("PC",1:d)
-    sq_diff_sum=0
-    for(sum_ind in 1:d){
-      sq_diff_sum = sq_diff_sum +(PCA_DT[,eval(parse(text = charvec[sum_ind]))][i] - 
-                                  PCA_DT[,eval(parse(text = charvec[sum_ind]))][j]  )^2
+    if(dt[YM == min(YM)][!(grid_id %in% na_grid_ids),.N] <= sample_size)
+    {
+      dt = dt[!(grid_id %in% na_grid_ids),]
+      fc = fc[!(grid_id %in% na_grid_ids),]
+      PCA_DT = PCA_DT[!(grid_id %in% na_grid_ids),]
+    } else {
+      grid_id_sample = sample(dt[YM == min(YM)][!(grid_id %in% na_grid_ids),grid_id],sample_size)
+      
+      dt = dt[grid_id %in% grid_id_sample,]
+      fc = fc[grid_id %in% grid_id_sample,]
+      PCA_DT = PCA_DT[grid_id %in% grid_id_sample,]
     }
-    return(sq_diff_sum)
-  }
-  
-  dummy_fct = function(d){
-    return( var_d(d,var_sc_prereq[,grid_id1],var_sc_prereq[,grid_id2]))
-    }
-  
-  dummy_list = mclapply(dvec,dummy_fct,mc.cores = 10)
-  names(dummy_list) = paste0("Var",dvec)
-  dummy_list = rbindlist(list(dummy_list))
-  
-  var_sc_prereq = data.table(var_sc_prereq,dummy_list)
-  
-  print("getting variances of forecast distribution done, moving to obs differences")
-  
-  # attach differences of observed residuals
-  
-  dt = dt[month == m,]
-  
-  
-  obs_diff = function(y,coor1,coor2,k){
-    i = match(coor1,dt[year == y,grid_id])
-    j = match(coor2,dt[year == y,grid_id])
     
-    abs_diff_obs = (abs(dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][i] - 
-                        dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][j]  ))
-    return(abs_diff_obs)
   }
   
- 
-  for(y in eval_years)
-  {
-    print(paste0("year ",y))
-    k  = sample(ens_size,1)
-    var_sc_prereq[,(paste0("ObsDiff_y",y)) := obs_diff(y,grid_id1,grid_id2,k)]
-  }
+  print("getting variances:")
   
+   # build data table that contains pairs of coordinates for all coordinates contained in dt
   
-  if(saveorgo)
-  {
-    save(var_sc_prereq,file = paste0(save_dir,"diff_var_by_PC_m",m,".RData"))
-  } else
-  {
-  return(var_sc_prereq)
-  }
-}
-
-
-
-  
-  # --- now get the differences of residuals required for the variogram score
+   dt_coor_1 = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
+   setnames(dt_coor_1,c("Lon1","Lat1","grid_id1"))
+   
+   # add dummy key, do outer full merge with a duplicate, and remove key again
+   
+   dt_coor_1[,"key" := 1]
+   dt_coor_2 = copy(dt_coor_1) 
+   setnames(dt_coor_2,c("Lon2","Lat2","grid_id2","key"))
+   var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
+   var_sc_prereq[, "key" := NULL]
    
    
-  #dt should be data table containing the columns .(year, grid_id1,grid_id2,fc_var, obs_diff) where year %in% eval_years and 
-
-   variogram_score = function(dt,
-                              p = 0.5,
-                              eval_years=2001:2010){
-     
-     
-     # get the p-th moment of a standard normal distribution
-     p_mom_sn = 2^(p/2)*gamma((p+1)/2)/sqrt(pi) 
-     
-     var_sc = sum(((dt[,fc_var])^(p/2) * p_mom_sn - 
-                      (dt[,obs_diff])^(p/2))^2)
+   ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
+   ##--- for the predictive distribution with d principal components
     
-     return(var_sc)
+   d = min(dvec) 
+   
+   
+   n_loc = dt_coor_1[,.N]
+   id_1 = mapply(rep,1:n_loc,times = n_loc)
+   id_2 = rep(1:n_loc, times = n_loc)
+   
+   variances = list()
+   
+   d = min(dvec) 
+   
+   vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+   variances[[d]] = (vec[id_1]-vec[id_2])^2
+   
+   for(d in dvec[2:length(dvec)]){
+     if(d %% 10 == 0)
+     {
+       print(paste0("d = ",d))
+     }
+     vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+     variances[[d]] = variances[[d-1]] + (vec[id_1]-vec[id_2])^2
    }
-     
+   names(variances) = paste0("var",dvec)
+   
+   variances = list(variances)
+   variances = rbindlist(variances)
+   
+   var_sc_prereq = data.table(var_sc_prereq,variances)
+   
+  
+  
+    print("getting variances of forecast distribution done, moving to differences of observed residuals and marginal SDs")
+    
+    # attach differences of observed residuals
+    
+    dt = dt[month == m & !(grid_id %in% land_grid_id[,unique(grid_id)]),]
+    
+    for(y in eval_years)
+      {
+      print(paste0("year ",y))
+      k  = sample(ens_size,1)
+      dt[year == y,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
+      vec = dt[year == y,obs_res]
+      var_sc_prereq[,(paste0("ObsDiff_y",y)) := abs(vec[id_1]-vec[id_2])]
+      vec2 = dt[year == y,SD_hat]
+      var_sc_prereq[,(paste0("MarSD_y",y)) := vec2[id_1]*vec2[id_2]]
+      }
+    
+    # we need the marginal variances for PCA with different number of principal components:
+    
+    d = min(dvec)
+    PCA_DT[,paste0("var",d) := eval(parse(text = paste0("PC",d)))^2]
+    for(d in (min(dvec)+1):max(dvec))
+    {
+      PCA_DT[,paste0("var",d) := eval(parse(text = paste0("var",d-1))) + eval(parse(text = paste0("PC",d)))^2]
+    }
+    PCA_DT[,paste0("PC",dvec) := NULL]
+    
+    
+    if(saveorgo)
+    {
+      print("saving...")
+      save(var_sc_prereq,PCA_DT,file = paste0(save_dir,"diff_var_by_PC_m",m,".RData"))
+    } else
+    {
+    return(var_sc_prereq)
+    }
+    print(paste0("month ",m," done."))
+}
+
+
+
+#' Computing variogram scores for PCA post-processing 
+#' 
+#' @param dvec integer vector. Contains the numbers of principal components we want to test for.
+#' @param p double. The power used in the variogram score.
+#' @param months,eval_years integer vectors containing the months and years considered.
+#' @param save_dir the directory to save in and to load the prepared data tables from (see setup_var_sc_PCA)
+#' @param file_name name of the saved file.
+#' 
+#' 
+#' @examples \dontrun{
+#' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
+#' var_sc_PCA(months = 1, save_dir = save_dir)}
+#'
+#' @author Claudio Heinrich
+#' 
+#' @export
 
    
 var_sc_PCA = function(dvec = 1:50,
                       p = 0.5,
                      months = 1:12,
                      eval_years = 2001:2010,
-                     saveorgo = TRUE,
                      save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
-                     file_name = "var_sc_by_PC.RData")
+                     file_name = "var_sc_by_PC.RData",
+                     mar_var_corr = TRUE)
 {
    sc = list()
    
    for(m in months)
    { print(paste0("month = ",m))
      load(file = paste0(save_dir,"diff_var_by_PC_m",m,".RData"))
+     
+     #setup for marginal variance correction factor
+     n_loc = PCA_DT[,.N]
+     id_1 = mapply(rep,1:n_loc,times = n_loc)
+     id_2 = rep(1:n_loc, times = n_loc)
+     
      var_sc_by_PC = function(d){
        return_data =  data.table(year = eval_years, d = d)
+       
+       if(mar_var_corr)
+       {
+       # marginal variance correction factor:
+       sdvec = sqrt(PCA_DT[,eval(parse(text = paste0("var",d)))])
+       mvcf = sdvec[id_1] * sdvec[id_2]
+       }
+       
        for(y in eval_years)
-       {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("Var",d),paste0("ObsDiff_y",y))]
+       {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("var",d),paste0("ObsDiff_y",y))]
+        
+        # marginal variance correction:
+       if(mar_var_corr)
+       {
+       MarSD = var_sc_prereq[,.SD,.SDcols = paste0("MarSD_y",y)]
+       dt_temp[,1] = dt_temp[,1]*MarSD/mvcf
+       }
+       
          setnames(dt_temp,c("fc_var","obs_diff"))
          return_data[year == y, sc := variogram_score(dt_temp, p=p)]
          return_data[year == y, sc := variogram_score(dt_temp, p=p)]
@@ -208,19 +263,50 @@ var_sc_PCA = function(dvec = 1:50,
      return_data[,month := m]
      return(return_data)
      }
-     sc_temp = mclapply(dvec,var_sc_by_PC,mc.cores = 12)
+     sc_temp = parallel::mclapply(dvec,var_sc_by_PC,mc.cores = 12)
      sc = c(sc,sc_temp)
    }
    sc = rbindlist(sc)
    setkey(sc,d,year,month)
    
-   if(saveorgo) 
-   {
-     save(sc, file = paste0(save_dir,file_name))
-   }
+   save(sc, file = paste0(save_dir,file_name))
+   
 }
    
-   
+
+
+########################################################
+################## Geostationary: ######################
+########################################################
+
+#' Setup for computing variogram scores 
+#'
+#' @description the variogram score for a multivariate normal forecast distribution X requires the variances of all differences of 
+#' univariate projections X_i-X_j, as well as the differences of the corresponding observations obs_i-obs_j. This function computes 
+#' these values for the (exponential) geostationary post-processing method.
+#'
+#' @param dt optional. The wide data table.
+#' @param months the months considered.
+#' @param eval_years integer vector contining the years you want to use for validation.
+#' @param savedir the directory to save in.
+#' @param file_name the name of the saved file.
+#' @param data_dir where the data of the fitted geostationary model is stored.
+#' @param var_file_names character vector. Contains the names of the files containing the fitted variograms.
+#' @param finite_time logical. If finite_time == TRUE, the computation is sped up by randomly sampling \code{sample_size} (non-land) locations and only considering pairs of these locations.
+#' @param sample_size Integer. See \code{finite_time}.
+#' 
+#' @return A data table var_sc_prereq
+#' 
+#' @examples \dontrun{
+#' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
+#' geostat_dir = paste0(save_dir,"/GeoStat")
+#' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
+#' setup_var_sc_geoStat(dt = DT,eval_years = eval_years,data_dir = geostat_dir,save_dir = geostat_dir)
+#' }
+#'
+#' @author Claudio Heinrich
+#' 
+#' @export
    
 setup_var_sc_geoStat = function(dt = NULL,
                           months = 1:12,
@@ -229,7 +315,7 @@ setup_var_sc_geoStat = function(dt = NULL,
                           file_name = "diff_var_geoStat_m",
                           data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
                           var_file_names = paste0("variogram_exp_m",months,".RData"),
-                          finite_time = TRUE,
+                          finite_time = FALSE,
                           sample_size = 500)
 {
   if (is.null(dt))
@@ -296,49 +382,56 @@ setup_var_sc_geoStat = function(dt = NULL,
     
     print("getting variances")
     
-    dummy_vec = c()
-    for(i in 1:var_sc_prereq[,.N])
-    {if(i %% 1000 == 0) print(paste0(i," / ",var_sc_prereq[,.N]))
-      dummy_vec = c(dummy_vec, Sigma[var_sc_prereq[,grid_id_ind1][i],var_sc_prereq[,grid_id_ind2][i]])
-    }
-    var_sc_prereq[,Var := dummy_vec]
+    id_1 = var_sc_prereq[,grid_id_ind1]
+    id_2 = var_sc_prereq[,grid_id_ind2]
+    ff = id_1 + (id_2 - 1)*dim(Sigma)[1]
+    a = Sigma[ff]
+    var_sc_prereq[,Var:=Sigma[ff]]
     
     
     print("getting variances of forecast distribution done, moving to obs differences")
     
     # attach differences of observed residuals
     
-    dt = dt[month == m,]
-    
-    
-    obs_diff = function(y,coor1,coor2,k){
-      i = match(coor1,dt[year == y,grid_id])
-      j = match(coor2,dt[year == y,grid_id])
-      
-      abs_diff_obs = (abs(dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][i] - 
-                            dt[year == y,.SD+Bias_Est-SST_bar,.SDcols = paste0("Ens",k)][j]  ))
-      return(abs_diff_obs)
-    }
-    
+    dt = dt[month == m ,]
     
     for(y in eval_years)
     {
       print(paste0("year ",y))
       k  = sample(ens_size,1)
-      var_sc_prereq[,(paste0("ObsDiff_y",y)) := obs_diff(y,grid_id1,grid_id2,k)]
+      dt_temp = dt[year == y,]
+      dt_temp[,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
+      vec = dt_temp[,obs_res]
+      var_sc_prereq[,(paste0("ObsDiff_y",y)) := abs(vec[id_1]-vec[id_2])]
     }
     
-    
-    
-      save(var_sc_prereq,file = paste0(save_dir,file_name,m,".RData"))
+    save(var_sc_prereq,file = paste0(save_dir,file_name,m,".RData"))
     
   }
-  
-    
-  # run the parallelized prepfunction by month:
-    mclapply(months, setup_by_month,mc.cores = 12) # setup_by_month saves a file for each run  
-  
+    # run the parallelized prepfunction by month:
+    parallel::mclapply(months, setup_by_month,mc.cores = 12) # setup_by_month saves a file for each run  
 }
+
+
+
+#' Computing variogram scores for geostationary post-processing 
+#' 
+#' @param p double. The power used in the variogram score.
+#' @param months,eval_years integer vectors containing the months and years considered.
+#' @param saveorgo logical. Whether or not the results are saved.
+#' @param save_dir the directory to save in and to load the prepared data tables from (see setup_var_sc_PCA)
+#' @param file_name name of the saved file.
+#' 
+#' 
+#' @examples \dontrun{
+#' geostat_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/GeoStat/"
+#' var_sc_geoStat(save_dir = geostat_dir)
+#' }
+#'
+#' @author Claudio Heinrich
+#' 
+#' @export
+
   
 var_sc_geoStat = function(p = 0.5,
                       months = 1:12,
@@ -367,58 +460,4 @@ var_sc_geoStat = function(p = 0.5,
     return(sc)
   }
 }   
-
-
-
-
-# --- plots ---
-
-
-load(file = paste0(save.dir,"variogram_scores.RData"))
-
-plot.dir = "./figures/"
-
-mean_sc = var_sc[,mean(v_sc), by = PCs]
-#mean_sc_all_years = var_sc_all_years[,mean(v_sc), by = PCs]
-
-
-yrange = range(c(range(mean_sc[[2]])))
-#yrange = range(c(range(mean_sc[[2]]),range(mean_sc_all_years[[2]])))
-
-pdf(paste0(plot.dir,"mean_variogram_scores.pdf"))
-plot(x = mean_sc[[1]],
-     y = mean_sc[[2]],
-     ylim = yrange,
-     type = "b",
-     col = "blue",
-     main = "mean variogram score",
-     xlab = "number of principal components",
-     ylab = "mean score"
-)
-# lines( mean_sc_all_years[[1]], 
-#        mean_sc_all_years[[2]],
-#        type = "b",
-#        col = "darkgreen")
-
-#---- add minima -----
-abline(h = min(mean_sc[[2]]), lty = "dashed", col = adjustcolor("blue",alpha = .5))
-#abline(h = min(mean_sc_all_years[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
-
-min_loc = mean_sc[,which.min(V1)]
-#min_loc_all_years = mean_sc_all_years[,which.min(V1)]
-
-points(x = mean_sc[[1]][min_loc],
-       y = mean_sc[[2]][min_loc],
-       col = "blue",
-       bg = "blue",
-       pch = 21)
-# points(x = mean_sc_all_years[[1]][min_loc_all_years],
-#        y = mean_sc_all_years[[2]][min_loc_all_years],
-#        col = "darkgreen",
-#        bg = "darkgreen",
-#        pch = 21)
-
-#legend("topright",legend = c("1985 - 2000","all years"),lty = c(1,1),col = c("blue","darkgreen"))
-dev.off()
-
 

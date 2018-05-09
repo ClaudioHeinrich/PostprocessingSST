@@ -85,10 +85,10 @@ crps.na.rm = function(y, mean, sd){
   na_loc = which( is.na(y) | is.na(mean) | is.na(sd) | sd == 0)
   
   if(identical(na_loc,integer(0))){
-    x = crps(y, family = "normal", mean = mean, sd = sd)
+    x = scoringRules::crps(y, family = "normal", mean = mean, sd = sd)
   }else{
     x = rep(0,length(y))
-    x[-na_loc] = crps(y[-na_loc], family = "normal", mean = mean[-na_loc], sd = sd[-na_loc])
+    x[-na_loc] = scoringRules::crps(y[-na_loc], family = "normal", mean = mean[-na_loc], sd = sd[-na_loc])
     x[na_loc] = NA
   }
   return(x)
@@ -138,22 +138,26 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 #'          
 #' @export
 
-
-
 ens_sd_est = function(dt, 
                       ens_size = 9,
                       saveorgo = TRUE,
                       save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                      file_name = "dt_combine_wide_bias_sd.RData"){
-# get the average standard deviation of the ensemble members by year, month and grid_id
-
-  for(i in 1:9){
-    dt = dt[,paste0("temp_",i) := .SD + Bias_Est - SST_bar,.SDcols = paste0("Ens",i)]
+                      file_name = "dt_combine_wide_bias_sd.RData")
+{# get the average standard deviation of the ensemble members by year, month and grid_id:
+  
+  get_variances = function(i)
+  {
+    var_setup_dt = as.data.table(dt[, (trc(.SD + Bias_Est) - SST_bar)^2/(ens_size-1),.SDcols = paste0("Ens",i)])
+    #var_setup_dt = as.data.table(var_setup_dt)
+    return(var_setup_dt)
   }
-dt = dt[,var_bar := sum(.SD^2)/ncol(.SD), .SDcols = paste0("temp_",1:ens_size),
-        by = .(grid_id, month,year)]
-
-dt[,paste0("temp_",1:ens_size) := NULL]
+  
+  var_list = parallel::mclapply(1:ens_size,get_variances,mc.cores = ens_size)
+  var_list = as.data.table(var_list)
+  setnames(var_list,paste0("temp",1:ens_size))
+  
+  dt[,"var_bar" := rowSums(var_list)]
+  
 return(dt)
 }
 
@@ -208,7 +212,7 @@ bias_correct = function(dt = NULL,
                     by = .(grid_id, month)]
   }
   
-  dt[,"SST_hat" := Ens_bar + Bias_Est]
+  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
   
   if(saveorgo){
     save(dt, file = paste0(save_dir,file_name))
@@ -256,8 +260,8 @@ sd_est = function(dt = NULL,
   
   if(is.null(dt)) 
     {
-    dt = load_combined_wide(bias = TRUE)[year > 1985,] # first year the bias estimate is 0 and (obs-fc)^2 is not a good approximation for the variance
-  } 
+    dt = load_combined_wide(bias = TRUE)
+    }
   
   
   if(method == "sma"){
