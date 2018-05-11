@@ -246,17 +246,17 @@ bias_correct = function(dt = NULL,
 #' @export
 
 sd_est = function(dt = NULL,
-                        method = "sma", # "sma" for 'simple moving average',
+                  method = "sma", # "sma" for 'simple moving average',
                         # "ema" for 'exponential moving average'
-                        par_1 = 16,   # if method == sma, par_1 is the length of window for the sma
+                  par_1 = 16,   # if method == sma, par_1 is the length of window for the sma
                         # if method == ema, par_1 is the ratio of the exp. mov. av.
-                        scores = FALSE,
-                        ens_mean = FALSE,
-                        ens_size = 9,
-                        eval_years = 2001:2010,
-                        saveorgo = TRUE,
-                        save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        file_name = "dt_combine_wide_bc_var.RData"){
+                  scores = FALSE,
+                  ens_mean = FALSE,
+                  ens_size = 9,
+                  eval_years = 2001:2010,
+                  saveorgo = TRUE,
+                  save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                  file_name = "dt_combine_wide_bc_var.RData"){
   
   if(is.null(dt)) 
     {

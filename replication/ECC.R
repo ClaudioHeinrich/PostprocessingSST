@@ -32,59 +32,61 @@ forecast_ECC = function(dt = NULL,
                         saveorgo = TRUE,
                         save_dir = "./Data/PostClim/SFE/Derived/ECC/",
                         file_name = "ECC_fc.RData"
-                        ){
-  
-if(is.null(dt))
+                        )
 {
-  load_combined_wide(var = TRUE)
-}
-  
-# generate noise and marginally post-process each ensemble member
-  
-na_cols = dt[ ,which(is.na(Bias_Est) |  is.na(Ens_bar) | is.na(var_bar) )]
-
-length_norm = dt[ -na_cols,.N]
-
-for(i in 1:ens_size)
+  if(is.null(dt))
   {
-  norm_rv = rnorm(n = length_norm, mean = dt[-na_cols,eval(parse(text = paste0("Ens",i))) + Bias_Est], sd = dt[-na_cols,SD_hat])
-  dt[ -na_cols,paste0("fc",i) := norm_rv]
+    load_combined_wide(var = TRUE)
   }
-
-#get rank order of the ensemble and reorder the post-processed ensemble to mach the rank order statistic of the ensemble
-
-
-rks_ens = dt[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("Ens",1:9)]
-
-rks_fc = dt[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("fc",1:9)]
-
-fcs = as.matrix(dt[,.SD,.SDcols = paste0("fc",1:ens_size)])
-
-num_row = nrow(fcs)
-
-ecc_fcs = matrix(NA,nrow = num_row,ncol = ens_size)
-for(i in 1:num_row){
-  if( i %% 100000 == 0)
+    
+  # generate noise and marginally post-process each ensemble member
+    
+  na_rows = dt[ ,which(is.na(Bias_Est) |  is.na(Ens_bar) | is.na(var_bar) )]
+  
+  length_norm = dt[ -na_rows,.N]
+  
+  for(i in 1:ens_size)
+    {
+    norm_rv = rnorm(n = length_norm, 
+                    mean = dt[-na_rows,eval(parse(text = paste0("Ens",i))) + Bias_Est], 
+                    sd = dt[-na_rows,SD_hat])
+    dt[ -na_rows,paste0("fc",i) := norm_rv]
+    }
+  
+  
+  # get rank order of the ensemble and reorder the post-processed ensemble to mach the rank order statistic of the ensemble
+  
+  rks_ens = dt[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("Ens",1:9)]
+  
+  rks_fc = dt[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("fc",1:9)]
+  
+  fcs = as.matrix(dt[,.SD,.SDcols = paste0("fc",1:ens_size)])
+  
+  num_row = nrow(fcs)
+  
+  ecc_fcs = matrix(NA,nrow = num_row,ncol = ens_size)
+  for(i in 1:num_row){
+    if( i %% 100000 == 0)
+    {
+      print(paste0(i," / ",num_row))
+    }
+    if(!is.na(fcs[i,1]))
+    { 
+      ecc_fcs[i,] = fcs[i, match(rks_ens[i,],rks_fc[i,])]
+    }
+  }
+  
+  ecc_fcs = data.table(ecc_fcs)
+  setnames(ecc_fcs,paste0("ecc_fc",1:ens_size))
+  
+  dt = data.table(dt,ecc_fcs)
+  
+  if(saveorgo)
   {
-    print(paste0(i," / ",num_row))
+    save(dt, file = paste0(save_dir,file_name))
   }
-  if(!is.na(fcs[i,1]))
-  { 
-    ecc_fcs[i,] = fcs[i, match(rks_ens[i,],rks_fc[i,])]
-  }
-}
-
-ecc_fcs = data.table(ecc_fcs)
-setnames(ecc_fcs,paste0("ecc_fc",1:ens_size))
-
-dt = data.table(dt,ecc_fcs)
-
-if(saveorgo)
-{
-  save(dt, file = paste0(save_dir,file_name))
-}
-
-return(dt)
+  
+  return(dt)
 
 }
 

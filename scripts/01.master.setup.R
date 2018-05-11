@@ -41,13 +41,13 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 # this one takes time, avoid if possible:
 
- # make_combined_wide_dataset(lat_box = lat_box, 
- #                            lon_box = lon_box, 
- #                            output_loc = save_dir, 
- #                            output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
+# make_combined_wide_dataset(lat_box = lat_box,
+#                            lon_box = lon_box,
+#                            output_loc = save_dir,
+#                            output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
 DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
- # save everything:
- save.image(file = paste0(save_dir,"setup.RData"))
+# save everything:
+save.image(file = paste0(save_dir,"setup.RData"))
 

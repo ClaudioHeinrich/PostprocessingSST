@@ -1,4 +1,8 @@
 
+
+#### This Script is currently stripped for scraps and NOT operational ###
+
+
 ### example plots ###
 
 ex_years = 2002:2004

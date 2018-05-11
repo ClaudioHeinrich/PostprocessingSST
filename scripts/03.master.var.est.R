@@ -16,7 +16,7 @@
 # Data files: dt_combine_wide_bc_var.RData, scores.bc.sd.sma.Rdata, scores.bc.sd.ema.Rdata
 # Plots: mean_scores_sd_sma.pdf, mean_scores_sd_ema.pdf 
 #
-# Requires previous run of 01.master.setup.R and 02.master.bias.correct 
+# Requires previous run of 02.master.bias.correct 
 # with the same value of name_abbr as below.
 
 ##### setting up ######
@@ -99,52 +99,48 @@ y_range = range(c(sc_sma_var[,CRPS],sc_ema_var[,CRPS]))
 ## plot for sma ##
 
 pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
-plot(x = sc_sma_var[,win_length],
-     y = sc_sma_var[,CRPS],
-     ylim = y_range,
-     type = "b",
-     col = "blue",
-     main = paste0("CRPS for ",name_abbr," SD estimation by SMA"),
-     xlab = "window length",
-     ylab = "variance score"
-)
-
-# highlight minimum and add minimum reference line 
-abline(h = sc_sma_var[,min(CRPS)], lty = "dashed", col = adjustcolor("blue",alpha = .5))
-
-min_loc_CRPS = sc_sma_var[,which.min(CRPS)]
-
-points(x = sc_sma_var[,win_length][min_loc_CRPS],
-       y = sc_sma_var[,CRPS][min_loc_CRPS],
+  plot(x = sc_sma_var[,win_length],
+       y = sc_sma_var[,CRPS],
+       ylim = y_range,
+       type = "b",
        col = "blue",
-       bg = "blue",
-       pch = 21)
-
+       main = paste0("CRPS for ",name_abbr," SD estimation by SMA"),
+       xlab = "window length",
+       ylab = "variance score"
+  )
+  
+  # highlight minimum and add minimum reference line 
+  abline(h = sc_sma_var[,min(CRPS)], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+  min_loc_CRPS = sc_sma_var[,which.min(CRPS)]
+  points(x = sc_sma_var[,win_length][min_loc_CRPS],
+         y = sc_sma_var[,CRPS][min_loc_CRPS],
+         col = "blue",
+         bg = "blue",
+         pch = 21)
+  
 dev.off()
 
 ## plot for ema ##
 
 pdf(paste0(plot_dir,"/mean_scores_sd_ema.pdf"))
-plot(x = sc_ema_var[,a],
-     y = sc_ema_var[,CRPS],
-     ylim = y_range,
-     type = "b",
-     col = "blue",
-     main = paste0("CRPS for ",name_abbr," SD estimation by EMA"),
-     xlab = "weight parameter a",
-     ylab = "variance score"
-)
-
-# highlight minimum and add minimum reference line 
-abline(h = sc_ema_var[,min(CRPS)], lty = "dashed", col = adjustcolor("blue",alpha = .5))
-
-min_loc_CRPS = sc_ema_var[,which.min(CRPS)]
-
-points(x = sc_ema_var[,a][min_loc_CRPS],
-       y = sc_ema_var[,CRPS][min_loc_CRPS],
+  plot(x = sc_ema_var[,a],
+       y = sc_ema_var[,CRPS],
+       ylim = y_range,
+       type = "b",
        col = "blue",
-       bg = "blue",
-       pch = 21)
+       main = paste0("CRPS for ",name_abbr," SD estimation by EMA"),
+       xlab = "weight parameter a",
+       ylab = "variance score"
+  )
+  
+  # highlight minimum and add minimum reference line 
+  abline(h = sc_ema_var[,min(CRPS)], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+  min_loc_CRPS = sc_ema_var[,which.min(CRPS)]
+  points(x = sc_ema_var[,a][min_loc_CRPS],
+         y = sc_ema_var[,CRPS][min_loc_CRPS],
+         col = "blue",
+         bg = "blue",
+         pch = 21)
 
 dev.off()
 

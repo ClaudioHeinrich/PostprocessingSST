@@ -80,7 +80,7 @@ setup_var_sc_PCA = function(m,
   
   # for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
   
-  setup_PCA(dt = dt, y = 2010, m=m, cov_dir = cov_dir) # the year is irrelevant
+  setup_PCA(dt = dt, y = 2010, m=m, cov_dir = cov_dir,max_PCA_depth = max(dvec)) # the year is irrelevant
   PCA <- eval(parse(text = paste0("PCA",m)))
   PCA_DT = fc[year == min(year)][month == min(month),.(Lon,Lat,grid_id)]
   
@@ -257,9 +257,8 @@ var_sc_PCA = function(dvec = 1:50,
        }
        
          setnames(dt_temp,c("fc_var","obs_diff"))
-         return_data[year == y, sc := variogram_score(dt_temp, p=p)]
-         return_data[year == y, sc := variogram_score(dt_temp, p=p)]
-       }
+         return_data[year == y, sc := variogram_score(dt_temp, p=p, eval_years = eval_years)]
+      }
      return_data[,month := m]
      return(return_data)
      }
@@ -301,7 +300,7 @@ var_sc_PCA = function(dvec = 1:50,
 #' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
 #' geostat_dir = paste0(save_dir,"/GeoStat")
 #' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
-#' setup_var_sc_geoStat(dt = DT,eval_years = eval_years,data_dir = geostat_dir,save_dir = geostat_dir)
+#' setup_var_sc_geoStat(dt = DT,data_dir = geostat_dir,save_dir = geostat_dir)
 #' }
 #'
 #' @author Claudio Heinrich
@@ -420,7 +419,7 @@ setup_var_sc_geoStat = function(dt = NULL,
 #' @param p double. The power used in the variogram score.
 #' @param months,eval_years integer vectors containing the months and years considered.
 #' @param saveorgo logical. Whether or not the results are saved.
-#' @param save_dir the directory to save in and to load the prepared data tables from (see setup_var_sc_PCA)
+#' @param save_dir the directory to save in and to load the prepared data tables from (see setup_var_sc_geoStat)
 #' @param file_name name of the saved file.
 #' 
 #' 
@@ -449,7 +448,7 @@ var_sc_geoStat = function(p = 0.5,
       for(y in eval_years)
       {dt_temp = var_sc_prereq[,.SD,.SDcols = c("Var",paste0("ObsDiff_y",y))]
       setnames(dt_temp,c("fc_var","obs_diff"))
-      sc[month == m &year == y, sc := variogram_score(dt_temp, p=p)]
+      sc[month == m &year == y, sc := variogram_score(dt_temp, p=p, eval_years = eval_years)]
       }
   }
   setkey(sc,year,month)
@@ -466,29 +465,45 @@ var_sc_geoStat = function(p = 0.5,
 ####################### ECC: ###########################
 ########################################################
 
+#' Variogram scores for ECC rely on estimate of the pth moment for the forecast distribution and not on assumed normality. Thus, we need a differentfct to compute variograms.
+#'
+#' @param dt a data table containing the columns .(year, grid_id1,grid_id2,fc_var, obs_diff) 
+#' @param eval_years integer vector containing the years you want to use for validation, need to be contained in dt[,year]
+#' 
+#' @return double var_sc
+#' 
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+
+variogram_score_ECC = function(dt,
+                           eval_years=2001:2010){
+  
+  var_sc = sum((dt[,fc_var]- dt[,obs_diff])^2)
+  return(var_sc)
+}
+
 #' Setup for computing variogram scores for ECC
 #'
-#' @description the variogram score for requires the variances of all differences of 
-#' univariate projections X_i-X_j, as well as the differences of the corresponding observations obs_i-obs_j. This function computes 
-#' these values for the (exponential) geostationary post-processing method.
+#' @description the variogram score requires the pth moment of all differences of 
+#' univariate projections of the forecast distribution X_i-X_j, as well as the differences of the corresponding observations obs_i-obs_j. 
+#' This function computes the moment estimate for X_i-X_j for ECC post-processed forecasts and the differences in the observation.
 #'
 #' @param dt optional. The wide data table.
+#' @param p The power for the variogram score.
 #' @param months the months considered.
 #' @param eval_years integer vector contining the years you want to use for validation.
+#' @param ens_size Size of the forecast ensemble.
 #' @param savedir the directory to save in.
-#' @param file_name the name of the saved file.
-#' @param data_dir where the data of the fitted geostationary model is stored.
-#' @param var_file_names character vector. Contains the names of the files containing the fitted variograms.
-#' @param finite_time logical. If finite_time == TRUE, the computation is sped up by randomly sampling \code{sample_size} (non-land) locations and only considering pairs of these locations.
-#' @param sample_size Integer. See \code{finite_time}.
-#' 
-#' @return A data table var_sc_prereq
+#' @param file_name the name of the saved files.
+#' @param data_dir Only required if dt == NULL. Where we load the ECC forecast from.
 #' 
 #' @examples \dontrun{
 #' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
-#' geostat_dir = paste0(save_dir,"/GeoStat")
+#' ECC_dir = paste0(save_dir,"/ECC")
 #' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
-#' setup_var_sc_geoStat(dt = DT,eval_years = eval_years,data_dir = geostat_dir,save_dir = geostat_dir)
+#' setup_var_sc_ECC(data_dir = ECC_dir,save_dir = ECC_dir)
 #' }
 #'
 #' @author Claudio Heinrich
@@ -529,7 +544,9 @@ setup_var_sc_ECC = function(dt = NULL,
   # parallelize rest
   setup_by_month = function(m)
   {
-    dt = dt[month == m,]
+    print(paste0("month =  ",m))
+    
+    dt_temp_1 = dt[month == m,]
     print("getting variances")
     
     id_1 = var_sc_prereq[,grid_id_ind1]
@@ -537,7 +554,7 @@ setup_var_sc_ECC = function(dt = NULL,
     
     for(y in eval_years)
     {print(paste0("year = ",y))
-      dt_temp = dt[year == y,.SD,
+      dt_temp_2 = dt_temp_1[year == y,.SD,
                    .SDcols = c(paste0("ecc_fc",1:ens_size),
                                paste0("Ens",1:ens_size),
                                "Bias_Est","SST_bar")]
@@ -545,8 +562,7 @@ setup_var_sc_ECC = function(dt = NULL,
       # get moment estimate:
       for(i in 1:ens_size)
       {
-        print(i) 
-        vec = dt_temp[,eval(parse(text = paste0("ecc_fc",i)))]
+        vec = dt_temp_2[,eval(parse(text = paste0("ecc_fc",i)))]
         mom_vec = mom_vec + abs(vec[id_1]-vec[id_2])^p
       }
       mom_vec = mom_vec/ens_size
@@ -554,8 +570,8 @@ setup_var_sc_ECC = function(dt = NULL,
       
       #get observation:
       k  = sample(ens_size,1)
-      dt_temp[,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
-      vec = dt_temp[,obs_res]
+      dt_temp_2[,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
+      vec = dt_temp_2[,obs_res]
       var_sc_prereq[,(paste0("ObsDiff_y",y)) := abs(vec[id_1]-vec[id_2])^p]
     }
     
@@ -563,8 +579,53 @@ setup_var_sc_ECC = function(dt = NULL,
     
   }
   # run the parallelized prepfunction by month:
-  parallel::mclapply(months, setup_by_month,mc.cores = 12) # setup_by_month saves a file for each run  
+  parallel::mclapply(months, setup_by_month,mc.cores = 12,mc.silent = FALSE) # setup_by_month saves a file for each run  
 }
 
 
+
+#' Computing variogram scores for ECC post-processing 
+#' 
+#' @param months,eval_years integer vectors containing the months and years considered.
+#' @param saveorgo logical. Whether or not the results are saved.
+#' @param save_dir the directory to save in and to load the prepared data tables from (see setup_var_sc_ECC)
+#' @param file_name name of the saved file.
+#' 
+#' 
+#' @examples \dontrun{
+#' ECC_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/ECC"
+#' var_sc_geoStat(save_dir = geostat_dir)
+#' }
+#'
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+
+var_sc_ECC = function(months = 1:12,
+                      eval_years = 2001:2010,
+                      saveorgo = TRUE,
+                      save_dir = "~/PostClimDataNoBackup/SFE/Derived/ECC/",
+                      file_name = "var_sc.RData")
+{ sc = as.data.table(expand.grid(months,eval_years))
+setnames(sc,c("month","year"))
+
+for(m in months)
+{ print(paste0("month = ",m))
+  load(file = paste0(save_dir,"diff_var_ECC_m",m,".RData"))
+  for(y in eval_years)
+  {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("mom_est_y",y),paste0("ObsDiff_y",y))]
+  setnames(dt_temp,c("fc_var","obs_diff"))
+  sc[month == m &year == y, sc := variogram_score_ECC(dt_temp,eval_years = eval_years)]
+  }
+}
+setkey(sc,year,month)
+
+if(saveorgo) 
+{
+  save(sc, file = paste0(save_dir,file_name))
+}else{
+  return(sc)
+}
+}   
 

@@ -4,13 +4,17 @@
 
 #######################################################################################
 
-# This script compares several multivariate post-processing models based on their variogram scores
+# This script compares several multivariate post-processing models based on their variogram scores.
 #
 # 
 # Files generated:
-#   
-# Data files: scores.bc.sd.sma.Rdata, scores.bc.sd.ema.Rdata
-# Plots: mean_scores_sd_sma.pdf, mean_scores_sd_ema.pdf 
+# 
+# Directories: PCACov, GeoStat, ECC
+# Data files (* in 1:12): PCA/CovRes_mon*.RData, PCA/diff_var_by_PC_m*.RData, PCA/var_sc_by_PC.RData, PCA/var_sc_by_PC_no_marg_corr.RData
+#                         GeoStat/diff_var_geoStat_m*.RData, GeoStat/variogram_exp_m*.RData, GeoStat/var_sc.RData,
+#                         ECC/ECC_fc.RData, ECC/diff_var_ECC_m*.RData, ECC/var_sc.RData
+#
+# Plots: mean_variogram_scores.pdf
 #
 # Requires previous run of 03.master.var.est.R
 # with the same value of name_abbr as below.
@@ -42,14 +46,17 @@ DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_v
 
 ##### setting up ######
 
+PCA_dir = paste0(save_dir,"/PCA/")
+dir.create(PCA_dir, showWarnings = FALSE)
+
 training_years = DT[!(year %in% validation_years),unique(year)]
 
-cov_dir = paste0(save_dir,"/PCACov/")
-dir.create(cov_dir, showWarnings = FALSE)
+for_res_cov(Y = training_years,
+            dt = DT, 
+            save_dir = PCA_dir,
+            ens_size = ens_size)
 
-for_res_cov(Y = training_years,dt = DT, save_dir = cov_dir,ens_size = ens_size)
-
-PCs = 1:50 # range of PCs to test
+PCs = 1:100 # range of PCs to test
 
 # the variogram score computation takes long and can be skipped by running the following lines
 
@@ -61,29 +68,29 @@ PCs = 1:50 # range of PCs to test
 
 dummy_fct = function(m)
 {
-   setup_var_sc_PCA(m,DT,dvec = PCs,eval_years = validation_years,cov_dir = cov_dir,save_dir = save_dir)
+   setup_var_sc_PCA(m,DT,dvec = PCs,eval_years = validation_years,cov_dir = PCA_dir,save_dir = PCA_dir)
 }
 
-parallel::mclapply(1:12,dummy_fct,mc.cores = 12)
+parallel::mclapply(1:12,dummy_fct,mc.cores = 12,mc.silent = FALSE)
 
 var_sc_PCA(dvec = PCs,
            months = 1:12,
            eval_years = validation_years,
-           save_dir = save_dir)
+           save_dir = PCA_dir)
 
 # for comparison do the same without marginal correction:
 
 var_sc_PCA(dvec = PCs,
            months = 1:12,
            eval_years = validation_years,
-           save_dir = save_dir,
+           save_dir = PCA_dir,
            file_name = "var_sc_by_PC_no_marg_corr.RData",
            mar_var_corr = FALSE)
 
 
-load(file = paste0(save_dir,"var_sc_by_PC_no_marg_corr.RData"))
+load(file = paste0(PCA_dir,"var_sc_by_PC_no_marg_corr.RData"))
 sc_nmc = sc
-load(file = paste0(save_dir,"var_sc_by_PC.RData"))
+load(file = paste0(PCA_dir,"var_sc_by_PC.RData"))
 
 #############################################
 
@@ -106,7 +113,9 @@ print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(m
 
 # to skip this section, run instead:
 
+# geostat_dir = paste0(save_dir, "GeoStat/")
 # load(file = paste0(geostat_dir,"var_sc.RData"))
+# sc_geostat = sc
 
 #########################################
 
@@ -124,10 +133,18 @@ var_sc_geoStat(eval_years = validation_years,
                save_dir = geostat_dir)
 
 load(file = paste0(geostat_dir,"var_sc.RData"))
-
+sc_geostat = sc
 
 #########################################
 ################ ECC ####################
+#########################################
+
+# to skip this section, run instead:
+
+# ECC_dir = paste0(save_dir,"ECC/")
+# load(file = paste0(ECC_dir,"var_sc.RData"))
+# sc_ECC = sc
+
 #########################################
 
 ECC_dir = paste0(save_dir,"ECC/")
@@ -135,62 +152,70 @@ dir.create(ECC_dir, showWarnings = FALSE)
 
 forecast_ECC(dt = DT,save_dir = ECC_dir)
 
-setup_var_sc_ECC(eval_years = validation_years,data_dir = ECC_dir)
+setup_var_sc_ECC(eval_years = validation_years,data_dir = ECC_dir,save_dir = ECC_dir)
+
+var_sc_ECC(eval_years = validation_years,save_dir = ECC_dir)
+
+load(file = paste0(ECC_dir,"var_sc.RData"))
+sc_ECC = sc
 
 
 ###########################################
 ########### plotting scores: ##############
 ###########################################
 
+# we leave out ECC, because its score gets too bad:
+print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)])
+
+
 pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
-
-rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]]))
-
-#### with marginal correction ####
-
-plot(x = mean_sc[[1]],
-     y = mean_sc[[2]],
-     ylim = rr,
-     type = "b",
-     col = "blue",
-     main = paste0("mean variogram scores for ",name_abbr),
-     xlab = "number of principal components",
-     ylab = "mean score")
-
-#---- add minima: -----
-abline(h = min(mean_sc[[2]]), lty = "dashed", col = adjustcolor("blue",alpha = .5))
-
-opt_num_PCs = mean_sc[,which.min(mean_sc)]
-
-points(x = mean_sc[[1]][opt_num_PCs],
-       y = mean_sc[[2]][opt_num_PCs],
+  rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],sc_geostat[,mean(sc)]))
+  
+  #### with marginal correction ####
+  
+  plot(x = mean_sc[[1]],
+       y = mean_sc[[2]],
+       ylim = rr,
+       type = "b",
        col = "blue",
-       bg = "blue",
-       pch = 21)
-
-#### without marginal correction ####
-
-lines(x = mean_sc_nmc[[1]],
-     y = mean_sc_nmc[[2]],
-     type = "b",
-     col = "darkgreen")
-
-#---- add minima: -----
-abline(h = min(mean_sc_nmc[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
-
-opt_num_PCs = mean_sc_nmc[,which.min(mean_sc)]
-
-points(x = mean_sc_nmc[[1]][opt_num_PCs],
-       y = mean_sc_nmc[[2]][opt_num_PCs],
-       col = "darkgreen",
-       bg = "darkgreen",
-       pch = 21)
-
-# --- add geostat value: ----
-
-abline(h = sc[,mean(sc)], lty = "dashed", col = adjustcolor("darkred"))
-
-legend("topright",legend = c("PCA, mar.cor.var.","just PCA","geostat"),col = c("blue","darkgreen","darkred"),lty = c(1,1,2))
-
+       main = paste0("mean variogram scores for ",name_abbr),
+       xlab = "number of principal components",
+       ylab = "mean score")
+  
+  #---- add minima: -----
+  abline(h = min(mean_sc[[2]]), lty = "dashed", col = adjustcolor("blue",alpha = .5))
+  
+  opt_num_PCs = mean_sc[,which.min(mean_sc)]
+  
+  points(x = mean_sc[[1]][opt_num_PCs],
+         y = mean_sc[[2]][opt_num_PCs],
+         col = "blue",
+         bg = "blue",
+         pch = 21)
+  
+  #### without marginal correction ####
+  
+  lines(x = mean_sc_nmc[[1]],
+       y = mean_sc_nmc[[2]],
+       type = "b",
+       col = "darkgreen")
+  
+  #---- add minima: -----
+  abline(h = min(mean_sc_nmc[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
+  
+  opt_num_PCs = mean_sc_nmc[,which.min(mean_sc)]
+  
+  points(x = mean_sc_nmc[[1]][opt_num_PCs],
+         y = mean_sc_nmc[[2]][opt_num_PCs],
+         col = "darkgreen",
+         bg = "darkgreen",
+         pch = 21)
+  
+  # --- add geostat value: ----
+  
+  abline(h = sc_geostat[,mean(sc)], lty = "dashed", col = adjustcolor("darkred"))
+  #abline(h = sc_ECC[,mean(sc)], lty = "dashed")
+  
+  legend("topright",legend = c("PCA, mar.cor.var.","just PCA","geostat"),col = c("blue","darkgreen","darkred"),lty = c(1,1,2))
 dev.off()
 

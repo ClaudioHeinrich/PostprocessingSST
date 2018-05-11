@@ -6,7 +6,7 @@
 
 # This script computes average scores for a range of different methods 
 # of bias correction. It then chooses and applies the optimal way of 
-# bias correction. It complements the data table DT by the two new 
+# bias correction. It complements the data table DT by two new 
 # columns Bias_Est and SST_hat (which is just Ens_bar + Bias_Est, truncated
 # at freezing temperature).
 #
@@ -77,13 +77,13 @@ dummy_function = function(k){
 sc_ema = parallel::mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = 8)
 sc_ema = rbindlist(sc_ema)
 
-save(sc_ema, file = paste0(save_dir,"scores.bc.ema.Rdata"))
+save(sc_ema, file = paste0(save_dir,"scores.bc.ema.RData"))
 
 
 ###### plotting scores for different ways of bias correction ######
 
-load(paste0(save_dir,"scores.bc.sma.Rdata"))
-load(paste0(save_dir,"scores.bc.ema.Rdata"))
+load(paste0(save_dir,"scores.bc.sma.RData"))
+load(paste0(save_dir,"scores.bc.ema.RData"))
 
 # ensure that they are plotted on the the same range
 y_range = range(c(sc_sma[,sqrt(MSE)],sc_ema[,sqrt(MSE)]))  
@@ -91,53 +91,47 @@ y_range = range(c(sc_sma[,sqrt(MSE)],sc_ema[,sqrt(MSE)]))
 ## plot for sma ##
 
 pdf(paste0(plot_dir,"mean_scores_sma.pdf"))
-plot(x = sc_sma[,win_length],
-     y = sc_sma[,sqrt(MSE)],
-     ylim = y_range,
-     type = "b",
-     col = "blue",
-     main = paste0("RMSE for ",name_abbr," bias correction by SMA"),
-     xlab = "window length",
-     ylab = "RMSE"
-)
-
-# highlight minimum and add minimum reference line 
-abline(h = sc_sma[,min(sqrt(MSE))], lty = "dashed", col = adjustcolor("blue",alpha = .5))
-
-min_loc_RMSE = sc_sma[,which.min(MSE)]
-
-points(x = sc_sma[,win_length][min_loc_RMSE],
-       y = sc_sma[,sqrt(MSE)][min_loc_RMSE],
+  plot(x = sc_sma[,win_length],
+       y = sc_sma[,sqrt(MSE)],
+       ylim = y_range,
+       type = "b",
        col = "blue",
-       bg = "blue",
-       pch = 21)
-
+       main = paste0("RMSE for ",name_abbr," bias correction by SMA"),
+       xlab = "window length",
+       ylab = "RMSE"
+  )
+  
+  # highlight minimum and add minimum reference line 
+  abline(h = sc_sma[,min(sqrt(MSE))], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+  min_loc_RMSE = sc_sma[,which.min(MSE)]
+  points(x = sc_sma[,win_length][min_loc_RMSE],
+         y = sc_sma[,sqrt(MSE)][min_loc_RMSE],
+         col = "blue",
+         bg = "blue",
+         pch = 21)
 dev.off()
 
 ## plot for ema ##
 
 pdf(paste0(plot_dir,"mean_scores_ema.pdf"))
-plot(x = sc_ema[,a],
-     y = sc_ema[,sqrt(MSE)],
-     ylim = y_range,
-     type = "b",
-     col = "blue",
-     main = paste0("RMSE for ",name_abbr," bias correction by EMA"),
-     xlab = "weight parameter a",
-     ylab = "RMSE"
-)
-
-# highlight minimum and add minimum reference line 
-abline(h = sc_ema[,min(sqrt(MSE))], lty = "dashed", col = adjustcolor("blue",alpha = .5))
-
-min_loc_RMSE = sc_ema[,which.min(MSE)]
-
-points(x = sc_ema[,a][min_loc_RMSE],
-       y = sc_ema[,sqrt(MSE)][min_loc_RMSE],
+  plot(x = sc_ema[,a],
+       y = sc_ema[,sqrt(MSE)],
+       ylim = y_range,
+       type = "b",
        col = "blue",
-       bg = "blue",
-       pch = 21)
-
+       main = paste0("RMSE for ",name_abbr," bias correction by EMA"),
+       xlab = "weight parameter a",
+       ylab = "RMSE"
+  )
+  
+  # highlight minimum and add minimum reference line 
+  abline(h = sc_ema[,min(sqrt(MSE))], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+  min_loc_RMSE = sc_ema[,which.min(MSE)]
+  points(x = sc_ema[,a][min_loc_RMSE],
+         y = sc_ema[,sqrt(MSE)][min_loc_RMSE],
+         col = "blue",
+         bg = "blue",
+         pch = 21)
 dev.off()
 
 
