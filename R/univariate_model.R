@@ -141,15 +141,24 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 ens_sd_est = function(dt, 
                       ens_size = 9,
                       saveorgo = TRUE,
+                      mean_est = "sm",
                       save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
                       file_name = "dt_combine_wide_bias_sd.RData")
-{# get the average standard deviation of the ensemble members by year, month and grid_id:
-  
-  get_variances = function(i)
-  {
-    var_setup_dt = as.data.table(dt[, (trc(.SD + Bias_Est) - SST_bar)^2/(ens_size-1),.SDcols = paste0("Ens",i)])
+{# get the average variation of the bias corrected truncated ensemble members around the true value by year, month and grid_id:
+  if(mean_est == "bcf"){
+    get_variances = function(i)
+    {
+      var_setup_dt = as.data.table(dt[, (trc(.SD + Bias_Est) - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
+      #var_setup_dt = as.data.table(var_setup_dt)
+      return(var_setup_dt)
+    }
+  } else if (mean_est == "sm"){
+    get_variances = function(i)
+    {
+    var_setup_dt = as.data.table(dt[, (trc(.SD) - trc(Ens_bar))^2/(ens_size-1),.SDcols = paste0("Ens",i)])
     #var_setup_dt = as.data.table(var_setup_dt)
     return(var_setup_dt)
+    }
   }
   
   var_list = parallel::mclapply(1:ens_size,get_variances,mc.cores = ens_size)
@@ -265,13 +274,13 @@ sd_est = function(dt = NULL,
   
   
   if(method == "sma"){
-    dt = dt[,"SD_hat" := sqrt(sim_mov_av(l = par_1, 
-                              vec = var_bar, 
-                              years = year)),
-            by = .(grid_id, month)]
+    dt[year != min(year),"SD_hat" := sqrt(sim_mov_av(l = par_1, 
+                                                     vec = var_bar, 
+                                                     years = year)),
+       by = .(grid_id, month)]
   }
   if (method == "ema"){
-    dt = dt[,"SD_hat" := sqrt(exp_mov_av(a = par_1,
+    dt = dt[year != min(year),"SD_hat" := sqrt(exp_mov_av(a = par_1,
                               vec = var_bar, 
                               years = year)),
             by = .(grid_id, month)]

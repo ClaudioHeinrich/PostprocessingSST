@@ -146,8 +146,11 @@ dev.off()
 
 ### finding optimal way of variance modelling ###
 
-if(sc_sma_var[,min(CRPS)] < sc_ema_var[,min(CRPS)]){
-  print(paste0("optimal variance estimation uses sample variance with window length of ",sc_sma_var[,which.min(CRPS)], " years, and achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),
+# if the optimal scores for simple moving averages and exponential moving acerages are essentially the same (less than 1 % difference),
+# we pick simple moving averages.
+
+if(sc_sma_var[,min(CRPS)] < 1.01*sc_ema_var[,min(CRPS)]){
+  print(paste0("optimal variance estimation uses simple moving average over sample variances with window length of ",sc_sma_var[,which.min(CRPS)], " years, and achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),
                ". Best estimation with exponentially weighted sample variance achieves a RMSE of ",round(sc_ema_var[,min(CRPS)],3),"."))
   opt_par = c("sma",sc_sma_var[,which.min(CRPS)])
 } else{

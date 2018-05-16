@@ -1,3 +1,63 @@
+
+
+#' Creates and saves the covariance matrix for the residuals of a given month, trained on a specific set of years.
+#'
+#' @param dt The wide data.table
+#' @param Y training years.  
+#' @param M training months the PCA should be computed for.
+#' @param save_dir Where we save.
+#' @param ens_size The number of ensemble members.
+#'
+#' @author Claudio Heinrich
+#' @examples 
+#' \dontrun{for_res_cov()}
+#' 
+#' @export
+for_res_cov_new = function(dt = NULL,
+                       Y = 1985:2000,
+                       M = 1:12,
+                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                       ens_size = 9,
+                       mar_var_corr = TRUE
+){  
+  
+  if(is.null(dt))
+  {
+    print("loading data")
+    dt = load_combined_wide(var = TRUE)
+  }
+  
+  
+  
+  for(mon in M){
+    print(paste0("month =",mon))  
+    
+    dt_PCA = copy(dt)
+    dt_PCA = dt_PCA[month == mon & year %in% Y,]
+    
+    
+    dt_PCA[,paste0("Res",1:ens_size):= trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",1:ens_size)]
+    
+    dt_PCA[,"res_mean" := rowSums(.SD)/ens_size,.SDcols = paste0("Res",1:9)]
+    dt_PCA[,res_mean_new := mean(res_mean),by = grid_id]
+    
+    sqrt_cov_mat = c()
+    for( ens in 1:ens_size){
+      sqrt_cov_mat = c(sqrt_cov_mat, 
+                       na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean_new]))
+    }
+    sqrt_cov_mat = matrix(sqrt_cov_mat,
+                          ncol = ens_size * length(Y))
+    
+    res_cov = sqrt_cov_mat/(sqrt(length(Y)*ens_size -1))
+    
+    save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
+    
+    rm(dt_PCA)
+  }
+}
+
+
 #' Creates and saves the covariance matrix for the residuals trained on a specific set of years
 #'
 #' @param dt The wide data.table

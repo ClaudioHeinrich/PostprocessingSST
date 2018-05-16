@@ -46,7 +46,7 @@ DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_v
 
 ##### setting up ######
 
-PCA_dir = paste0(save_dir,"/PCA/")
+PCA_dir = paste0(save_dir,"PCA/")
 dir.create(PCA_dir, showWarnings = FALSE)
 
 training_years = DT[!(year %in% validation_years),unique(year)]
@@ -56,49 +56,101 @@ for_res_cov(Y = training_years,
             save_dir = PCA_dir,
             ens_size = ens_size)
 
-PCs = 1:100 # range of PCs to test
+PCs = 1:50 # range of PCs to test
 
-# the variogram score computation takes long and can be skipped by running the following lines
+months = 1:12
 
-# load(file = paste0(save_dir,"var_sc_by_PC_no_marg_corr.RData"))
-# sc_nmc = sc
-# load(file = paste0(save_dir,"var_sc_by_PC.RData"))
 
 #### variogram score computation: ####
 
-dummy_fct = function(m)
-{
-   setup_var_sc_PCA(m,DT,dvec = PCs,eval_years = validation_years,cov_dir = PCA_dir,save_dir = PCA_dir)
+# the variogram score computation takes long and can be skipped (go to the 'combine'-section) if previously run
+
+
+# with marginal correction:
+
+for(m in months)
+  { 
+   # setup: get principal components and marginal variances for the given month m:
+  
+    print(paste0("m = ",m))
+    load(file = paste0(PCA_dir,"CovRes_mon",m,".RData"))
+    PCA = irlba::irlba(res_cov, nv = max(PCs))
+    
+    land_ids = which(DT[year == min(year) & month == min(month),is.na(Ens_bar) | is.na(SST_bar)])
+    
+    PCA_DT = DT[year == min(year) & month == min(month),][-land_ids,.(Lon,Lat,grid_id)]
+    
+    for(d in  PCs){
+      PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
+    } 
+    
+    # also get marginal variances
+    variances = list()
+    d = min(PCs) 
+    vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+    variances[[d]] = vec^2
+    
+    for(d in PCs[2:length(PCs)]){
+      vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+      variances[[d]] = variances[[d-1]] + vec^2
+    }
+    names(variances) = paste0("var",PCs)
+    PCA_DT = data.table(PCA_DT,rbindlist(list(variances)))  
+  
+  # now move to getting the variogram scores:
+    
+  # without marginal correction:
+    
+  dummy_fct = function(y)
+  {
+    var_sc_PCA_new_no_marg_corr(m,y,DT,PCA = PCA,PCA_DT = PCA_DT,dvec = PCs,cov_dir = PCA_dir,ens_size = ens_size,save_dir = PCA_dir)
+  }
+  parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
+
+  # with marginal correction:
+  
+  dummy_fct = function(y)
+    {
+    print(c(paste0("y = ",y),paste0("m = ",m)))
+    var_sc_PCA_new(m,y,DT,PCA = PCA,PCA_DT = PCA_DT,dvec = PCs,cov_dir = PCA_dir,ens_size = ens_size,save_dir = PCA_dir)
+    }
+  parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
 }
 
-parallel::mclapply(1:12,dummy_fct,mc.cores = 12,mc.silent = FALSE)
-
-var_sc_PCA(dvec = PCs,
-           months = 1:12,
-           eval_years = validation_years,
-           save_dir = PCA_dir)
-
-# for comparison do the same without marginal correction:
-
-var_sc_PCA(dvec = PCs,
-           months = 1:12,
-           eval_years = validation_years,
-           save_dir = PCA_dir,
-           file_name = "var_sc_by_PC_no_marg_corr.RData",
-           mar_var_corr = FALSE)
 
 
-load(file = paste0(PCA_dir,"var_sc_by_PC_no_marg_corr.RData"))
-sc_nmc = sc
-load(file = paste0(PCA_dir,"var_sc_by_PC.RData"))
+###### combine: ######
+
+scores_nmc = list()
+k=0
+for(m in months){
+  for(y in validation_years)
+  {k=k+1
+  load(file = paste0(PCA_dir,"var_sc_by_PC_no_marg_corr_m",m,"_y",y,".RData"))
+  scores_nmc[[k]] = scores
+  }
+}
+scores_nmc = rbindlist(scores_nmc)
+
+scores_mc = list()
+k=0
+for(m in months){
+  for(y in validation_years)
+  {k=k+1
+  load(file = paste0(PCA_dir,"var_sc_by_PC_m",m,"_y",y,".RData"))
+  scores_mc[[k]] = scores
+  }
+}
+scores_mc = rbindlist(scores_mc)
+
 
 #############################################
 
-mean_sc = sc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
+mean_sc = scores_mc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
 mean_sc = unique(mean_sc)
 
 
-mean_sc_nmc = sc_nmc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
+mean_sc_nmc = scores_nmc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
 mean_sc_nmc = unique(mean_sc_nmc)
 
 print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(mean_sc),d][1],
@@ -114,8 +166,13 @@ print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(m
 # to skip this section, run instead:
 
 # geostat_dir = paste0(save_dir, "GeoStat/")
+#
+# load(file = paste0(geostat_dir,"var_sc_nmc.RData"))
+# sc_geostat_nmc = sc
+# 
 # load(file = paste0(geostat_dir,"var_sc.RData"))
 # sc_geostat = sc
+
 
 #########################################
 
@@ -123,6 +180,22 @@ geostat_dir = paste0(save_dir, "GeoStat/")
 dir.create(geostat_dir, showWarnings = FALSE)
 
 geostationary_training(dt = DT, save_dir = geostat_dir)
+
+# without marginal variance correction:
+
+setup_var_sc_geoStat(dt = DT,
+                     eval_years = validation_years,
+                     data_dir = geostat_dir,
+                     save_dir = geostat_dir,
+                     file_name = "diff_var_geoStat_nmc_m",
+                     mar_var_cor = FALSE)
+
+var_sc_geoStat(eval_years = validation_years,
+               save_dir = geostat_dir,
+               data_name = "diff_var_geoStat_nmc_m",
+               file_name = "var_sc_nmc.RData")
+
+# with marginal variance correction:
 
 setup_var_sc_geoStat(dt = DT,
                      eval_years = validation_years,
@@ -132,8 +205,14 @@ setup_var_sc_geoStat(dt = DT,
 var_sc_geoStat(eval_years = validation_years,
                save_dir = geostat_dir)
 
+
+
+load(file = paste0(geostat_dir,"var_sc_nmc.RData"))
+sc_geostat_nmc = sc
+
 load(file = paste0(geostat_dir,"var_sc.RData"))
 sc_geostat = sc
+
 
 #########################################
 ################ ECC ####################
@@ -164,12 +243,12 @@ sc_ECC = sc
 ########### plotting scores: ##############
 ###########################################
 
-# we leave out ECC, because its score gets too bad:
-print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)])
+# we leave out ECC, because its score is just too bad:
+print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)]))
 
 
 pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
-  rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],sc_geostat[,mean(sc)]))
+  rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],sc_geostat[,mean(sc)],sc_geostat_nmc[,mean(sc)]))
   
   #### with marginal correction ####
   
@@ -214,8 +293,9 @@ pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
   # --- add geostat value: ----
   
   abline(h = sc_geostat[,mean(sc)], lty = "dashed", col = adjustcolor("darkred"))
-  #abline(h = sc_ECC[,mean(sc)], lty = "dashed")
+  abline(h = sc_geostat_nmc[,mean(sc)], lty = "dashed", col = adjustcolor("black"))
+  abline(h = sc_ECC[,mean(sc)], lty = "dashed")
   
-  legend("topright",legend = c("PCA, mar.cor.var.","just PCA","geostat"),col = c("blue","darkgreen","darkred"),lty = c(1,1,2))
+  legend("topright",legend = c("PCA, mar.cor.var.","just PCA","geostat,m.c.v.","geostat"),col = c("blue","darkgreen","darkred"),lty = c(1,1,2,2))
 dev.off()
 

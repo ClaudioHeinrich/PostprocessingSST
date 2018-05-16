@@ -58,7 +58,7 @@ geostationary_training = function (dt = NULL,
   
   
   for(i in 1:ens_size){
-      dt = dt[,  paste0("Res",i) := .SD + Bias_Est - SST_bar,.SDcols = paste0("Ens",i)]
+      dt = dt[,  paste0("Res",i) := trc(.SD + Bias_Est) - SST_bar,.SDcols = paste0("Ens",i)]
   }
   
   
