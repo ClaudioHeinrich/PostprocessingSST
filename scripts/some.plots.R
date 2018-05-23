@@ -5,8 +5,50 @@
 
 ### example plots ###
 
-ex_years = 2002:2004
+ex_years = 1986:2010
 ex_month = 3
+
+dt_month = DT[month == ex_month,]
+
+rr = range(dt_month[,SD_hat],na.rm = TRUE)
+rr = c(0,max(rr))
+
+for(y in ex_years)
+{
+  plot_diagnostic( dt_month[year == y,.(Lon,Lat,SD_hat)],
+                   mn = paste0("SD_hat Ens spread 0",ex_month," / ",y),
+                   rr = rr,
+                   col_scheme = "wr",
+                   save_pdf = TRUE,
+                   save_dir = paste0(plot_dir,"/"),
+                   file_name = paste0("SD_hat_ens_spread",y))
+  
+}
+
+
+ex_years = 1986:2010
+ex_month = 3
+
+dt_month = DT[month == ex_month,]
+
+rr = range(dt_month[,sqrt(var_bar)],na.rm = TRUE)
+rr = c(0,max(rr))
+
+for(y in ex_years)
+{
+plot_diagnostic( dt_month[year == y,.(Lon,Lat,sqrt(var_bar))],
+                mn = paste0("sd_bar Ens_spread 0",ex_month," / ",y),
+                rr = rr,
+                col_scheme = "wr",
+                save_pdf = TRUE,
+                save_dir = paste0(plot_dir,"/"),
+                file_name = paste0("sd_spread",y))
+
+}
+
+
+
+
 
 ex_PCs = 25
 
@@ -20,7 +62,7 @@ for(y in ex_years){
                   save_pdf = TRUE,
                   save_dir = paste0(plot_dir,"/"),
                   file_name = paste0("SST",y))
-
+  
   plot_diagnostic(DT_PCA[year == y,.(Lon,Lat,Ens1)],
                   mn = paste0("Ens1 0",ex_month," / ",y),
                   save_pdf = TRUE,
@@ -158,7 +200,7 @@ for(y in ex_years){
                   save_dir = paste0(plot_dir,"/"),
                   file_name = paste0("fc_geostat",y))
   
- 
+  
   
 }
 
@@ -255,7 +297,7 @@ ens_size = 9   #size of forecast ensemble
 PCvec = c(5,opt_num_PCs,50)      # number of considered principal components
 
 for(PCs in PCvec){
-
+  
   print(paste0("computing RHs for ",PCs," principal components."))
   no_dt = list()
   for(i in 1:MC_sample_size){
@@ -265,12 +307,12 @@ for(PCs in PCvec){
   no_dt = as.data.table(no_dt)
   
   setnames(no_dt,paste0("no",1:MC_sample_size))
-
+  
   DT_pca = no_dt[,c("year","month","YM","SST_bar","Bias_Est",paste0("Ens",1:ens_size)) := DT[year %in% validation_years & month %in% validation_months,c("year","month","YM","SST_bar","Bias_Est",paste0("Ens",1:ens_size)),with = FALSE]]
-
-
+  
+  
   #choose random ensemble members (REM) and generate forecast as REM + bias + noise
-
+  
   ens_mem = sample.int(ens_size,MC_sample_size,replace = TRUE)
   for(i in 1:MC_sample_size){
     dummy_dt = DT_pca[,.SD,.SDcols = c(paste0("no",i),paste0("Ens",ens_mem[i]),"Bias_Est")]
@@ -320,7 +362,7 @@ for(PCs in PCvec){
   
   title(paste0("RHs for forecast by ",PCs," pcs"),outer = TRUE)
   dev.off()
-
+  
 }
 
 ###################
@@ -349,57 +391,57 @@ climatology = DT[year %in% clim_years, clim := mean(SST_bar),by = .(grid_id,mont
 
 for(m in ex_months){
   print(paste0("month = ",m))
-    
-    #generate noise:
-    no_dt = list()
-    for(i in 1:MC_sample_size){
-      no_dt[[i]] = forecast_PCA(m = m, y = ex_year, PCA_depth = PCs, saveorgo = FALSE)[,.(Lon,Lat,noise), keyby = .(Lon,Lat)][,noise]
-    }
-    no_dt = as.data.table(no_dt)
-    setnames(no_dt,paste0("no",1:MC_sample_size))
-    
-    DT_pca_plot = no_dt[,c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)) := 
-                          DT[year == ex_year & month == m, c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)),
-                             with = FALSE]]
-    DT_pca_plot[,clim := climatology[month == m, clim]]
-    
-    # choose random ensemble members (REM) and generate forecast as REM + bias + noise
-    
-    ens_mem = sample.int(ens_size,MC_sample_size,replace = TRUE)
-    for(i in 1:MC_sample_size){
-      dummy_dt = DT_pca_plot[,.SD,.SDcols = c(paste0("no",i),paste0("Ens",ens_mem[i]),"Bias_Est")]
-      forecast = dummy_dt[[1]] + dummy_dt[[2]] + dummy_dt[[3]]
-      DT_pca_plot = DT_pca_plot[,paste0("fc",i) := forecast]
-    }
-    
-    #forecast plots:
-    
-    rr_sst = range(na.omit(DT_pca_plot[,.SD,.SDcols = c(paste0("fc",1:MC_sample_size))]))
-    
-    for(i in 1:MC_sample_size){
-      plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i))))],
-                      rr = rr_sst,
-                      mn = paste0("SST forecast for ",ex_month_names[which(ex_months == m)]),
-                      save_pdf = TRUE, 
-                      save_dir = paste0(plot_dir,"/"),
-                      file_name = paste0("m",m,"_fc",i),
-                      stretch_par = .8)
-    }
-    
-    #anomaly plot 
-    rr_clim = range(na.omit(DT_pca_plot[,.SD - clim,.SDcols = c(paste0("fc",1:MC_sample_size))]))
-    
-    for(i in 1:MC_sample_size){
-      plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i)))-clim)],
-                      rr = rr_clim,
-                      mn = paste0("Anomaly forecast for ",ex_month_names[which(ex_months == m)]),
-                      save_pdf = TRUE, 
-                      save_dir = paste0(plot_dir,"/"),
-                      file_name = paste0("m",m,"_afc",i),
-                      stretch_par = .8)
-    }
-    
+  
+  #generate noise:
+  no_dt = list()
+  for(i in 1:MC_sample_size){
+    no_dt[[i]] = forecast_PCA(m = m, y = ex_year, PCA_depth = PCs, saveorgo = FALSE)[,.(Lon,Lat,noise), keyby = .(Lon,Lat)][,noise]
   }
+  no_dt = as.data.table(no_dt)
+  setnames(no_dt,paste0("no",1:MC_sample_size))
+  
+  DT_pca_plot = no_dt[,c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)) := 
+                        DT[year == ex_year & month == m, c("year","month","YM","Lat","Lon","SST_bar","Bias_Est",paste0("Ens",1:ens_size)),
+                           with = FALSE]]
+  DT_pca_plot[,clim := climatology[month == m, clim]]
+  
+  # choose random ensemble members (REM) and generate forecast as REM + bias + noise
+  
+  ens_mem = sample.int(ens_size,MC_sample_size,replace = TRUE)
+  for(i in 1:MC_sample_size){
+    dummy_dt = DT_pca_plot[,.SD,.SDcols = c(paste0("no",i),paste0("Ens",ens_mem[i]),"Bias_Est")]
+    forecast = dummy_dt[[1]] + dummy_dt[[2]] + dummy_dt[[3]]
+    DT_pca_plot = DT_pca_plot[,paste0("fc",i) := forecast]
+  }
+  
+  #forecast plots:
+  
+  rr_sst = range(na.omit(DT_pca_plot[,.SD,.SDcols = c(paste0("fc",1:MC_sample_size))]))
+  
+  for(i in 1:MC_sample_size){
+    plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i))))],
+                    rr = rr_sst,
+                    mn = paste0("SST forecast for ",ex_month_names[which(ex_months == m)]),
+                    save_pdf = TRUE, 
+                    save_dir = paste0(plot_dir,"/"),
+                    file_name = paste0("m",m,"_fc",i),
+                    stretch_par = .8)
+  }
+  
+  #anomaly plot 
+  rr_clim = range(na.omit(DT_pca_plot[,.SD - clim,.SDcols = c(paste0("fc",1:MC_sample_size))]))
+  
+  for(i in 1:MC_sample_size){
+    plot_diagnostic(DT_pca_plot[,.(Lon,Lat,eval(parse(text = paste0("fc",i)))-clim)],
+                    rr = rr_clim,
+                    mn = paste0("Anomaly forecast for ",ex_month_names[which(ex_months == m)]),
+                    save_pdf = TRUE, 
+                    save_dir = paste0(plot_dir,"/"),
+                    file_name = paste0("m",m,"_afc",i),
+                    stretch_par = .8)
+  }
+  
+}
 
 
 

@@ -141,21 +141,21 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 ens_sd_est = function(dt, 
                       ens_size = 9,
                       saveorgo = TRUE,
-                      mean_est = "sm",
+                      mean_est = "bcf",
                       save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
                       file_name = "dt_combine_wide_bias_sd.RData")
 {# get the average variation of the bias corrected truncated ensemble members around the true value by year, month and grid_id:
   if(mean_est == "bcf"){
     get_variances = function(i)
     {
-      var_setup_dt = as.data.table(dt[, (trc(.SD + Bias_Est) - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
+      var_setup_dt = as.data.table(dt[, (.SD + Bias_Est - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
       #var_setup_dt = as.data.table(var_setup_dt)
       return(var_setup_dt)
     }
   } else if (mean_est == "sm"){
     get_variances = function(i)
     {
-    var_setup_dt = as.data.table(dt[, (trc(.SD) - trc(Ens_bar))^2/(ens_size-1),.SDcols = paste0("Ens",i)])
+    var_setup_dt = as.data.table(dt[, (.SD - Ens_bar)^2/(ens_size-1),.SDcols = paste0("Ens",i)])
     #var_setup_dt = as.data.table(var_setup_dt)
     return(var_setup_dt)
     }

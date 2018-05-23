@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO" 
+name_abbr = "NAO_small" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -46,12 +46,12 @@ DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_v
 
 ##### setting up ######
 
-PCA_dir = paste0(save_dir,"PCA/")
+PCA_dir = paste0(save_dir,"PCA_new/")
 dir.create(PCA_dir, showWarnings = FALSE)
 
 training_years = DT[!(year %in% validation_years),unique(year)]
 
-for_res_cov(Y = training_years,
+for_res_cov_new(Y = training_years,
             dt = DT, 
             save_dir = PCA_dir,
             ens_size = ens_size)
@@ -63,10 +63,8 @@ months = 1:12
 
 #### variogram score computation: ####
 
-# the variogram score computation takes long and can be skipped (go to the 'combine'-section) if previously run
+# the variogram score computation takes long and can be skipped (go to the 'combine'-section) if ran previously
 
-
-# with marginal correction:
 
 for(m in months)
   { 
@@ -166,7 +164,7 @@ print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(m
 # to skip this section, run instead:
 
 # geostat_dir = paste0(save_dir, "GeoStat/")
-#
+# 
 # load(file = paste0(geostat_dir,"var_sc_nmc.RData"))
 # sc_geostat_nmc = sc
 # 

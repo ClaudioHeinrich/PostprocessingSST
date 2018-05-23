@@ -19,10 +19,14 @@ library(data.table)
 
 # choose your favourite area for analysis and give it a name abbreviation
 
-lat_box = c(30,70)
-lon_box = c(-60,15)
+lat_box = c(40,70)
+lon_box = c(-60,-30)
 
-name_abbr = "NAO" # for Northern Atlantic Ocean
+# lat_box = c(-20,0)
+# lon_box = c(-110,-75)
+
+
+name_abbr = "NAO_small" # for northern atlantic ocean
 
 ens_size = 9 # size of forecast ensemble
 
@@ -39,14 +43,15 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 ### construct or load wide data set ###
 
-# this one takes time, avoid if possible:
+# takes time, avoid if possible: if the data hasn't changed and you're just trying a new window, just run this:
+
+DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 
 # make_combined_wide_dataset(lat_box = lat_box,
 #                            lon_box = lon_box,
 #                            output_loc = save_dir,
 #                            output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
-DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
 # save everything:
 save.image(file = paste0(save_dir,"setup.RData"))

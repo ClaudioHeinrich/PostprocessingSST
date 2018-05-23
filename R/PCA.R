@@ -1,25 +1,10 @@
 
-
-#' Creates and saves the covariance matrix for the residuals of a given month, trained on a specific set of years.
-#'
-#' @param dt The wide data.table
-#' @param Y training years.  
-#' @param M training months the PCA should be computed for.
-#' @param save_dir Where we save.
-#' @param ens_size The number of ensemble members.
-#'
-#' @author Claudio Heinrich
-#' @examples 
-#' \dontrun{for_res_cov()}
-#' 
-#' @export
-for_res_cov_new = function(dt = NULL,
+for_res_cov = function(dt = NULL,
                        Y = 1985:2000,
                        M = 1:12,
                        save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                        ens_size = 9,
-                       mar_var_corr = TRUE
-){  
+                       centering = "b"){  
   
   if(is.null(dt))
   {
@@ -32,24 +17,40 @@ for_res_cov_new = function(dt = NULL,
   for(mon in M){
     print(paste0("month =",mon))  
     
-    dt_PCA = copy(dt)
-    dt_PCA = dt_PCA[month == mon & year %in% Y,]
+    dt_PCA = copy(dt[month == mon & year %in% Y,])
+    
+    dt_PCA[,paste0("Res",1:ens_size):= .SD-SST_bar,.SDcols = paste0("Ens",1:ens_size)]
     
     
-    dt_PCA[,paste0("Res",1:ens_size):= trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",1:ens_size)]
-    
-    dt_PCA[,"res_mean" := rowSums(.SD)/ens_size,.SDcols = paste0("Res",1:9)]
-    dt_PCA[,res_mean_new := mean(res_mean),by = grid_id]
-    
-    sqrt_cov_mat = c()
-    for( ens in 1:ens_size){
-      sqrt_cov_mat = c(sqrt_cov_mat, 
-                       na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean_new]))
+    if(centering == "b")
+    {
+      dt_PCA[,"center" := - Bias_Est]
+      decor_factor = 1 / sqrt(length(Y) * ens_size )
     }
-    sqrt_cov_mat = matrix(sqrt_cov_mat,
-                          ncol = ens_size * length(Y))
+    if(centering == "frm")
+    {
+      dt_PCA[,"center" := mean(rowSums(.SD)/ens_size),.SDcols = paste0("Res",1:9), by =.(grid_id, month)]
+      decor_factor = 1 / sqrt(length(Y) * ens_size - 1)
+    }
+    if(centering == "rmby")
+    {
+      dt_PCA[,"center" := rowSums(.SD)/ens_size,.SDcols = paste0("Res",1:9)]  
+      decor_factor = 1 / sqrt(length(Y)*(ens_size -1))
+    }
     
-    res_cov = sqrt_cov_mat/(sqrt(length(Y)*ens_size -1))
+    dt_PCA[,c(paste0("Res",1:ens_size,"new")) := .SD - center, .SDcols = paste0("Res",1:9)]
+    
+    sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,.SD - center,.SDcols = paste0("Res",1:9)]))
+    
+    # sqrt_cov_mat = c()
+    # for( ens in 1:ens_size){
+    #   sqrt_cov_mat = c(sqrt_cov_mat, 
+    #                    na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens,"new")))]))
+    # }
+    # sqrt_cov_mat = matrix(sqrt_cov_mat,
+    #                       ncol = ens_size * length(Y))
+    
+    res_cov = devor_factor * sqrt_cov_mat
     
     save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
     
@@ -58,229 +59,6 @@ for_res_cov_new = function(dt = NULL,
 }
 
 
-#' Creates and saves the covariance matrix for the residuals trained on a specific set of years
-#'
-#' @param dt The wide data.table
-#' @param Y training years.  So this will use all years in order to form the covariance matrix
-#' @param M training months the PCA should be computed for.
-#' @param save_dir Where we save.
-#' @param ens_size The number of ensemble members.
-#'
-#' @author Claudio Heinrich
-#' @examples 
-#' \dontrun{for_res_cov()}
-#' 
-#' @export
-for_res_cov = function(dt = NULL,
-                       Y = 1985:2010,
-                       M = 1:12,
-                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       ens_size = 9
-){  
-  
-  if(is.null(dt))
-  {
-    print("loading data")
-    dt = load_combined_wide(bias = TRUE)
-  }
-  
-  year.num = max(Y)-min(Y)+1
-  
-  for(mon in M){
-    print(paste0("month =",mon))  
-    
-    dt_PCA = copy(dt)
-    dt_PCA = dt_PCA[month == mon & year %in% Y,]
-    
-    for(ens in  1:ens_size){
-      dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-SST_bar]
-    }
-    dt_PCA = dt_PCA[,"res_mean" := mean(SST_hat- SST_bar), by =  grid_id]
-    
-    sqrt_cov_mat = c()
-    for( ens in 1:ens_size){
-      sqrt_cov_mat = c(sqrt_cov_mat, 
-                       na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
-    }
-    sqrt_cov_mat = matrix(sqrt_cov_mat,
-                          nrow = length(na.omit(dt_PCA[,res_mean]))/year.num)
-    
-    res_cov = sqrt_cov_mat/(sqrt(year.num*ens_size -1))
-    
-    save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
-    
-    rm(dt_PCA)
-  }
-  
-}
-
-
-#' Helping function
-#' 
-#' @description Sets up for_unc_cov_combined.
-#'
-#' @param dt The wide data table.
-#' @param M The months you want the PCA to be performed for.
-#' @param Y The years you want to perform the PCA for.
-#' @param save_dir The directory in which the covariances are saved.
-#' @param obs_size The number of observations in the observational product.
-#' @param ens_size The number of ensemble members.
-#' 
-#' @examples \dontrun{for_unc_cov(Y = 1985:1986)}
-#'
-#' @author Claudio Heinrich
-#' 
-#' @export
-
-
-for_unc_cov = function(dt = NULL,
-                       Y = 1985:2010,
-                       M = 1:12,
-                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       obs_size = 10,
-                       ens_size = 9
-                       ){
-  
-  if(is.null(dt)) dt = load_combined_wide(bias = TRUE)
-  
-  year.num = max(Y)-min(Y)+1
-  
-  for(mon in M){
-    print(paste0("month =",mon))  
-    
-    for (obs in 1:obs_size){
-      
-      print(paste0("obs =",obs))
-      
-      dt_PCA = dt[month == mon,]
-      trash = c(paste0("SST", 1:obs_size),"SST_sd","SST_bar","Ens_sd")
-      trash = trash[! trash == paste0("SST",obs)]
-      dt_PCA = dt_PCA[,(trash):=NULL,]
-      
-      for(ens in  1:ens_size){
-        dt_PCA = dt_PCA[,paste0("Res",ens):= eval(parse(text = paste0("Ens",ens)))+Bias_Est-eval(parse(text = paste0("SST",obs)))]
-        dt_PCA = dt_PCA[, paste0("Ens",ens):=NULL]
-      }
-      dt_PCA = dt_PCA[,"res_mean" := mean(Ens_bar +Bias_Est- eval(parse(text = paste0("SST",obs)))), by =  grid_id]
-      
-      sqrt_cov_mat = c()
-      for( ens in 1:ens_size){
-        sqrt_cov_mat = c(sqrt_cov_mat, 
-                         na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens))) - res_mean]))
-      }
-      sqrt_cov_mat = matrix(sqrt_cov_mat,
-                            nrow = length(na.omit(dt_PCA[,res_mean]))/year.num,
-                            ncol = year.num*ens_size) 
-      sqrt_cov_mat = sqrt_cov_mat/(sqrt(year.num*ens_size -1))
-      
-      save(sqrt_cov_mat, file = paste0(save_dir,"CovFU_mon",mon,"_obs",obs,".RData"))
-      
-      rm(dt_PCA)
-    }
-  }
-}
-
-
-#' Creates and saves the covariance matrix for the residuals taking observation uncertainty into account.
-#'
-#' @param M Training months the PCA should be computed for.
-#' @param cov_dir Where the covariances are saved, should match save_dir of for_unc_cov.
-#' @param obs_size The number of observations in the observational product.
-#'
-#' @author Claudio Heinrich
-#' 
-#' @examples \dontrun{for_unc_cov_combined()}
-#' 
-#' @export
-
-for_unc_cov_combined = function(M = 1:12,
-                                cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                                obs_size = 10){
-  
-  for(mon in M){
-    load(file = paste0(cov_dir,"CovFU_mon",mon,"_obs",1,".RData"))
-    
-    cov_for_unc = sqrt_cov_mat
-    
-    if (obs_size > 1){
-      for(obs in 2:obs_size){
-        load(file = paste0(cov_dir,"CovFU_mon",mon,"_obs",obs,".RData"))
-        cov_for_unc = matrix(c(cov_for_unc,sqrt_cov_mat),
-                             nrow = dim(cov_for_unc)[1],
-                             ncol = dim(cov_for_unc)[2] + dim(sqrt_cov_mat)[2]
-        )
-        
-      }
-    }
-    
-    cov_for_unc = cov_for_unc/sqrt(obs_size)
-    
-    save(cov_for_unc, file = paste0(cov_dir,"Cov_FU_mon",mon,".RData"))
-  }
-}
-
-
-#' Creates and saves the covariance matrix for the observation for modelling only observation uncertainty.
-#'
-#' @param M Training months the PCA should be computed for.
-#' @param save_dir The directory in which the covariances are saved.
-#' @param obs_size The number of observations in the observational product.
-#' @param ens_size The number of ensemble members.
-#' @param load_reduced_data If FALSE, the reduced data table dt_reduced is computed and saved in data_dir, which takes time. If TRUE, the data table is loaded.
-#' @param data_dir Where everything is saved.
-#'
-#' @examples \dontrun{obs_unc_cov()}
-#'
-#' @author Claudio Heinrich
-#' 
-#' @export
-
-obs_unc_cov = function(M = 1:12,
-                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       obs_size = 10,
-                       ens_size = 9,
-                       load_reduced_data = TRUE,
-                       data_dir = "~/PostClimDataNoBackup/SFE/PCACov/"
-){
-  
-  #--- bring out the trash, reshape and save ---
-  
-  if(! load_reduced_data){
-    
-    dt = load_combined_wide()
-    
-    dt = bias_correct(dt = dt)
-    
-    dt_reduced <- dt[,c(paste0("Ens", 1:9),"Ens_bar","SST_sd","Ens_sd"):=NULL,]
-    dt_reduced = dt_reduced[,"obs_mean_y" := mean( SST_bar, na.rm = TRUE), by = .(month, grid_id)]
-    dt_reduced = dt_reduced[,"SST_bar":=NULL,]
-    dt_reduced = melt(dt_reduced, measure.vars = paste0("SST",1:obs_size))
-    dt_reduced = dt_reduced[,"cov_vec" :=  value - obs_mean_y , by = .(month, grid_id)]
-    save(dt_reduced, file = paste0(data_dir,"../Derived/dt_reduced_PCA.RData"))
-    print("reduced data saved")
-  }
-  
-  #---- compute empirical covariance matrices
-  
-  load(file = paste0(data_dir,"../Derived/dt_reduced_PCA.RData"))
-  dt_reduced_water = na.omit(dt_reduced)
-  y_range = range(dt_reduced_water[,year])
-  num_y = y_range[2]-y_range[1]+1
-  cov_size_row = length(unique(dt_reduced_water[,grid_id]))
-  cov_size_col = num_y * obs_size
-  
-  
-  for(mon in M){
-    print(paste0("month = ",mon))
-    cov_obs_unc=matrix(na.omit(dt_reduced_water[month == mon, cov_vec]), 
-                       nrow = cov_size_row, 
-                       ncol = cov_size_col, 
-                       byrow = FALSE)/sqrt(cov_size_col-1)
-    
-    # the empirical covariance matrix is cov_obs_unc %*% t(cov_obs_unc), but does not need to be computed
-    save(cov_obs_unc, file = paste0(data_dir,"/CovOU_mon",mon,".RData"))
-  }
-}
 
 
 
@@ -521,7 +299,7 @@ forecast_PCA_new = function(dt = NULL,
   land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
                       .(Lon,Lat,grid_id,month,year)]
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar")
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
   fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
   
   
@@ -560,13 +338,17 @@ forecast_PCA_new = function(dt = NULL,
       PCA <- eval(parse(text = paste0("PCA",mon)))
       eigen_vectors <- PCA$u[,1:d]
       sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
-      mar_sds <- sqrt(rowSums(eigen_vectors^2))
+      mar_sds <- sqrt(rowSums((eigen_vectors %*% sing_values)^2))
+      crit_ind  = which(mar_sds < 0.1)
       
-      for(year in y){
+      for(y_0 in y){
         
         if(d == 0)  {
           a <- matrix(0,nrow =  dim(PCA$u)[1],ncol = n)
-        }else{var_correct = diag(fc[year == y,][month == mon,var_bar] / mar_sds)
+        }else{ 
+          var_correct_vec = fc[year == y_0,][month == mon,SD_hat] / mar_sds
+          var_correct_vec[crit_ind] = 1
+          var_correct = diag(var_correct_vec)
           a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n)
         }
             
@@ -616,4 +398,104 @@ forecast_PCA_new = function(dt = NULL,
     }
   return(fc)
 }
+
+
+#' getting PCs for visualization/visual analysis
+#' 
+#' 
+#' @param dt the data table, if NULL, it is loaded.
+#' @param y,m Integer vectors containing year(s) and month(s).
+#' @param PCA_depth the output contains the columns PC1, ..., PC(PCA_depth)
+#' @param saveorgo Logical, whether we save or not. 
+#' @param save_dir The directory to save in.
+#' @param cov_dir Where the PCA covariance matrices are stored.
+#' 
+#' @return data table containing PCA_depth columns containing the PCs
+#' 
+#' @examples \dontrun{get_PCs(y = 1999, m = 7)}
+#' 
+#' @author Claudio Heinrich        
+#' 
+#' @export
+
+get_PCs = function(dt = NULL,
+                   y,
+                   m,
+                   PCA_depth = 4,
+                   mar_var_correct = TRUE,
+                   saveorgo = FALSE,
+                   save_dir = "./Data/PostClim/SFE/Derived/PCA/",
+                   file_name = "PCs.RData",
+                   cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/")
+{
+  
+  
+  if(is.null(dt))
+  {
+    print("load and prepare data")
+    dt = load_combined_wide(bias = TRUE)
+    trash = c(paste0("SST",1:10))
+    dt[, (trash):=NULL]
+    dt = dt[year %in% y & month %in% m,]
+  }
+  
+  #find land grid ids:
+  
+  land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
+                     .(Lon,Lat,grid_id,month,year)]
+  SD_cols = c("Lon","Lat","grid_id","month","year","YM",
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
+  
+  fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
+  
+  
+  #get covariance matrices
+  
+  print("data preparation complete - getting covariance matrices next:")
+  
+  for(mon in m)
+  {
+    load(file = paste0(cov_dir,"CovRes_mon",mon,".RData"))
+    
+    PCA = irlba::irlba(res_cov, nv = PCA_depth)
+    
+    for(y_0 in y)
+    {
+      for (d in 1:PCA_depth)
+        {
+          fc[month == mon & year == y_0, paste0("PC",d) := PCA$d[d] * PCA$u[,d]]
+        }
+      
+      if(mar_var_correct)
+      {
+        eigen_vectors <- PCA$u[,1:PCA_depth]
+        sing_values <- diag(x = PCA$d[1:PCA_depth], nrow = length(PCA$d[1:PCA_depth]))
+        mar_sds <- sqrt(rowSums(( eigen_vectors %*% sing_values)^2))
+        
+        for(d in 1:PCA_depth)
+        {
+          fc[month == mon & year == y_0, paste0("PC_marcor_",d) := SD_hat * PCA$d[d] * PCA$u[,d] / mar_sds]  
+        }
+      }
+    }
+  }
+  
+ 
+  fc_land <- list()
+  fc_land[[1]] = fc
+  fc_land[[2]] = land_grid_id
+  fc_land = rbindlist(fc_land, fill = TRUE)
+  fc_land = fc_land[ order(year,month,grid_id)]
+  fc = fc_land
+  
+  #-------- save -------
+  
+  if(saveorgo)
+  { 
+    save(fc, file = paste0(save_dir,file_name))
+  }
+  
+  return(fc)
+}
+
 
