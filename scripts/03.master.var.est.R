@@ -29,7 +29,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_small" 
+name_abbr = "NAO" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -147,9 +147,9 @@ dev.off()
 ### finding optimal way of variance modelling ###
 
 # if the optimal scores for simple moving averages and exponential moving acerages are essentially the same (less than 1 % difference),
-# we pick simple moving averages.
+# we pick exponential moving averages, since they are more stable.
 
-if(sc_sma_var[,min(CRPS)] < 1.01*sc_ema_var[,min(CRPS)]){
+if(sc_sma_var[,min(CRPS)] < 0.99*sc_ema_var[,min(CRPS)]){
   print(paste0("optimal variance estimation uses simple moving average over sample variances with window length of ",sc_sma_var[,which.min(CRPS)], " years, and achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),
                ". Best estimation with exponentially weighted sample variance achieves a RMSE of ",round(sc_ema_var[,min(CRPS)],3),"."))
   opt_par = c("sma",sc_sma_var[,which.min(CRPS)])

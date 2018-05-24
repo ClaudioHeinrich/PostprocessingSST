@@ -1,4 +1,25 @@
 
+#----  functions for issuing PCA forecasts ----
+
+#' Organize data to be run in a PCA analysis
+#'
+#' @description A preprossesing script that creates the example
+#' dataset from the original raw data
+#'
+#' @importFrom irlba irlba
+#' 
+#' @param dt The data.table of ensemble forecasts and associated observations including bias estimate, is loaded if NULL.
+#' @param m Integer vector. Which month(s) to process.
+#' @param y Integer vector. Which year(s) to process.
+#' @param max_PCA_depth Integer. How many principal components should we consider at a maximum.
+#' @param cov_dir String.  Where should we store the Covariance matrices?
+#' @param data_dir String. Where should the data be stored?
+#' 
+#' @examples \dontrun{setup_PCA(m = 7)}
+#' 
+#' @author Claudio Heinrich
+#' @export
+
 for_res_cov = function(dt = NULL,
                        Y = 1985:2000,
                        M = 1:12,
@@ -50,7 +71,7 @@ for_res_cov = function(dt = NULL,
     # sqrt_cov_mat = matrix(sqrt_cov_mat,
     #                       ncol = ens_size * length(Y))
     
-    res_cov = devor_factor * sqrt_cov_mat
+    res_cov = decor_factor * matrix(sqrt_cov_mat,ncol = length(Y) * ens_size)
     
     save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
     

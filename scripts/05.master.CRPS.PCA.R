@@ -5,18 +5,13 @@
 
 #######################################################################################
 
-# This script estimates the marginal variance of the ensemble forecast by 
-# a range of different methods and computes average scores for each method.
-# It then selects and applies the optimal way of variance estimation and
-# complements the data table DT by a new column SD_hat.
+# This script compares the marginal performance of the PCA method with and without marginal correction
 #
 # 
 # Files generated:
 #   
-# Data files: dt_combine_wide_bc_var.RData, scores.bc.sd.sma.Rdata, scores.bc.sd.ema.Rdata
-# Plots: mean_scores_sd_sma.pdf, mean_scores_sd_ema.pdf 
 #
-# Requires previous run of 02.master.bias.correct 
+# Requires previous run of 03.master.var.est 
 # with the same value of name_abbr as below.
 
 ##### setting up ######
