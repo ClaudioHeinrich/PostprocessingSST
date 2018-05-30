@@ -14,7 +14,7 @@
 #' 
 #' @export
 
-sim_mov_av = function( l,vec, years, skip = 0 ){
+sim_mov_av = function(l,vec, years, skip = 0){
   
   all_years = min(years):max(years)
   
@@ -94,23 +94,51 @@ crps.na.rm = function(y, mean, sd){
   return(x)
 }
 
-
-
 #' Computes scores for bias correction and variance estimation
 #'
 #' @param DT The data table
+#' @param ens_size Size of the ensemble.
 #' @param eval_years The years to compute the scores for
 #' @param var Logical. If TRUE the CRPS is computed, else the MSE of the bias corrected forecast is computed
 #'                   
 #' @return A one-row data table containing the mean score.
 #'
 #' @author Claudio Heinrich
-#' @examples crps.na.rm(c(NA,rnorm(10)), 1,1)
+#' @examples \dontrun{
+#' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
+#' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
+#' global_mean_scores(DT)}
 #' 
 #' 
 #' @export
 
-global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
+
+global_mean_scores = function (DT, ens_size = 9, eval_years = 2001:2010, var = TRUE)
+{
+  if(var){
+    # marginal distribution is a mixture distribution of normal distributions centered at the ensemble members + Bias_Est, all with variance SD_hat^2.
+    
+    na_ids = DT[year %in% eval_years,which(is.na(Ens_bar) | is.na(Bias_Est) | is.na(SD_hat))]
+    DT_temp = DT[year %in% eval_years,][-na_ids,]
+    
+    obs = DT_temp[,SST_bar]
+    means = as.matrix(DT_temp[,trc(.SD + Bias_Est),.SDcols = paste0("Ens",1:ens_size)])
+    sds = rep(DT_temp[,SD_hat], ens_size)
+    sds = matrix(sds, ncol = ens_size)
+    # get CRPS for each location for Gaussian mixture distribution
+    mar_CRPS = scoringRules::crps_mixnorm(obs,means,sds)
+    glob_mean_sc = data.table("CRPS" = mean(mar_CRPS))
+    
+  } else {
+    glob_mean_sc = DT[year %in% eval_years, 
+                      .("MSE" = mean( (SST_bar - SST_hat)^2, na.rm=TRUE))]
+  }
+  
+  return(glob_mean_sc)
+}
+
+
+global_mean_scores_old = function (DT, eval_years = 2001:2010, var = TRUE){
   
   if(var){
     glob_mean_sc = DT[year %in% eval_years, 

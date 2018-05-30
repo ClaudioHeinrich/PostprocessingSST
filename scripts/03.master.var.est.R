@@ -29,13 +29,16 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO" 
+name_abbr = "NAO_2" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
 DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_wide_bc.RData"))
 
+###### adding ensmeble member forecasts to DT ######
+
+DT[,paste0("EMF",1:ens_size) := trc(.SD + Bias_Est),.SDcols = paste0("Ens",1:ens_size)]
 
 ###### getting sample variances of ensemble  ######
 

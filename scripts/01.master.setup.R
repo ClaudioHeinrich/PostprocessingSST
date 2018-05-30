@@ -26,7 +26,7 @@ lon_box = c(-60,-30)
 # lon_box = c(-110,-75)
 
 
-name_abbr = "NAO_small" # for northern atlantic ocean
+name_abbr = "NAO_2" # for northern atlantic ocean
 
 ens_size = 9 # size of forecast ensemble
 

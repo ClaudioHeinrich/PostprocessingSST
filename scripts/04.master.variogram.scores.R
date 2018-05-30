@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_small" 
+name_abbr = "NAO_2" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -255,6 +255,8 @@ print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)]))
 
 pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
   rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],sc_geostat[,mean(sc)],sc_geostat_nmc[,mean(sc)],sc_ECC[,mean(sc)]))
+  #rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]]))
+  
   
   #### with marginal correction ####
   
@@ -282,11 +284,11 @@ pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
   
   lines(x = mean_sc_nmc[[1]],
        y = mean_sc_nmc[[2]],
-       type = "l",
+       type = "b",
        col = "darkgreen")
   
   #---- add minima: -----
-  #abline(h = min(mean_sc_nmc[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
+  abline(h = min(mean_sc_nmc[[2]]), lty = "dashed", col = adjustcolor("darkgreen",alpha = .5))
   
   opt_num_PCs = mean_sc_nmc[,which.min(mean_sc)]
   
