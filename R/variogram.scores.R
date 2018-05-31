@@ -351,9 +351,18 @@ var_sc_PCA_old = function(m, y, dt,
                           cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                           ens_size = 9,
                           save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
-                          file_name = "var_sc_by_PC")
+                          file_name = "var_sc_by_PC",
+                          weighted = FALSE,
+                          weight_fct = NULL)
 {
-  # for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
+  if(weighted)
+  {
+    # the weights are a function of the SST difference averaged over training_years
+    weight_dt = dt[year %in% training_years & month == m,][,mean(SST_bar), by = grid_id]
+    setnames(weight_dt,c("grid_id","mean_SST"))
+  }
+  
+ # setting up:
   
   dt = dt[year %in% y & month %in% m,]
   
@@ -423,6 +432,27 @@ var_sc_PCA_old = function(m, y, dt,
   var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
   var_sc_prereq[, "key" := NULL]
   
+  #get weights for variogram score
+  
+  if(weighted)
+  {
+    if(is.null(weight_fct))
+    {
+      weight_fct = function(x)
+      { y = rep(1, length(x))
+      y[abs(x)>1] = (1/x[abs(x)>1]^4)
+      return(y)
+      }
+    }
+    
+    var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
+    #normalizing:
+    var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+  } else {
+    var_sc_prereq[,"weights" := 1/sqrt(.N)]
+  }
+  
+  
   
   ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
   ##--- for the predictive distribution with d principal components, first without marginal variance correction
@@ -442,7 +472,7 @@ var_sc_PCA_old = function(m, y, dt,
     {
       print(paste0("d = ",d))
       mar_cor = PCA_DT[,eval(parse(text = paste0("marSDcf",d)))]
-      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)]
+      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)] / sqrt(ens_size)
       diff_var[[list_page]] =  rowSums((temp[id_1]-temp[id_2])^2)
       list_page = list_page + 1
     }  
@@ -452,12 +482,12 @@ var_sc_PCA_old = function(m, y, dt,
   {
     d = min(dvec) 
     vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
-    diff_var[[1]] = (vec[id_1]-vec[id_2])^2
+    diff_var[[1]] = (vec[id_1]-vec[id_2])^2/ens_size
     
     list_page = 2
     for(d in (min(dvec)+1):max(dvec)){
       vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
-      diff_var[[list_page]] = diff_var[[list_page-1]] + (vec[id_1]-vec[id_2])^2
+      diff_var[[list_page]] = diff_var[[list_page-1]] + (vec[id_1]-vec[id_2])^2/ens_size
       list_page = list_page +1
     }
     names(diff_var) = paste0("dvar",min(dvec):max(dvec))
@@ -467,12 +497,13 @@ var_sc_PCA_old = function(m, y, dt,
   
   var_sc_prereq = data.table(var_sc_prereq,diff_var)
   
-  #complement var_sc_prereq by difference of observation:
+  #complement var_sc_prereq by the squared differences of the mean vectors and squared differences of observation:
   
-  k  = sample(ens_size,1)
-  dt[,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
-  vec = dt[,obs_res]
-  var_sc_prereq[,(paste0("ObsDiff_y",y)) := abs(vec[id_1]-vec[id_2])]
+  vec = dt[,trc(Ens_bar + Bias_Est)]
+  
+  var_sc_prereq[,sq_m_diff := (vec[id_1]-vec[id_2])^2]
+  
+  var_sc_prereq[,sq_obs_diff := (dt[,SST_bar][id_1]-dt[,SST_bar][id_2])^2]
   
   
   # get variogram scores
@@ -486,10 +517,12 @@ var_sc_PCA_old = function(m, y, dt,
     print(paste0("d = ",d))
     return_data =  data.table(year = y, d = d)
     
-    dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("dvar",d),paste0("ObsDiff_y",y))]
-    setnames(dt_temp,c("fc_var","obs_diff"))
-    return_data[, sc := variogram_score(dt_temp, p=p, eval_years = eval_years)]
-    scores[[list_page]] = return_data[,month := m]
+    dt_temp = var_sc_prereq[,.SD,.SDcols = c("sq_m_diff",paste0("dvar",d),"sq_obs_diff","weights")]
+    setnames(dt_temp,c("sq_mean_diff", "dvar", "sq_obs_diff","weights"))
+    return_data[,sc := variogram_score_nrm_p2(dt_temp)]
+    
+    
+    scores[[list_page]] = return_data[,month := m]  
     list_page = list_page +1
   }
   
@@ -502,8 +535,8 @@ var_sc_PCA_old = function(m, y, dt,
   
   save(scores, file = paste0(save_dir,file_name,"_m",m,"_y",y,".RData"))
 }
-
-
+  
+ 
 
 
 ########################################################
@@ -539,6 +572,135 @@ var_sc_PCA_old = function(m, y, dt,
 #' 
 #' @export
    
+
+var_sc_geoStat_new = function(dt,m,y,
+                                    Mod = NULL,Dist = NULL,
+                                    save_dir = "~/PostClimDataNoBackup/SFE/Derived/GeoStat/",
+                                    file_name = "var_sc",
+                                    data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                                    var_file_name = paste0("variogram_exp_m",m,".RData"),
+                                    mar_var_cor = TRUE,
+                                    weighted = FALSE,
+                                    weight_fct = NULL)
+{
+  
+  if(weighted)
+  {
+    # the weights are a function of the SST difference averaged over training_years
+    weight_dt = dt[year %in% training_years & month == m,][,mean(SST_bar), by = grid_id]
+    setnames(weight_dt,c("grid_id","mean_SST"))
+  }
+  
+  
+  
+  # setting up:
+  
+  dt = dt[year %in% y & month %in% m,]
+  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt = dt[-land_ids,]
+  }
+  
+  
+  dt_coor_1 = dt[YM == min(YM), .(Lat,Lon,grid_id)]
+  dt_coor_1[,grid_id_ind := match(grid_id,sort(grid_id))]
+  setkey(dt_coor_1,Lat,Lon) #ordering needs to be the same as in geostationary_training
+  setnames(dt_coor_1,c("Lat1","Lon1","grid_id1","grid_id_ind1"))
+  
+  # add dummy key, do outer full merge with a duplicate, and remove key again
+  
+  dt_coor_1[,"key" := 1]
+  dt_coor_2 = copy(dt_coor_1) 
+  setnames(dt_coor_2,c("Lat","Lon2","grid_id2","grid_id_ind2","key"))
+  var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
+  var_sc_prereq[, "key" := NULL]
+  
+  #get weights for variogram score
+  
+  if(weighted)
+  {
+    if(is.null(weight_fct))
+    {
+      weight_fct = function(x)
+      { y = rep(1, length(x))
+      y[abs(x)>1] = (1/x[abs(x)>1]^4)
+      return(y)
+      }
+    }
+    
+    var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
+    #normalizing:
+    var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+  } else {
+    var_sc_prereq[,"weights" := 1/sqrt(.N)]
+  }
+  
+  # get covariance matrix
+  if(is.null(Mod) | is.null(Dist))
+  {
+    load(paste0(data_dir,var_file_name))  
+  }
+  
+  psill <- Mod$psill[2]
+  range <- Mod$range[2]
+  nugget <- Mod$psill[1]
+  
+  Sigma <- psill*exp(-Dist/range)
+  sills <- diag(Sigma) + nugget
+  diag(Sigma) <- sills
+  mar_var = Sigma[1]
+  
+  if(mar_var_cor)
+  {
+    SDs = dt[,SD_hat]/sqrt(mar_var)
+    # crit_ind = which(dt[,SD_hat]<.001)
+    # SDs[crit_ind] = .001/sqrt(mar_var)
+    D = diag(SDs)
+    Sigma = D %*% Sigma %*% D
+  }
+  
+  ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j in the predictive distribution
+  
+  id_1 = var_sc_prereq[,grid_id_ind1]
+  id_2 = var_sc_prereq[,grid_id_ind2]
+  
+  #finding variance and covariance locations in Sigma:
+  n_loc = dim(Sigma)[1]
+  var_id_1 = id_1 + (id_1-1)*n_loc
+  var_id_2 = id_2 + (id_2-1)*n_loc
+  cov_id = id_1 + (id_2 - 1)*n_loc
+  
+  #getting variances for differences:
+  var_sc_prereq[,dvar := Sigma[var_id_1] + Sigma[var_id_2] - 2* Sigma[cov_id]] 
+  
+  
+  #complement var_sc_prereq by the squared differences of the mean vectors and squared differences of observation:
+  
+  vec = dt[,SST_hat]
+  var_sc_prereq[,sq_mean_diff := (vec[id_1]-vec[id_2])^2]
+  
+  var_sc_prereq[,sq_obs_diff := (dt[,SST_bar][id_1]-dt[,SST_bar][id_2])^2]
+  
+  # get variogram scores
+ 
+  scores =  data.table(year = y, month = m)
+    
+  dt_temp = var_sc_prereq[,.SD,.SDcols = c("sq_mean_diff","dvar","sq_obs_diff","weights")]
+  scores[,sc := variogram_score_nrm_p2(dt_temp)]
+    
+  if(!mar_var_cor)
+  {
+    file_name = paste0(file_name,"_nmc")
+  }
+  
+  save(scores, file = paste0(save_dir,file_name,"_m",m,"_y",y,".RData"))
+}
+
+
+
+
 setup_var_sc_geoStat = function(dt = NULL,
                           months = 1:12,
                           eval_years = 2001:2010,
@@ -701,10 +863,9 @@ var_sc_geoStat = function(p = 0.5,
 #' @export
 
 
-variogram_score_ECC = function(dt,
-                           eval_years=2001:2010)
+variogram_score_ECC = function(dt)
 {
-  var_sc = sum((dt[,fc_var]- dt[,obs_diff])^2)
+  var_sc = sum(dt[,weights]*(dt[,fc_var]- dt[,obs_diff])^2)
   return(var_sc)
 }
 
@@ -735,17 +896,26 @@ variogram_score_ECC = function(dt,
 #' @export
 
 setup_var_sc_ECC = function(dt = NULL,
-                            p = 0.5,
+                            p = 2,
                             months = 1:12,
                             eval_years = 2001:2010,
                             ens_size = 9,
                             save_dir = "~/PostClimDataNoBackup/SFE/Derived/ECC/",
                             file_name = "diff_var_ECC_m",
-                            data_dir = "./Data/PostClim/SFE/Derived/ECC/")
+                            data_dir = "./Data/PostClim/SFE/Derived/ECC/",
+                            weighted = FALSE,
+                            weight_fct = NULL)
 {
   if (is.null(dt))
   {
     load(file = paste0(data_dir,"ECC_fc.RData"))
+  }
+  
+  if(weighted)
+  {
+    # the weights are a function of the SST difference averaged over training_years
+    weight_dt = dt[year %in% training_years & month == m,][,mean(SST_bar), by = grid_id]
+    setnames(weight_dt,c("grid_id","mean_SST"))
   }
   
   
@@ -776,7 +946,25 @@ setup_var_sc_ECC = function(dt = NULL,
     id_1 = var_sc_prereq[,grid_id_ind1]
     id_2 = var_sc_prereq[,grid_id_ind2]
     
-    for(y in eval_years[2:length(eval_years)])
+    if(weighted)
+    {
+      if(is.null(weight_fct))
+      {
+        weight_fct = function(x)
+        { y = rep(1, length(x))
+        y[abs(x)>1] = (1/x[abs(x)>1]^4)
+        return(y)
+        }
+      }
+      
+      var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
+      #normalizing:
+      var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+    } else {
+      var_sc_prereq[,"weights" := 1/sqrt(.N)]
+    }
+    
+    for(y in eval_years)
     {
       print(paste0("year = ",y))
       dt_temp_2 = dt_temp_1[year == y,.SD,
@@ -784,20 +972,18 @@ setup_var_sc_ECC = function(dt = NULL,
                                         paste0("Ens",1:ens_size),
                                         "Bias_Est","SST_bar")]
       #get observation:
-      k  = sample(ens_size,1)
-      dt_temp_2[,obs_res := trc(.SD+Bias_Est)-SST_bar,.SDcols = paste0("Ens",k)]
-      vec = dt_temp_2[,obs_res]
+      vec = dt_temp_2[,SST_bar]
       var_sc_prereq[,(paste0("ObsDiff_y",y)) := abs(vec[id_1]-vec[id_2])^p]
       
       # get moment estimate :
       
       mom_vec = 0
-      for(i in (1:ens_size)[-k])
+      for(i in (1:ens_size))
       {
-        vec = dt_temp_3[,trc(eval(parse(text = paste0("ecc_fc",i)))-SST_bar)]
+        vec = dt_temp_2[,eval(parse(text = paste0("ecc_fc",i)))]
         mom_vec = mom_vec + abs(vec[id_1]-vec[id_2])^p
       }
-      mom_vec = mom_vec/(ens_size-1)
+      mom_vec = mom_vec/ens_size
       var_sc_prereq[,(paste0("mom_est_y",y)) := mom_vec]
       
       
@@ -836,16 +1022,16 @@ var_sc_ECC = function(months = 1:12,
                       saveorgo = TRUE,
                       save_dir = "~/PostClimDataNoBackup/SFE/Derived/ECC/",
                       file_name = "var_sc.RData")
-{ sc = as.data.table(expand.grid(months,eval_years[2:length(eval_years)]))
+{ sc = as.data.table(expand.grid(months,eval_years))
   setnames(sc,c("month","year"))
   
   for(m in months)
   { print(paste0("month = ",m))
     load(file = paste0(save_dir,"diff_var_ECC_m",m,".RData"))
-    for(y in eval_years[2:length(eval_years)])
-    {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("mom_est_y",y),paste0("ObsDiff_y",y))]
-    setnames(dt_temp,c("fc_var","obs_diff"))
-    sc[month == m &year == y, sc := variogram_score_ECC(dt_temp,eval_years = eval_years)]
+    for(y in eval_years)
+    {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("mom_est_y",y),paste0("ObsDiff_y",y),"weights")]
+    setnames(dt_temp,c("fc_var","obs_diff","weights"))
+    sc[month == m &year == y, sc := variogram_score_ECC(dt_temp)]
     }
   }
   setkey(sc,year,month)

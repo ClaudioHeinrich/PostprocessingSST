@@ -113,7 +113,7 @@ crps.na.rm = function(y, mean, sd){
 #' @export
 
 
-global_mean_scores = function (DT, ens_size = 9, eval_years = 2001:2010, var = TRUE)
+global_mean_scores_EnsBMA = function (DT, ens_size = 9, eval_years = 2001:2010, var = TRUE)
 {
   if(var){
     # marginal distribution is a mixture distribution of normal distributions centered at the ensemble members + Bias_Est, all with variance SD_hat^2.
@@ -138,7 +138,7 @@ global_mean_scores = function (DT, ens_size = 9, eval_years = 2001:2010, var = T
 }
 
 
-global_mean_scores_old = function (DT, eval_years = 2001:2010, var = TRUE){
+global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
   
   if(var){
     glob_mean_sc = DT[year %in% eval_years, 

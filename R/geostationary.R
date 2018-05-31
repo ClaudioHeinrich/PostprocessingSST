@@ -57,15 +57,16 @@ geostationary_training = function (dt = NULL,
   Lat_max  = dt[,range(Lat)][2]
   
   
-  for(i in 1:ens_size){
-      dt = dt[,  paste0("Res",i) := trc(.SD + Bias_Est) - SST_bar,.SDcols = paste0("Ens",i)]
-  }
-  
-  
   for(mon in m){
     print(paste0("month = ",mon))
     
-    DT = dt[month == mon, .SD,.SDcols = c("Lon","Lat","year","month","YM", paste0("Res",1:ens_size))]
+    DT = dt[month == mon,]
+    
+    land_ids <- which(DT[, is.na(Ens_bar) | is.na(SST_bar)])
+    if(!identical(land_ids,integer(0)))
+    {
+      DT = DT[-land_ids,]
+    }
     
     sp <- sp::SpatialPoints(cbind(x=DT[YM == min(YM), Lon],
                                   y=DT[YM == min(YM), Lat]), 
@@ -83,9 +84,8 @@ geostationary_training = function (dt = NULL,
     
     time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
     
-    setkey(DT,YM,Lat,Lon) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
-    random_pick = sample(ens_size,1)
-    data = DT[,.SD,.SDcols = paste0("Res",random_pick)] 
+    setkey(DT,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
+    data = DT[,.(trc(Ens_bar+Bias_Est)-SST_bar)] 
     setnames(data,"Res")
     
     

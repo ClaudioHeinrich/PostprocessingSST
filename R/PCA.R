@@ -46,7 +46,7 @@ for_res_cov = function(dt = NULL,
     if(centering == "b")
     {
       dt_PCA[,"center" := - Bias_Est]
-      decor_factor = 1 / sqrt(length(Y) * ens_size )
+      decor_factor = 1 / sqrt( length(Y) * ens_size )
     }
     if(centering == "frm")
     {
@@ -297,7 +297,7 @@ forecast_PCA_new = function(dt = NULL,
                             m,
                             n = 10, 
                             PCA_depth = 15,  
-                            ens_member = TRUE,
+                            ens_member = FALSE,
                             ens_size = 9,
                             saveorgo = TRUE,
                             save_dir = "./Data/PostClim/SFE/Derived/PCA/",
@@ -360,7 +360,7 @@ forecast_PCA_new = function(dt = NULL,
       eigen_vectors <- PCA$u[,1:d]
       sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
       mar_sds <- sqrt(rowSums((eigen_vectors %*% sing_values)^2))
-      crit_ind  = which(mar_sds < 0.1)
+      crit_ind  = which(mar_sds < 1e-20)
       
       for(y_0 in y){
         
@@ -370,7 +370,7 @@ forecast_PCA_new = function(dt = NULL,
           var_correct_vec = fc[year == y_0,][month == mon,SD_hat] / mar_sds
           var_correct_vec[crit_ind] = 1
           var_correct = diag(var_correct_vec)
-          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n)
+          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n) / sqrt(ens_size)
         }
             
         no <- rbind(no, a)
@@ -392,12 +392,7 @@ forecast_PCA_new = function(dt = NULL,
       }
       
       if(truncate){
-        trc = function (x){ 
-          truncation.value = -1.769995
-          x = truncation.value * (x < truncation.value) + x * (x >= truncation.value)
-          return(x)}
-        
-        fc[, paste0("fc",i,"PC",d) := lapply(.SD,trc), .SDcols = paste0("fc",i,"PC",d) ]
+          fc[, paste0("fc",i,"PC",d) := lapply(.SD,trc), .SDcols = paste0("fc",i,"PC",d) ]
         }  
       }
   }

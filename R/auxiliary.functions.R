@@ -85,8 +85,8 @@ dss = function(y, mean, sd){
 mst.rank <- function (x) {
   l.mst <- NULL
   for(f in 1:(dim(x)[2])) {
-    euc.dist <- rdist(t(x[,-f]))
-    l.mst <- c(l.mst,sum(spantree(euc.dist)$dist))
+    euc.dist <- rdist::rdist(t(x[,-f]))
+    l.mst <- c(l.mst,sum(vegan::spantree(euc.dist)$dist))
   }
   x.rank <- rank(l.mst,ties="random")
   return(x.rank)
@@ -131,9 +131,9 @@ bd.rank <- function(x)
 
 # The data table should have the key variable (most commonly YM) as first column and the ranks of the observations as second
 
-rhist.dt <- function(B, ens.size = 9, breaks = ens.size + 1, hist_xlab="", hist_ylab="", hist_ylim=NULL)
+rhist_dt <- function(B, ens_size = 9, breaks = ens_size + 1, hist_xlab="", hist_ylab="", hist_ylim=NULL)
 {
-  hist(as.vector(B[[2]]),breaks=seq(0, breaks, by=1), main="",xlab=hist_xlab,ylab=hist_ylab,axes=FALSE,col="gray80",border="gray60",ylim=hist_ylim)
+  hist(as.vector(B[[2]]),breaks=seq(0, max(as.vector(B[[2]])), length.out = breaks), main="",xlab=hist_xlab,ylab=hist_ylab,axes=FALSE,col="gray80",border="gray60",ylim=hist_ylim)
   abline(a=length(B[[1]])/breaks, b=0, lty=2, col="gray30")
 }
 

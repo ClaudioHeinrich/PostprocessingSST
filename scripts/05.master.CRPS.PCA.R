@@ -24,7 +24,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO" 
+name_abbr = "NAO_2" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -57,7 +57,7 @@ dummy_fct = function(m)
   PCA_DT = DT[year == min(year) & month == min(month),][-land_ids,.(Lon,Lat,grid_id)]
   
   for(d in  PCs){
-    PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
+    PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]/sqrt(ens_size)
   } 
   
   # also get marginal variances
