@@ -1,3 +1,7 @@
+rm(list = ls())
+
+library(PostProcessing)
+setwd("~/NR/SFE/")
 
 
 #### This Script is currently stripped for scraps and NOT operational ###
@@ -182,7 +186,7 @@ for(y in ex_years){
 
 
 ###### Example plots of forecasted SST and anomalies w.r.t climatology #######
-
+opt_num_PCs = 15
 ex_depth = opt_num_PCs
 ex_months = 4:9
 ex_month_names = c("April","May","June","July","August","September")

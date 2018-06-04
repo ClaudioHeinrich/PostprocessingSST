@@ -6,12 +6,10 @@
 #' 
 #' @return none
 #'
-#' @export
+#' @export image.plot.na
 #' 
 #' @author Claudio Heinrich
 #' @importFrom fields image.plot
-
-
 image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 {
   newz.na <- zlim[2]+(zlim[2]-zlim[1])/length(col) # new z for NA
