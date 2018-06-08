@@ -152,7 +152,6 @@ geostationary_training = function (dt = NULL,
 #' @param y,m Integer vectors containing year(s) and month(s).
 #' @param n Integer. Size of the desired forecast ensemble. 
 #' @param ens_size Integer. Size of the NWP ensemble.
-#' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature.
 #' @param saveorgo Logical, whether we save or not. 
 #' @param save_dir,file_name The directory to save in and the name of the saved file.
 #' @param data_dir,var_file_names Where the fitted variograms are stored.
@@ -169,17 +168,16 @@ geostationary_training = function (dt = NULL,
 #' @export
 
 forecast_geostat = function(dt = NULL,
-                            n=100,
+                            n=1,
                             y = 2001:2010,
                             m = 1:12,
                             ens_size = 9,
-                            truncate = TRUE,
                             saveorgo = TRUE,
                             save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
                             file_name = "geostat_fc.RData",
                             data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
-                            var_file_names = paste0("variogram_exp_m",m,".RData")){
-    
+                            var_file_names = paste0("variogram_exp_m",m,".RData"))
+{
     if(is.null(dt))
     {
       print("load and prepare data")
@@ -191,6 +189,9 @@ forecast_geostat = function(dt = NULL,
     
     fc = dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols]
     
+    #take land out
+    fc_land_ids = fc[,which(is.na(Ens_bar) | is.na(SST_bar))]
+    fc_water = fc[-fc_land_ids,]
     
     for(mon in m){
     
@@ -200,7 +201,7 @@ forecast_geostat = function(dt = NULL,
       
       psill <- Mod$psill[2]
       range <- Mod$range[2]
-      nugget <- Mod$psill[1]
+      nugget <- max(Mod$psill[1],0.1)
       
       Sigma <- psill*exp(-Dist/range)
       sills <- diag(Sigma) + nugget
@@ -209,23 +210,20 @@ forecast_geostat = function(dt = NULL,
       ns <- length(sp)
       
       print(paste0("generating noise for month ",mon))
-      no <- MASS::mvrnorm(n=n*length(y), mu=rep(0,ns), Sigma=Sigma)
+      no <- matrix(MASS::mvrnorm(n=n*length(y), mu=rep(0,length(sp)), Sigma=Sigma), nrow = n*length(y))
       for (year in y){
         for (i in 1:n){
             y_ind = which(year == y)
             yn_ind = (y_ind - 1)*n + i
-            fc[year == year & month == mon,  paste0("no",i):= no[yn_ind,]]
-            fc[year == year & month == mon & is.na(SST_hat) | is.na(SST_bar),paste0("no",i) := NA]
-            ens_mem = sample.int(ens_size,1) 
-            fc[year == year & month == mon,paste0("fc",i):= rowSums(.SD), .SDcols = c(paste0("Ens",ens_mem),"Bias_Est",paste0("no",i))]
+            fc_water[year == year & month == mon, paste0("no",i):= no[yn_ind,]]
+            fc_water[year ==year & month == mon,paste0("fc",i):= trc(Ens_bar + Bias_Est) + .SD, 
+                    .SDcols = paste0("no",i)]
+            
         }
       }
       
-      if(truncate){
-        for(i in 1:n){
-          fc[, paste0("fc",i) := lapply(.SD,trc), .SDcols = paste0("fc",i) ]
-        }
-      }  
+      #add land again:
+      fc = merge(fc,fc_water, by = colnames(fc), all.x = TRUE)
       
       if(saveorgo){
         save(fc,file = paste0(save_dir,file_name))

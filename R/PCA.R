@@ -81,6 +81,52 @@ for_res_cov = function(dt = NULL,
 
 
 
+for_res_cov_wrtm = function(dt = NULL,
+                       Y = 1985:2000,
+                       M = 1:12,
+                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                       centering = "b",
+                       ens_size = 9){  
+  
+  if(is.null(dt))
+  {
+    print("loading data")
+    dt = load_combined_wide(var = TRUE)
+  }
+  
+  
+  
+  for(mon in M){
+    print(paste0("month =",mon))  
+    
+    dt_PCA = copy(dt[month == mon & year %in% Y,])
+    
+    if(centering == "b")
+    {
+      dt_PCA[,"Res":= SST_bar - trc(Ens_bar + Bias_Est)]  
+      cor_factor = 1 / sqrt( length(Y))
+    }
+    
+    
+    sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,Res]))
+    
+    # sqrt_cov_mat = c()
+    # for( ens in 1:ens_size){
+    #   sqrt_cov_mat = c(sqrt_cov_mat, 
+    #                    na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens,"new")))]))
+    # }
+    # sqrt_cov_mat = matrix(sqrt_cov_mat,
+    #                       ncol = ens_size * length(Y))
+    
+    res_cov = cor_factor * matrix(sqrt_cov_mat,ncol = length(Y) )
+    
+    save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
+    
+    rm(dt_PCA)
+  }
+}
+
+
 
 
 #-----------------------------
@@ -318,7 +364,7 @@ forecast_PCA_new = function(dt = NULL,
   #find land grid ids:
   
   land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
-                      .(Lon,Lat,grid_id,month,year)]
+                      .(Lon,Lat,grid_id,month,year,YM)]
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
               "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
   fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
@@ -458,7 +504,7 @@ get_PCs = function(dt = NULL,
   #find land grid ids:
   
   land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
-                     .(Lon,Lat,grid_id,month,year)]
+                     .(Lon,Lat,grid_id,month,year,YM)]
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
               "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
   

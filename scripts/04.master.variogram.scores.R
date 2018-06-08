@@ -37,7 +37,17 @@ save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 load(file = paste0(save_dir,"setup.RData"))
 DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
 
+####### Do you want to use a weight function for the variogram scores?
 
+weight_a_minute = TRUE
+
+weight_fct = function(x)
+{ y = rep(1, length(x))
+y[abs(x)>1] = (1/x[abs(x)>1])
+return(y)
+}
+
+weight_name_addition = "dw"  # for down weighted
 
 ###############################
 ########### PCA ###############
@@ -57,15 +67,15 @@ dir.create(PCA_dir, showWarnings = FALSE)
 
 training_years = DT[!(year %in% validation_years),unique(year)]
 
-for_res_cov(Y = training_years,
+for_res_cov_wrtm(Y = training_years,
             dt = DT, 
             save_dir = PCA_dir,
             ens_size = ens_size,
             centering = "b")
 
-PCs = c(1:10,12,14,16,18,20,25,30,50,70) # range of PCs to test
+PCs = c(1:10) # range of PCs to test
 
-months = 1:12
+
 
 
 #### variogram score computation: ####
@@ -77,7 +87,7 @@ for(m in months)
   
     print(paste0("m = ",m))
     load(file = paste0(PCA_dir,"CovRes_mon",m,".RData"))
-    PCA = irlba::irlba(res_cov, nv = max(PCs))
+    PCA = irlba::irlba(res_cov, nv = max(PCs),fastpath = FALSE)
     
     land_ids = which(DT[year == min(year) & month == min(month),is.na(Ens_bar) | is.na(SST_bar)])
     
@@ -111,6 +121,8 @@ for(m in months)
   dummy_fct = function(y)
   {
     var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
+                   weighted = weight_a_minute, weight_fct = weight_fct,
+                   file_name = paste0("var_sc_by_PC", weight_name_addition),
                    marginal_correction = FALSE, 
                    cov_dir = PCA_dir, save_dir = PCA_dir)
   }
@@ -121,8 +133,10 @@ for(m in months)
   dummy_fct = function(y)
     {
     print(c(paste0("y = ",y),paste0("m = ",m)))
-    var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs,ens_size = ens_size,
-               cov_dir = PCA_dir,save_dir = PCA_dir)
+    var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
+                   weighted = weight_a_minute, weight_fct = weight_fct,
+                   file_name = paste0("var_sc_by_PC", weight_name_addition),
+                   cov_dir = PCA_dir, save_dir = PCA_dir)
     }
   parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
 }
@@ -136,7 +150,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(PCA_dir,"var_sc_by_PC_nmc_m",m,"_y",y,".RData"))
+  load(file = paste0(PCA_dir,"var_sc_by_PC",weight_name_addition,"_nmc_m",m,"_y",y,".RData"))
   scores_nmc[[k]] = scores
   }
 }
@@ -147,7 +161,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(PCA_dir,"var_sc_by_PC_m",m,"_y",y,".RData"))
+  load(file = paste0(PCA_dir,"var_sc_by_PC",weight_name_addition,"_m",m,"_y",y,".RData"))
   scores_mc[[k]] = scores
   }
 }
@@ -167,7 +181,7 @@ print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(m
 
 # save
 
-save(scores_mc,scores_nmc,mean_sc,mean_sc_nmc,file = paste0(PCA_dir,"variogram_scores.RData"))
+save(scores_mc,scores_nmc,mean_sc,mean_sc_nmc,file = paste0(PCA_dir,"variogram_scores",weight_name_addition,".RData"))
 
 
 #########################################
@@ -180,12 +194,13 @@ save(scores_mc,scores_nmc,mean_sc,mean_sc_nmc,file = paste0(PCA_dir,"variogram_s
 # load(file = paste0(geostat_dir,"variogram_scores.RData"))
 
 
-#########################################
+
+###########################################
 
 geostat_dir = paste0(save_dir, "GeoStat/")
 dir.create(geostat_dir, showWarnings = FALSE)
 
-geostationary_training(dt = DT, save_dir = geostat_dir)
+geostationary_training(dt = DT, save_dir = geostat_dir,m = months)
 
 
 for(m in months)
@@ -203,8 +218,10 @@ for(m in months)
   dummy_fct = function(y)
   {
     var_sc_geoStat_new( DT, m, y, Mod = Mod, Dist = Dist,
-                       save_dir = geostat_dir, data_dir = geostat_dir,
-                       mar_var_cor = FALSE)
+                        weighted = weight_a_minute, weight_fct = weight_fct, 
+                        file_name = paste0("var_sc",weight_name_addition),
+                        save_dir = geostat_dir, data_dir = geostat_dir,
+                        mar_var_cor = FALSE)
   }
   parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
   
@@ -213,8 +230,10 @@ for(m in months)
   dummy_fct = function(y)
   {
     var_sc_geoStat_new( DT,m, y, Mod = Mod, Dist = Dist,
-                       save_dir = geostat_dir, data_dir = geostat_dir,
-                       mar_var_cor = TRUE)
+                        weighted = weight_a_minute, weight_fct = weight_fct, 
+                        file_name = paste0("var_sc",weight_name_addition),
+                        save_dir = geostat_dir, data_dir = geostat_dir,
+                        mar_var_cor = TRUE)
   }
   parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
 }
@@ -227,7 +246,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(geostat_dir,"var_sc_nmc_m",m,"_y",y,".RData"))
+  load(file = paste0(geostat_dir,"var_sc",weight_name_addition,"_nmc_m",m,"_y",y,".RData"))
   scores_geostat_nmc[[k]] = scores
   }
 }
@@ -238,7 +257,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(geostat_dir,"var_sc_m",m,"_y",y,".RData"))
+  load(file = paste0(geostat_dir,"var_sc",weight_name_addition,"_m",m,"_y",y,".RData"))
   scores_geostat_mc[[k]] = scores
   }
 }
@@ -254,7 +273,7 @@ mean_geostat_sc_nmc = unique(mean_geostat_sc_nmc)
 
 # save
 
-save(scores_geostat_mc,scores_geostat_nmc,mean_geostat_sc,mean_geostat_sc_nmc,file = paste0(geostat_dir,"variogram_scores.RData"))
+save(scores_geostat_mc,scores_geostat_nmc,mean_geostat_sc,mean_geostat_sc_nmc,file = paste0(geostat_dir,"variogram_scores",weight_name_addition,".RData"))
 
 
 
@@ -276,15 +295,20 @@ dir.create(ECC_dir, showWarnings = FALSE)
 
 forecast_ECC(dt = DT[year %in% validation_years],save_dir = ECC_dir)
 
-setup_var_sc_ECC(eval_years = validation_years, data_dir = ECC_dir, save_dir = ECC_dir)
+setup_var_sc_ECC(eval_years = validation_years,
+                 months = months,
+                 weighted = weight_a_minute, weight_fct = weight_fct, 
+                 ens_size = ens_size,
+                 file_name = paste0("diff_var_ECC",weight_name_addition,"m"),
+                 data_dir = ECC_dir, save_dir = ECC_dir)
 
-var_sc_ECC(eval_years = validation_years,save_dir = ECC_dir)
+var_sc_ECC(months = months,eval_years = validation_years,save_dir = ECC_dir, 
+           data_name = paste0("diff_var_ECC",weight_name_addition,"m"),file_name = paste0("var_sc",weight_name_addition,".RData"))
 
-load(file = paste0(ECC_dir,"var_sc.RData"))
+load(file = paste0(ECC_dir,"var_sc",weight_name_addition,".RData"))
 sc_ECC = sc
 
-
-###########################################
+#########################################
 ########### plotting scores: ##############
 ###########################################
 
@@ -292,7 +316,7 @@ sc_ECC = sc
 print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)]))
 
 
-pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
+pdf(paste0(plot_dir,"/mean_variogram_scores",weight_name_addition,".pdf"))
   rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],mean_geostat_sc[,mean_sc],mean_geostat_sc_nmc[,mean_sc]))
   #rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]]))
   
@@ -344,7 +368,7 @@ pdf(paste0(plot_dir,"/mean_variogram_scores.pdf"))
   #abline(h = sc_ECC[,mean(sc)], lty = "dashed", col = adjustcolor("pink"))
   
   
-  legend("right",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat"),
+  legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat"),
          col = c("blue","darkgreen","darkred","black"),lty = c(1,1,2,2,2))
   # legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat","ECC"),
   #        col = c("blue","darkgreen","darkred","black","pink"),lty = c(1,1,2,2,2))

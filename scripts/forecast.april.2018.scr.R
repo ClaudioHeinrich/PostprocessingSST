@@ -125,7 +125,7 @@ output_name = paste0("dt_combine_",name_abbr,"_wide.RData")
   
   
 
-# load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
+ DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))
 
 
 

@@ -155,6 +155,7 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 #' @param ens_size integer. Size of the ensemble.
 #' @param saveorgo logical. Do we save the data table?
 #' @param save_dir,file_name character strings. Directory and file name for saving.
+#' @param mean_est
 #' 
 #' @return the data table dt with a new column labelled 'var_bar'
 #' 
@@ -169,17 +170,24 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 ens_sd_est = function(dt, 
                       ens_size = 9,
                       saveorgo = TRUE,
-                      mean_est = "bcf",
+                      mean_est = "sv",
                       save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
                       file_name = "dt_combine_wide_bias_sd.RData")
 {# get the average variation of the bias corrected truncated ensemble members around the true value by year, month and grid_id:
   if(mean_est == "bcf"){
     get_variances = function(i)
     {
-      var_setup_dt = as.data.table(dt[, (.SD + Bias_Est - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
+      var_setup_dt = as.data.table(dt[, (trc(.SD + Bias_Est) - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
       #var_setup_dt = as.data.table(var_setup_dt)
       return(var_setup_dt)
     }
+    
+    var_list = parallel::mclapply(1:ens_size,get_variances,mc.cores = ens_size)
+    var_list = as.data.table(var_list)
+    setnames(var_list,paste0("temp",1:ens_size))
+  
+    dt[,"var_bar" := rowSums(var_list)]
+      
   } else if (mean_est == "sm"){
     get_variances = function(i)
     {
@@ -187,13 +195,17 @@ ens_sd_est = function(dt,
     #var_setup_dt = as.data.table(var_setup_dt)
     return(var_setup_dt)
     }
+    
+    var_list = parallel::mclapply(1:ens_size,get_variances,mc.cores = ens_size)
+    var_list = as.data.table(var_list)
+    setnames(var_list,paste0("temp",1:ens_size))
+  
+    dt[,"var_bar" := rowSums(var_list)]
+  } else if (mean_est == "sv") 
+  {
+    dt[,"var_bar" := (SST_bar-SST_hat)^2]
   }
   
-  var_list = parallel::mclapply(1:ens_size,get_variances,mc.cores = ens_size)
-  var_list = as.data.table(var_list)
-  setnames(var_list,paste0("temp",1:ens_size))
-  
-  dt[,"var_bar" := rowSums(var_list)]
   
 return(dt)
 }

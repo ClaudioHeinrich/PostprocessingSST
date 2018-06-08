@@ -370,6 +370,10 @@ var_sc_PCA_old = function(m, y, dt,
   if(!identical(land_ids,integer(0)))
   {
     dt = dt[-land_ids,]
+    if(weighted)
+    {
+      weight_dt = weight_dt[-land_ids,]
+    }
   }
   
   #get covariance matrix
@@ -432,6 +436,12 @@ var_sc_PCA_old = function(m, y, dt,
   var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
   var_sc_prereq[, "key" := NULL]
   
+  # get pairs of indices of locations
+  
+  n_loc = dt_coor_1[,.N]
+  id_1 = as.vector(mapply(rep,1:n_loc,times = n_loc))
+  id_2 = rep(1:n_loc, times = n_loc)
+  
   #get weights for variogram score
   
   if(weighted)
@@ -440,16 +450,16 @@ var_sc_PCA_old = function(m, y, dt,
     {
       weight_fct = function(x)
       { y = rep(1, length(x))
-      y[abs(x)>1] = (1/x[abs(x)>1]^4)
+      y[abs(x)>1] = (1/x[abs(x)>1]^2)
       return(y)
       }
     }
     
     var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
     #normalizing:
-    var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+    var_sc_prereq[,"weights" := weights/sum(weights)]
   } else {
-    var_sc_prereq[,"weights" := 1/sqrt(.N)]
+    var_sc_prereq[,"weights" := 1/.N]
   }
   
   
@@ -457,11 +467,7 @@ var_sc_PCA_old = function(m, y, dt,
   ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
   ##--- for the predictive distribution with d principal components, first without marginal variance correction
   
-  n_loc = dt_coor_1[,.N]
-  id_1 = as.vector(mapply(rep,1:n_loc,times = n_loc))
-  id_2 = rep(1:n_loc, times = n_loc)
-  
-  print("getting variances of differences:")
+    print("getting variances of differences:")
   
   diff_var = list()
   
@@ -601,6 +607,10 @@ var_sc_geoStat_new = function(dt,m,y,
   if(!identical(land_ids,integer(0)))
   {
     dt = dt[-land_ids,]
+    if(weighted)
+    {
+      weight_dt = weight_dt[-land_ids,]
+    }
   }
   
   
@@ -617,6 +627,11 @@ var_sc_geoStat_new = function(dt,m,y,
   var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
   var_sc_prereq[, "key" := NULL]
   
+  # indices for pairs of locations
+  
+  id_1 = var_sc_prereq[,grid_id_ind1]
+  id_2 = var_sc_prereq[,grid_id_ind2]
+  
   #get weights for variogram score
   
   if(weighted)
@@ -625,16 +640,16 @@ var_sc_geoStat_new = function(dt,m,y,
     {
       weight_fct = function(x)
       { y = rep(1, length(x))
-      y[abs(x)>1] = (1/x[abs(x)>1]^4)
+      y[abs(x)>1] = (1/x[abs(x)>1]^2)
       return(y)
       }
     }
     
     var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
     #normalizing:
-    var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+    var_sc_prereq[,"weights" := weights/sum(weights)]
   } else {
-    var_sc_prereq[,"weights" := 1/sqrt(.N)]
+    var_sc_prereq[,"weights" := 1/.N]
   }
   
   # get covariance matrix
@@ -661,10 +676,7 @@ var_sc_geoStat_new = function(dt,m,y,
     Sigma = D %*% Sigma %*% D
   }
   
-  ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j in the predictive distribution
-  
-  id_1 = var_sc_prereq[,grid_id_ind1]
-  id_2 = var_sc_prereq[,grid_id_ind2]
+ 
   
   #finding variance and covariance locations in Sigma:
   n_loc = dim(Sigma)[1]
@@ -911,13 +923,6 @@ setup_var_sc_ECC = function(dt = NULL,
     load(file = paste0(data_dir,"ECC_fc.RData"))
   }
   
-  if(weighted)
-  {
-    # the weights are a function of the SST difference averaged over training_years
-    weight_dt = dt[year %in% training_years & month == m,][,mean(SST_bar), by = grid_id]
-    setnames(weight_dt,c("grid_id","mean_SST"))
-  }
-  
   
   # build data table that contains pairs of coordinates for all coordinates contained in dt that are not land_id
   land_grid_id = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
@@ -940,6 +945,18 @@ setup_var_sc_ECC = function(dt = NULL,
   {
     print(paste0("month =  ",m))
     
+    if(weighted)
+    {
+      # the weights are a function of the SST difference averaged over training_years
+      weight_dt = dt[year %in% eval_years & month == m,][,mean(SST_bar), by = grid_id]
+      setnames(weight_dt,c("grid_id","mean_SST"))
+      land_ids = weight_dt[,which(is.na(mean_SST))]
+      if(!identical(land_ids,integer(0)))
+      {
+        weight_dt = weight_dt[-land_ids,]
+      }
+    }
+    
     dt_temp_1 = dt[month == m,]
     print("getting variances")
     
@@ -952,16 +969,16 @@ setup_var_sc_ECC = function(dt = NULL,
       {
         weight_fct = function(x)
         { y = rep(1, length(x))
-        y[abs(x)>1] = (1/x[abs(x)>1]^4)
+        y[abs(x)>1] = (1/x[abs(x)>1]^2)
         return(y)
         }
       }
       
       var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
       #normalizing:
-      var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+      var_sc_prereq[,"weights" := weights/sum(weights)]
     } else {
-      var_sc_prereq[,"weights" := 1/sqrt(.N)]
+      var_sc_prereq[,"weights" := 1/.N]
     }
     
     for(y in eval_years)
@@ -1021,13 +1038,14 @@ var_sc_ECC = function(months = 1:12,
                       eval_years = 2001:2010,
                       saveorgo = TRUE,
                       save_dir = "~/PostClimDataNoBackup/SFE/Derived/ECC/",
+                      data_name = "diff_var_ECC_m",
                       file_name = "var_sc.RData")
 { sc = as.data.table(expand.grid(months,eval_years))
   setnames(sc,c("month","year"))
   
   for(m in months)
   { print(paste0("month = ",m))
-    load(file = paste0(save_dir,"diff_var_ECC_m",m,".RData"))
+    load(file = paste0(save_dir,data_name,m,".RData"))
     for(y in eval_years)
     {dt_temp = var_sc_prereq[,.SD,.SDcols = c(paste0("mom_est_y",y),paste0("ObsDiff_y",y),"weights")]
     setnames(dt_temp,c("fc_var","obs_diff","weights"))
