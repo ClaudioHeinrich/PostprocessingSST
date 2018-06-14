@@ -30,16 +30,16 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Pres_Bergen" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
-DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
+
 
 ####### Do you want to use a weight function for the variogram scores?
 
-weight_a_minute = TRUE
+weight_a_minute = FALSE
 
 weight_fct = function(x)
 { y = rep(1, length(x))
@@ -47,7 +47,7 @@ y[abs(x)>1] = (1/x[abs(x)>1])
 return(y)
 }
 
-weight_name_addition = "dw"  # for down weighted
+weight_name_addition = ""  
 
 ###############################
 ########### PCA ###############
@@ -62,18 +62,18 @@ weight_name_addition = "dw"  # for down weighted
 
 ##### setting up ######
 
-PCA_dir = paste0(save_dir,"PCA_new/")
+PCA_dir = paste0(save_dir,"PCA/")
 dir.create(PCA_dir, showWarnings = FALSE)
 
 training_years = DT[!(year %in% validation_years),unique(year)]
 
-for_res_cov_wrtm(Y = training_years,
+for_res_cov(Y = training_years,
             dt = DT, 
             save_dir = PCA_dir,
             ens_size = ens_size,
             centering = "b")
 
-PCs = c(1:10) # range of PCs to test
+PCs = c(1:10,15,20,30,50,70) # range of PCs to test
 
 
 
@@ -308,15 +308,19 @@ var_sc_ECC(months = months,eval_years = validation_years,save_dir = ECC_dir,
 load(file = paste0(ECC_dir,"var_sc",weight_name_addition,".RData"))
 sc_ECC = sc
 
+
+
 #########################################
 ########### plotting scores: ##############
 ###########################################
+
+
 
 # we leave out ECC, because its score is just too bad:
 print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)]))
 
 
-pdf(paste0(plot_dir,"/mean_variogram_scores",weight_name_addition,".pdf"))
+pdf(paste0(plot_dir,"/mean_variogram_scores_wrtm_newnew",weight_name_addition,".pdf"))
   rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],mean_geostat_sc[,mean_sc],mean_geostat_sc_nmc[,mean_sc]))
   #rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]]))
   
@@ -328,7 +332,7 @@ pdf(paste0(plot_dir,"/mean_variogram_scores",weight_name_addition,".pdf"))
        ylim = rr,
        type = "b",
        col = "blue",
-       main = paste0("mean variogram scores for ",name_abbr),
+       main = paste0("mean variogram scores"),
        xlab = "number of principal components",
        ylab = "mean score")
   
@@ -368,9 +372,12 @@ pdf(paste0(plot_dir,"/mean_variogram_scores",weight_name_addition,".pdf"))
   #abline(h = sc_ECC[,mean(sc)], lty = "dashed", col = adjustcolor("pink"))
   
   
-  legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat"),
-         col = c("blue","darkgreen","darkred","black"),lty = c(1,1,2,2,2))
+  legend("topright",legend = c("PCA, m.c.v.","PCA","geostat"),
+         col = c("blue","darkgreen","darkred"),lty = c(1,1,2))
   # legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat","ECC"),
   #        col = c("blue","darkgreen","darkred","black","pink"),lty = c(1,1,2,2,2))
 dev.off()
 
+##################
+
+save.image(file = paste0(save_dir,"setup.RData"))

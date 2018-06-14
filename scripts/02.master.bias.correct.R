@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Full" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -96,7 +96,7 @@ pdf(paste0(plot_dir,"mean_scores_sma.pdf"))
        ylim = y_range,
        type = "b",
        col = "blue",
-       main = paste0("RMSE for ",name_abbr," bias correction by SMA"),
+       main = paste0("RMSE for bias correction by SMA"),
        xlab = "window length",
        ylab = "RMSE"
   )
@@ -119,7 +119,7 @@ pdf(paste0(plot_dir,"mean_scores_ema.pdf"))
        ylim = y_range,
        type = "b",
        col = "blue",
-       main = paste0("RMSE for ",name_abbr," bias correction by EMA"),
+       main = paste0("RMSE for bias correction by EMA"),
        xlab = "weight parameter a",
        ylab = "RMSE"
   )
@@ -147,11 +147,17 @@ if(sc_sma[,min(MSE)] < sc_ema[,min(MSE)]){
   opt_par = c("ema",sc_ema[,a][sc_sma[,which.min(MSE)]])
 }
 
-bias_correct(dt = DT,
+DT = bias_correct(dt = DT,
              method = opt_par[1],
              par_1 = as.double(opt_par[2]),
-             save_dir = save_dir,
-             file_name = paste0("dt_combine_wide_bc.RData"))
+             save_dir = save_dir)
+
+DT = bias_correct_training(dt = DT,
+                           method = opt_par,
+                           training_years = training_years,
+                           save_dir = save_dir)
 
 
+######
 
+save.image(file = paste0(save_dir,"setup.RData"))

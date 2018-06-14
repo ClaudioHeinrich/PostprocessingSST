@@ -10,12 +10,12 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Pres_Bergen" 
+name_abbr = "Full" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
-DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
+
 
 ex_plot_dir = paste0(plot_dir,"Examples/")
 dir.create(ex_plot_dir, showWarnings = FALSE)
@@ -23,11 +23,13 @@ dir.create(ex_plot_dir, showWarnings = FALSE)
 
 ### example plots ###
 
-ex_month = 6:7
+ex_month = 9
 
-
+cex = 1.1
 
 # get climatology
+
+training_years = 1985:2000
 
 DT[year %in% training_years,clim := mean(SST_bar),by =.(month,grid_id)]
 clim_vec = rep(DT[year == min(training_years),clim],length(DT[,unique(year)]))
@@ -40,13 +42,164 @@ DT[,ano := SST_bar - clim]
 
 rr = c(-5,5)
 
-ex_years = 2018
+ex_years = 2001:2003
 
 mn = ""
 add_title = TRUE # do we want titles on the plots or do we want to play the guess-my-method game?
 repetitions = 1
 
 
+
+# SST residuals
+
+r_plus = max(abs(range(DT[year %in% ex_years & month %in% ex_month,SST_bar - SST_hat],na.rm = TRUE)))
+
+rr = c(-r_plus,r_plus)
+
+for(m in ex_month)
+{
+  for(y in ex_years)
+  {
+    if(add_title)
+    {
+      mn = paste0("Forecast residual, ",m," / ",y)
+    }
+    for(k in 1:repetitions)
+    {
+      plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,SST_bar - SST_hat)],
+                      mn = mn,
+                      ylab = "", xlab = "",
+                      rr = rr,
+                      cex = cex,
+                      save_pdf = TRUE,
+                      save_dir = ex_plot_dir,
+                      file_name = paste0("res",k,"_m",m,"_y",y))  
+    }
+  }
+}
+
+# raw ensemble member and forecast
+
+for(m in ex_month)
+{
+  for(y in ex_years)
+  {
+    ens = sample(ens_size,repetitions)
+    
+    rr = range(DT[year == y & month == m,.(SST_bar,Ens_bar)],na.rm = TRUE)
+      
+      if(add_title)
+      {
+        mn = paste0("raw forecast, ",m," / ",y)
+      }
+      plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,Ens_bar)],
+                      mn = mn,
+                      rr = rr,
+                      cex = cex,
+                      ylab = "", xlab = "",
+                      save_pdf = TRUE,
+                      save_dir = ex_plot_dir,
+                      file_name = paste0("rfc",k,"_m",m,"_y",y))  
+      
+      if(add_title)
+      {
+        mn = paste0("observed SST, ",m," / ",y)
+      }
+      plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,SST_bar)],
+                      mn = mn,
+                      rr = rr,
+                      ylab = "", xlab = "",
+                      save_pdf = TRUE,
+                      save_dir = ex_plot_dir,
+                      file_name = paste0("SST",k,"_m",m,"_y",y))  
+      
+  }
+}
+
+# show principal components:
+ex_years = 2002
+
+PCs = 2
+
+prin_comp_dt = get_PCs(dt = DT, y = ex_years, m = ex_month, PCA_depth = PCs, cov_dir = PCA_dir)
+
+#without marginal correction
+
+for(y in ex_years){
+  rr_PC_raw = range(prin_comp_dt[year == y,.SD,.SDcols = c(paste0("PC",1:PCs))],na.rm = TRUE)
+  rr_PC_raw = c(-max(abs(rr_PC_raw)), max(abs(rr_PC_raw)))
+  
+  for(d in 1:PCs)
+  {
+    plot_diagnostic(prin_comp_dt[year == y,.SD,.SDcols = c("Lon","Lat",paste0("PC",d))],
+                    rr = rr_PC_raw,
+                    mn = paste0("PC ",d,", nmc, 0",ex_month," / ",y),
+                    xlab = "", ylab = "",
+                    cex = cex,
+                    save_pdf = TRUE,
+                    save_dir = ex_plot_dir,
+                    file_name = paste0("PC",d,"_y",y,"_raw"))
+    
+  }
+}
+
+#with marginal correction:
+
+for(y in ex_years){
+  rr_PC_raw = range(prin_comp_dt[year == y,.SD,.SDcols = c(paste0("PC_marcor_",1:PCs))],na.rm = TRUE)
+  rr_PC_raw = c(-max(abs(rr_PC_raw)), max(abs(rr_PC_raw)))
+  
+  for(d in 1:PCs)
+  {
+    plot_diagnostic(prin_comp_dt[year == y,.SD,.SDcols = c("Lon","Lat",paste0("PC_marcor_",d))],
+                    rr = rr_PC_raw,
+                    mn = paste0("PC ",d,", 0",ex_month," / ",y),
+                    save_pdf = TRUE,
+                    xlab = "", ylab = "",
+                    cex = cex,
+                    save_dir = ex_plot_dir,
+                    file_name = paste0("PC",d,"_y",y,"_mc"))
+    
+  }
+}
+
+
+
+
+########## multivariate methods #################
+
+name_abbr = "Pres_Bergen" 
+
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+
+load(file = paste0(save_dir,"setup.RData"))
+
+
+ex_plot_dir = paste0(plot_dir,"Examples/")
+dir.create(ex_plot_dir, showWarnings = FALSE)
+
+ex_month = 9
+
+# get climatology
+
+training_years = 1985:2000
+
+DT[year %in% training_years,clim := mean(SST_bar),by =.(month,grid_id)]
+clim_vec = rep(DT[year == min(training_years),clim],length(DT[,unique(year)]))
+DT[,clim := clim_vec]
+DT[,ano := SST_bar - clim]
+
+
+
+######################
+
+rr = c(-5,5)
+
+
+ex_years = 2001:2003
+repetitions = 1
+mn = ""
+add_title = TRUE # do we want titles on the plots or do we want to play the guess-my-method game?
 
 # observed SST
 
@@ -63,158 +216,7 @@ for(m in ex_month)
       plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,ano)],
                       mn = mn,
                       rr = rr,
-                      save_pdf = TRUE,
-                      save_dir = ex_plot_dir,
-                      file_name = paste0("Ano",k,"_m",m,"_y",y))  
-    }
-  }
-}
-
-
-
-
-# raw ensemble member
-
-for(m in ex_month)
-{
-  for(y in ex_years)
-  {
-    ens = sample(ens_size,repetitions)
-    for(k in 1:repetitions)
-    {
-      
-      if(add_title)
-      {
-        mn = paste0("raw forecast ",m," / ",y)
-      }
-      plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,eval(parse(text = paste0("Ens",ens[k])))-clim)],
-                      mn = mn,
-                      rr = rr,
-                      save_pdf = TRUE,
-                      save_dir = ex_plot_dir,
-                      file_name = paste0("raw_fc",k,"_m",m,"_y",y))  
-    }
-  }
-}
-
-# bias corrected mean
-
-for(m in ex_month)
-{
-  for(y in ex_years)
-  {
-    
-      if(add_title)
-      {
-        mn = paste0("bias corrected forecast ",m," / ",y)
-      }
-      plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,SST_hat-clim)],
-                      mn = mn,
-                      rr = rr,
-                      save_pdf = TRUE,
-                      save_dir = ex_plot_dir,
-                      file_name = paste0("bc_fc",k,"_m",m,"_y",y))  
-    }
-  
-}
-
-
-
-# marginally corrected forecast
-
-for(m in ex_month)
-{
-  for(y in ex_years)
-  {
-    
-    for(k in 1:repetitions)
-    {
-      if(add_title)
-      {
-        mn = paste0("marg. cal. fc ",m," / ",y)
-      }
-      plot_diagnostic(DT[year == y & month == m,
-                             .(Lon,Lat,trc(Ens_bar + Bias_Est) + 
-                                 rnorm(DT[year == y & month == m,.N],mean = 0,sd = DT[year == y & month == m,SD_hat]) - clim)],
-                      mn = mn,
-                      rr = rr,
-                      save_pdf = TRUE,
-                      save_dir = ex_plot_dir,
-                      file_name = paste0("marcal_fc",k,"_m",m,"_y",y))
-      
-    }
-  }
-}
-
-
-
-# Ensemble spread
-
-for(m in ex_month)
-{
-  for(y in ex_years)
-  {
-    
-    for(k in 1:repetitions)
-    {
-      
-      DT_temp = DT[year %in% training_years, Ens_spread := sqrt(mean(Ens_sd^2)), by = .(Lon,Lat,month)]
-      rr_sd = range(c(0,DT_temp[,Ens_spread],DT[year == y & month == m,SD_hat]),na.rm = TRUE)
-      
-      if(add_title)
-      {
-        mn = paste0("July ensemble spread")
-      }
-      plot_diagnostic(DT_temp[year == min(year) & month == m,
-                         .(Lon,Lat,Ens_spread)],
-                      mn = mn,
-                      rr = rr_sd,
-                      save_pdf = TRUE,
-                      col_scheme = "wr",
-                      save_dir = ex_plot_dir,
-                      file_name = paste0("ens_spread",k,"_m",m,"_y",y))
-      
-      if(add_title)
-      {
-        mn = paste0("July SD, estimated from data")
-      }
-      plot_diagnostic(DT[year == y & month == m,
-                              .(Lon,Lat,SD_hat)],
-                      mn = mn,
-                      rr = rr_sd,
-                      save_pdf = TRUE,
-                      col_scheme = "wr",
-                      save_dir = ex_plot_dir,
-                      file_name = paste0("sd_hat",k,"_m",m,"_y",y))
-      
-    }
-  }
-}
-
-
-
-########## multivariate methods #################
-
-ex_years = 2001:2010
-repetitions = 1
-mn = ""
-add_title = FALSE # do we want titles on the plots or do we want to play the guess-my-method game?
-
-# observed SST
-
-for(m in ex_month)
-{
-  for(y in ex_years)
-  {
-    if(add_title)
-    {
-      mn = paste0("Ano ",m," / ",y)
-    }
-    for(k in 1:repetitions)
-    {
-      plot_diagnostic(DT[year == y & month == m,.(Lon,Lat,ano)],
-                      mn = mn,
-                      rr = rr,
+                      ylab = "", xlab = "",
                       save_pdf = TRUE,
                       save_dir = ex_plot_dir,
                       file_name = paste0("Ano",k,"_m",m,"_y",y))  
@@ -226,8 +228,8 @@ for(m in ex_month)
 
 
 ex_PCs = 50
-ex_years = 2001:2010
-repetitions = 5
+ex_years = 2001:2003
+repetitions = 1
 
 DT_PCA = forecast_PCA_new(dt = DT,y = ex_years, m = ex_month, n = repetitions, PCA_depth = ex_PCs,saveorgo = FALSE, cov_dir = PCA_dir)
 setkeyv(DT_PCA,key(DT))
@@ -248,12 +250,13 @@ for(PC in ex_PCs)
       {
         if(add_title)
         {
-          mn = paste0("PCA SST forecast ",m," / ",y)
+          mn = paste0("PCA forecast ",m," / ",y)
         }
-        plot_diagnostic(DT_PCA[year == y & month == m, .(Lon,Lat,eval(parse(text = paste0("fc",k,"PC",PC))))],
+        plot_diagnostic(DT_PCA[year == y & month == m, .(Lon,Lat,eval(parse(text = paste0("fc",k,"PC",PC)))-clim)],
                         mn = mn,
                         save_pdf = TRUE,
-                        #rr=rr,
+                        rr=rr,
+                        ylab = "", xlab = "",
                         save_dir = ex_plot_dir,
                         file_name = paste0("PCA_fc",k,"_m",m,"_y",y))
         
@@ -262,13 +265,14 @@ for(PC in ex_PCs)
   }
 }
 
-ex_years = 2002
+ex_years = 2001:2003
 # geostationary:
 DT_geostat = forecast_geostat(dt = DT, n = repetitions, y = ex_years, m = ex_month,
                               ens_size = ens_size, saveorgo = FALSE, data_dir = geostat_dir)
+setkey(DT_geostat,year,Lon,Lat)
 DT_geostat[,clim := DT[year %in% ex_years & month %in% ex_month,clim]]
 
-add_title = FALSE
+add_title = TRUE
 mn = ""
 
 for(y in ex_years)
@@ -277,7 +281,7 @@ for(y in ex_years)
   {
     if(add_title)
     {
-      mn = paste0("fc geost. ",m," / ",y)
+      mn = paste0("geostationary forecast ",m," / ",y)
     }
     for(k in 1:repetitions)
     {
@@ -285,6 +289,7 @@ for(y in ex_years)
                                  .SDcols = paste0("fc",k)],
                       mn = mn,
                       rr=rr,
+                      ylab = "", xlab = "",
                       save_pdf = TRUE,
                       save_dir = ex_plot_dir,
                       file_name = paste0("fc_geostat",k,"_m",m,"_y",y))
@@ -294,12 +299,12 @@ for(y in ex_years)
 
 # ECC
 
-ex_years = 2003
+ex_years = 2001:2003
 
 DT_ECC = forecast_ECC(dt = DT[year %in% ex_years & month %in% ex_month,],saveorgo = FALSE)
 DT_ECC[,clim := DT[year %in% ex_years & month %in% ex_month,clim]]
 
-add_title = FALSE
+add_title = TRUE
 mn = ""
 
 for(y in ex_years)
@@ -308,75 +313,76 @@ for(y in ex_years)
   {
     if(add_title)
     {
-      mn = paste0("fc ECC ",m," / ",y)
+      mn = paste0("ECC forecast ",m," / ",y)
     }
     ens = sample(ens_size,repetitions)
     for(k in 1:repetitions)
     {
-    plot_diagnostic(DT_ECC[year == y,.(Lon,Lat,.SD - clim),
-                           .SDcols = paste0("ecc_fc",ens[k])],
-                  mn = mn,
-                  rr = rr,
-                  save_pdf = TRUE,
-                  save_dir = ex_plot_dir,
-                  file_name = paste0("fc_ecc",k,"_m",m,"_y",y))
+      plot_diagnostic(DT_ECC[year == y,.(Lon,Lat,.SD - clim),
+                             .SDcols = paste0("ecc_fc",ens[k])],
+                      mn = mn,
+                      rr = rr,
+                      save_pdf = TRUE,
+                      save_dir = ex_plot_dir,
+                      file_name = paste0("fc_ecc",k,"_m",m,"_y",y))
     }
   }
 }
-  
- 
+
+
 
 #####################
 
- 
-  
- 
-
-  
- 
 
 
-# show principal components:
 
-PCs = 6
+########### marginal SDs and Ensemble spread #############
 
-prin_comp_dt = get_PCs(dt = DT, y = ex_years, m = ex_month, PCA_depth = PCs, cov_dir = PCA_dir)
+# Ensemble spread
 
-#without marginal correction
-
-for(y in ex_years){
-  rr_PC_raw = range(prin_comp_dt[year == y,.SD,.SDcols = c(paste0("PC",1:PCs))],na.rm = TRUE)
-  rr_PC_raw = c(-max(abs(rr_PC_raw)), max(abs(rr_PC_raw)))
-  
-  for(d in 1:PCs)
+for(m in ex_month)
+{
+  for(y in ex_years)
   {
-    plot_diagnostic(prin_comp_dt[year == y,.SD,.SDcols = c("Lon","Lat",paste0("PC",d))],
-                    rr = rr_PC_raw,
-                    mn = paste0("PC ",d,", 0",ex_month," / ",y),
-                    save_pdf = TRUE,
-                    save_dir = paste0(plot_dir,"/"),
-                    file_name = paste0("PC",d,"_y",y,"_raw"))
     
+    for(k in 1:repetitions)
+    {
+      
+      DT_temp = DT[year %in% training_years, Ens_spread := sqrt(mean(Ens_sd^2)), by = .(Lon,Lat,month)]
+      rr_sd = range(c(0,DT_temp[,Ens_spread],DT[year == y & month == m,SD_hat]),na.rm = TRUE)
+      
+      if(add_title)
+      {
+        mn = paste0("July ensemble spread")
+      }
+      plot_diagnostic(DT_temp[year == min(year) & month == m,
+                              .(Lon,Lat,Ens_spread)],
+                      mn = mn,
+                      rr = rr_sd,
+                      save_pdf = TRUE,
+                      col_scheme = "wr",
+                      save_dir = ex_plot_dir,
+                      file_name = paste0("ens_spread",k,"_m",m,"_y",y))
+      
+      if(add_title)
+      {
+        mn = paste0("July SD, estimated from data")
+      }
+      plot_diagnostic(DT[year == y & month == m,
+                         .(Lon,Lat,SD_hat)],
+                      mn = mn,
+                      rr = rr_sd,
+                      save_pdf = TRUE,
+                      col_scheme = "wr",
+                      save_dir = ex_plot_dir,
+                      file_name = paste0("sd_hat",k,"_m",m,"_y",y))
+      
+    }
   }
 }
 
-#with marginal correction:
 
-for(y in ex_years){
-  rr_PC_raw = range(prin_comp_dt[year == y,.SD,.SDcols = c(paste0("PC_marcor_",1:PCs))],na.rm = TRUE)
-  rr_PC_raw = c(-max(abs(rr_PC_raw)), max(abs(rr_PC_raw)))
-  
-  for(d in 1:PCs)
-  {
-    plot_diagnostic(prin_comp_dt[year == y,.SD,.SDcols = c("Lon","Lat",paste0("PC_marcor_",d))],
-                    rr = rr_PC_raw,
-                    mn = paste0("PC ",d,", 0",ex_month," / ",y),
-                    save_pdf = TRUE,
-                    save_dir = paste0(plot_dir,"/"),
-                    file_name = paste0("PC",d,"_y",y,"_mc"))
-    
-  }
-}
+
 
 # plotting marginal SDs
 

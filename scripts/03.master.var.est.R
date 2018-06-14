@@ -29,18 +29,18 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Full" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
-DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_wide_bc.RData"))
 
 ###### getting sample variances of ensemble  ######
 
 DT = ens_sd_est(dt = DT,
                 ens_size = ens_size,
                 save_dir = save_dir,
+                mean_est = "bcf",
                 file_name = paste0("dt_combine_wide_bc_var.RData"))
 
 
@@ -148,8 +148,8 @@ dev.off()
 # if the optimal scores for simple moving averages and exponential moving acerages are essentially the same (less than 1 % difference),
 # we pick exponential moving averages, since they are more stable.
 
-if(sc_sma_var[,min(CRPS)] < 0.99*sc_ema_var[,min(CRPS)]){
-  print(paste0("optimal variance estimation uses simple moving average over sample variances with window length of ",sc_sma_var[,which.min(CRPS)], " years, and achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),
+if(sc_sma_var[,min(CRPS)] < sc_ema_var[,min(CRPS)]){
+  print(paste0("optimal variance estimation uses simple moving average with window length of ",sc_sma_var[,which.min(CRPS)], " years, and achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),
                ". Best estimation with exponentially weighted sample variance achieves a RMSE of ",round(sc_ema_var[,min(CRPS)],3),"."))
   opt_par = c("sma",sc_sma_var[,which.min(CRPS)])
 } else{
@@ -160,10 +160,14 @@ if(sc_sma_var[,min(CRPS)] < 0.99*sc_ema_var[,min(CRPS)]){
 
 ### variance estimation ###
 
-sd_est(dt = DT,
+DT = sd_est(dt = DT,
        method = opt_par[1],
        par_1 = as.double(opt_par[2]),
        save_dir =save_dir,
        file_name = paste0("dt_combine_wide_bc_var.RData")
 )
+
+#####
+
+save.image(file = paste0(save_dir,"setup.RData"))
 

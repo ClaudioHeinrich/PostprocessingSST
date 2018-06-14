@@ -14,19 +14,37 @@
 #' 
 #' @export
 
-sim_mov_av = function(l,vec, years, skip = 0){
+sim_mov_av = function(l,vec, years, skip = 0, twosided = FALSE){
   
   all_years = min(years):max(years)
   
   sma = rep(0,length(vec))
   
-  for (i in (2 + skip) :length(vec)){
-    year_ind = which(all_years == years[i])
-    weight_vec = ((year_ind - which(all_years %in% years[1:(i-1)])) <= l ) & ((year_ind - which(all_years %in% years[1:(i-1)])) > skip)
-    if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
-    sma[i] = sum(weight_vec*vec[1:(i-1)])
+  if(!twosided)
+  {
+    for (i in 1:length(vec)){
+      y=years[i]
+      weight_vec = rep(0,length(vec))
+      rel_loc = (y > years) & ((y - years) <= l)
+      skip_loc =  y-years <= skip
+      weight_vec = rel_loc & !skip_loc
+      if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
+      sma[i] = sum(weight_vec*vec)
+    }
+    return(sma)  
+  } else if(twosided)
+  {
+    for (i in 1:length(vec)){
+      y=years[i]
+      weight_vec = rep(0,length(vec))
+      rel_loc = abs(years - y) <= l 
+      skip_loc = abs(years - y) <= skip
+      weight_vec = rel_loc & !skip_loc
+      if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
+      sma[i] = sum(weight_vec*vec)
+    }
+    return(sma)
   }
-  return(sma)
 }
 
 #' computes exponentially weighted moving averages, is resistant to missing values  
@@ -44,21 +62,34 @@ sim_mov_av = function(l,vec, years, skip = 0){
 #' @export
 
 
-exp_mov_av = function( a,vec, years, skip = 0 ){
+exp_mov_av = function( a,vec, years, skip = 0,twosided = FALSE){
+  
+  lv = length(vec)
   
   all_years = min(years):max(years)
   
-  exp_weights = rep(0,length(all_years))
-  for(i in 1:length(all_years)){
-    exp_weights[i] = exp(-a*(i-1))
-  }
   
-  ema = rep(0,length(vec))
   
-  for (i in (skip + 2):length(vec)){
-    weight_vec = rev(exp_weights[which(all_years %in% years[1:(i-1-skip)])])
-    weight_vec = weight_vec/sum(weight_vec)
-    ema[i] = sum(weight_vec*vec[1:(i-1-skip)])
+  ema = rep(0,lv)
+  
+  if(!twosided)
+  {
+    exp_weights = exp(-a * (1:length(all_years)))
+    
+    for (i in (skip + 2):lv){
+      weight_vec = rev(exp_weights[which(all_years %in% years[1:(i-1-skip)])])
+      weight_vec = weight_vec/sum(weight_vec)
+      ema[i] = sum(weight_vec*vec[1:(i-1-skip)])
+    }
+  } else if(twosided)
+  {
+      for (i in 1:lv){
+        year_dist = abs(years[1 : lv] - years[i])
+        weights = rep(0,lv)
+        weights[!(year_dist <= skip)] = exp_weights[year_dist]
+        weights = weights/sum(weights)
+        ema[i] = sum(weights*vec)
+    }
   }
   return(ema)
 }
@@ -336,4 +367,66 @@ sd_est = function(dt = NULL,
   } else return(dt)
   
 }
+
+
+#' Applies bias correction with a specified method to the data and saves or returns scores.
+#'
+#' @param dt The data table.
+#' @param method Method of bias correction. Takes "sma" for simple moving average and "ema" for exponential moving average. 
+#' @param par_1 Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).
+#' @param scores Logical. If true, the MSE is returned.
+#' @param eval_years Numerical vector. The years for evaluating the score.
+#' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
+#' @param save_dir,file_name Directory and name for the saved file.
+#' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
+#'                   
+#'                   
+#' @return The data table with corrected SST_hat and new column Bias_Est.
+#'
+#' @author Claudio Heinrich
+#' @examples \dontrun{bias_correct(saveorgo = FALSE)}
+#' 
+#' 
+#' @export
+
+bias_correct_training = function(dt = NULL,
+                                method,
+                                training_years = 1985:2000,
+                                eval_years = 2001:2010,
+                                saveorgo = TRUE,
+                                save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                                file_name = "dt_combine_wide_bias.RData",
+                                skip = 0){
+  
+  if(is.null(dt)) dt = load_combined_wide(bias = TRUE) 
+  
+  if(method[1] == "sma")
+    {
+      dt[year %in% training_years,"Bias_Est" :=   sim_mov_av(l = as.double(method[2]),
+                                                           vec = SST_bar - Ens_bar,
+                                                           years = year,
+                                                           skip = skip,
+                                                           twosided = TRUE),
+         by = .(grid_id, month)]
+  }
+  if (method[1] == "ema"){
+    dt[year %in% training_years,"Bias_Est" :=   exp_mov_av(a = as.double(method[2]),
+                                                           vec = SST_bar - Ens_bar,
+                                                           years = year,
+                                                           skip = skip,
+                                                           twosided = TRUE),
+       by = .(grid_id, month)]
+    
+  }
+  
+  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
+  
+  if(saveorgo){
+    save(dt, file = paste0(save_dir,file_name))
+  } else {
+    return(dt)
+  }
+  
+}
+
 

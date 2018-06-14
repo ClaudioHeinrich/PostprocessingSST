@@ -40,7 +40,7 @@ geostationary_training = function (dt = NULL,
                                    saveorgo = TRUE,
                                    save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
                                    file_name = "variogram_exp_m",
-                                   nintv = 100,
+                                   nintv = 50,
                                    truncate = TRUE){
 
   

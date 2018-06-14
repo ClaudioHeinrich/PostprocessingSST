@@ -22,7 +22,7 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
   
   breaks = c(breaks,zlim[2])
   
-  image.plot(x,y,z,zlim = zlim, col = col, breaks = breaks,...) 
+  fields::image.plot(x,y,z,zlim = zlim, col = col, breaks = breaks, font.main = 2,...) 
 }
 
 
@@ -36,6 +36,7 @@ image.plot.na <- function(x,y,z,zlim,  col, na.color='gray', breaks, ...)
 #' @param save_dir,file_name Directory and file name for saving the plot, only used if save_pdf = TRUE (string).
 #' @param lons,lats Vectors with two entries containing min and max longitude and latitude for plotting rectangle.
 #'             If NULL, the entire globe is used.
+#' @param xlab,ylab labeling of the plot.
 #' @param rr Range of the plot, if not specified the range of value is used.
 #' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
 #' @param col_scheme Either of "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
@@ -59,9 +60,10 @@ plot_diagnostic = function( dt,
                             save_pdf = FALSE,
                             save_dir = "./figures/",
                             file_name = "diag_plot",
-                            lons = NULL,
-                            lats = NULL,
+                            lons = NULL, lats = NULL,
+                            xlab = NULL, ylab = NULL,
                             rr = NULL,
+                            cex = 1,
                             set_white = NULL,
                             col_scheme = "bwr",
                             stretch_par = NULL)
@@ -110,7 +112,7 @@ plot_diagnostic = function( dt,
   
   if(col_scheme == "bwr"){
     if(is.null(set_white)){
-    color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
+    color <- fields::designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
     }else{
        zero.ind = min(which(brk > set_white))/length(brk)
        color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
@@ -120,7 +122,7 @@ plot_diagnostic = function( dt,
     color <- designer.colors(n=length(brk)-1, col = c("white","darkred"))
   }
   if(col_scheme == "wb"){
-    color <- designer.colors(n=length(brk)-1, col = c("white","blue"))
+    color <- fields::designer.colors(n=length(brk)-1, col = c("white","blue"))
   }
     
   #--- plotting ---
@@ -129,20 +131,31 @@ plot_diagnostic = function( dt,
   
   if(save_pdf) pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
   
+  if(is.null(xlab))
+  {
+    xlab = "Longitude"
+  }
+  
+  if(is.null(ylab))
+  {
+    ylab = "Latitude"
+  }
+  
+  
   image.plot.na(Lons,Lats,A,
-                  xlab="Longitude",ylab="Latitude",
+                  xlab=xlab,ylab=ylab,
                   zlim=rr,
                   xlim = range(Lons),
                   ylim = range(Lats),
                   breaks=brk,
                   col=color,
                   main = mn,
-                  cex.main=1.8,cex.lab=1.4,
+                  cex.main=cex,cex.lab=1.4,
                   cex.axis=1,
                   axis.args=list(cex.axis=1,
                                at = brk.at,
                                label = brk.lab))
-      map("world", add = TRUE)
+      maps::map("world", add = TRUE)
   
   if(save_pdf) dev.off()
   
@@ -447,7 +460,7 @@ plot_system = function(   type = "res",
              axis.args=list(cex.axis=1,
                             at = brk.at,
                             label = brk.lab))
-  map("world", add = TRUE)
+  maps::map("world", add = TRUE)
   if(print_figs ) dev.off()
   
   if(png_out){
@@ -466,7 +479,7 @@ plot_system = function(   type = "res",
                  axis.args=list(cex.axis=1,
                                 at = brk.at,
                                 label = brk.lab))
-      map("world", add = TRUE)
+      maps::map("world", add = TRUE)
       dev.off()
     }
   }

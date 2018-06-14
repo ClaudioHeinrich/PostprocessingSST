@@ -478,7 +478,7 @@ var_sc_PCA_old = function(m, y, dt,
     {
       print(paste0("d = ",d))
       mar_cor = PCA_DT[,eval(parse(text = paste0("marSDcf",d)))]
-      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)] / sqrt(ens_size)
+      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)] 
       diff_var[[list_page]] =  rowSums((temp[id_1]-temp[id_2])^2)
       list_page = list_page + 1
     }  

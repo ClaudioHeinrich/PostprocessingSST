@@ -33,7 +33,11 @@ for_res_cov = function(dt = NULL,
     dt = load_combined_wide(var = TRUE)
   }
   
-  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt = dt[-land_ids,]
+  }
   
   for(mon in M){
     print(paste0("month =",mon))  
@@ -94,7 +98,11 @@ for_res_cov_wrtm = function(dt = NULL,
     dt = load_combined_wide(var = TRUE)
   }
   
-  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt = dt[-land_ids,]
+  }
   
   for(mon in M){
     print(paste0("month =",mon))  
