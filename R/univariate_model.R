@@ -68,14 +68,12 @@ exp_mov_av = function( a,vec, years, skip = 0,twosided = FALSE){
   
   all_years = min(years):max(years)
   
-  
+  exp_weights = exp(-a * (1:length(all_years)))
   
   ema = rep(0,lv)
   
   if(!twosided)
   {
-    exp_weights = exp(-a * (1:length(all_years)))
-    
     for (i in (skip + 2):lv){
       weight_vec = rev(exp_weights[which(all_years %in% years[1:(i-1-skip)])])
       weight_vec = weight_vec/sum(weight_vec)
@@ -306,6 +304,109 @@ bias_correct = function(dt = NULL,
 }
 
 
+bias_correct_new = function(dt = NULL,
+                            training_years = 2001:2010,
+                            saveorgo = TRUE,
+                            save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                            file_name = "dt_combine_wide_bias.RData",
+                            skip = 0){
+  
+  if(is.null(dt)) dt = load_combined_wide(bias = FALSE) 
+  
+  if(method == "sma"){
+    dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
+                                      vec = SST_bar - Ens_bar, 
+                                      years = year,
+                                      skip = skip),
+            by = .(grid_id, month)]
+  }
+  if (method == "ema"){
+    dt = dt[,"Bias_Est" := exp_mov_av(a = par_1,
+                                      vec = SST_bar - Ens_bar,
+                                      years = year,
+                                      skip = skip),
+            by = .(grid_id, month)]
+  }
+  
+  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
+  
+  if(saveorgo){
+    save(dt, file = paste0(save_dir,file_name))
+  }
+  
+  if(scores){
+    mean_sc = global_mean_scores(dt, eval_years = eval_years, var = FALSE)
+    return(mean_sc)
+  } else return(dt)
+  
+}
+
+#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR).
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param training_years,validation_years Training years and validation years.
+#' 
+#' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+bias_lr = function(DT,
+                   months = 1:12,
+                   validation_years = 2001:2010)
+{
+  
+  for(y in validation_years)
+  {
+    print(y)
+    # grouped by month
+    
+    fits_by_month = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | month,
+                                 data=DT[year < y,])
+    months = as.character(DT[,month])
+    DT[,c("a","b"):= coef(fits_by_month)[months,]]
+    DT[year == y, T_hat_lr_m := a + b * Ens_bar]
+    
+    # grouped by location
+    
+    fits_by_loc = lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+                         data=DT[year < y,])
+    
+    grid_ids = as.character(DT[,grid_id])
+    DT[,c("a","b"):= coef(fits_by_loc)[grid_ids,]]
+    DT[year == y,T_hat_lr_loc := a + b * Ens_bar]
+    
+    # by both
+    
+    DT[,m_gid := interaction(month,grid_id)]
+    fits_by_both = lmList(formula = SST_bar ~ 1 + Ens_bar | m_gid,
+                          data=DT[year < y,])
+    m_gids = as.character(DT[,m_gid])
+    DT[,c("a","b"):= coef(fits_by_both)[m_gids,]]
+    DT[year == y,T_hat_lr_both := a + b * Ens_bar]
+    
+  }
+  
+  
+  RMSE_lr_m = sqrt(DT[year %in% validation_years,mean((T_hat_lr_m-SST_bar)^2, na.rm = TRUE)])
+  RMSE_lr_loc = sqrt(DT[year %in% validation_years,mean((T_hat_lr_loc-SST_bar)^2, na.rm = TRUE)])
+  RMSE_lr_both = sqrt(DT[year %in% validation_years,mean((T_hat_lr_both-SST_bar)^2, na.rm = TRUE)])
+  
+  new_col_names = c("a","b","T_hat_lr_m","T_hat_lr_loc","T_hat_lr_both","m_gid")
+  DT[,(new_col_names) := NULL]
+  
+  RMSE_linear_models = data.table(RMSE_lr_m = RMSE_lr_m, RMSE_lr_loc = RMSE_lr_loc, RMSE_lr_both = RMSE_lr_both)
+  
+  return(RMSE_linear_models)
+  
+}
+
+
 
 #' Estimates standard deviation with a specified method to the data and saves or returns scores.
 #'
@@ -423,10 +524,9 @@ bias_correct_training = function(dt = NULL,
   
   if(saveorgo){
     save(dt, file = paste0(save_dir,file_name))
-  } else {
-    return(dt)
-  }
-  
+  } 
+    
+  return(dt)
 }
 
 

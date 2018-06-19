@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Full" 
+name_abbr = "NAO_2_new" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -158,6 +158,12 @@ DT = bias_correct_training(dt = DT,
                            save_dir = save_dir)
 
 
-######
+###### compare to linear regression models ######
+
+RMSE_linear_models = bias_lr(DT,validation_years = validation_years)
+
+RMSE_linear_models
+
+#### save ####
 
 save.image(file = paste0(save_dir,"setup.RData"))

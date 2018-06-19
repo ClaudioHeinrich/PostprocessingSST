@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Pres_Bergen" 
+name_abbr = "NAO_2_new" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -320,7 +320,7 @@ sc_ECC = sc
 print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)]))
 
 
-pdf(paste0(plot_dir,"/mean_variogram_scores_wrtm_newnew",weight_name_addition,".pdf"))
+pdf(paste0(plot_dir,"/mean_variogram_scores_wrtm",weight_name_addition,".pdf"))
   rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],mean_geostat_sc[,mean_sc],mean_geostat_sc_nmc[,mean_sc]))
   #rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]]))
   

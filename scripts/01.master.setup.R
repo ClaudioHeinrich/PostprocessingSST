@@ -20,16 +20,16 @@ library(data.table)
 # choose your favourite area for analysis and give it a name abbreviation
 
 #NAO_2:
-# lat_box = c(40,70)
-# lon_box = c(-60,-30)
+ lat_box = c(40,70)
+ lon_box = c(-60,-30)
 
 #NAO:
 # lat_box = c(30,70)
 # lon_box = c(-70,-25)
 
 #Pres_Bergen: 
- lat_box = c(50,80)
- lon_box = c(-5,30)
+# lat_box = c(50,80)
+# lon_box = c(-5,30)
 
 #Europe:
 # lat_box = c(30,70)
@@ -37,12 +37,12 @@ library(data.table)
 
 
 
-name_abbr = "Full" # for northern atlantic ocean
+name_abbr = "NAO_2_new" # for northern atlantic ocean
 
 ens_size = 9 # size of forecast ensemble
 
 validation_years = 2001:2010 # all previous years are used for training 
-months = 9
+months = 1:12
 
 
 # create directories
@@ -57,7 +57,7 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 # takes time, avoid if possible: if the data hasn't changed and you're just trying out a new window, just run this:
 
-DT = load_combined_wide()
+DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 
 #DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 

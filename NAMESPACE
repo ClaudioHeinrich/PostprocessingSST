@@ -2,6 +2,7 @@
 
 S3method(crps,na.rm)
 export(bias_correct)
+export(bias_correct_training)
 export(combine_data_wide)
 export(contruct_grid_map)
 export(dss)
