@@ -25,7 +25,7 @@ for_res_cov = function(dt = NULL,
                        M = 1:12,
                        save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                        ens_size = 9,
-                       centering = "b"){  
+                       version = "sum_of_squares"){  
   
   if(is.null(dt))
   {
@@ -39,99 +39,102 @@ for_res_cov = function(dt = NULL,
     dt = dt[-land_ids,]
   }
   
-  for(mon in M){
-    print(paste0("month =",mon))  
-    
-    dt_PCA = copy(dt[month == mon & year %in% Y,])
-    
-    dt_PCA[,paste0("Res",1:ens_size):= .SD-SST_bar,.SDcols = paste0("Ens",1:ens_size)]
-    
-    
-    if(centering == "b")
-    {
-      dt_PCA[,"center" := - Bias_Est]
-      decor_factor = 1 / sqrt( length(Y) * ens_size )
-    }
-    if(centering == "frm")
-    {
-      dt_PCA[,"center" := mean(rowSums(.SD)/ens_size),.SDcols = paste0("Res",1:9), by =.(grid_id, month)]
-      decor_factor = 1 / sqrt(length(Y) * ens_size - 1)
-    }
-    if(centering == "rmby")
-    {
-      dt_PCA[,"center" := rowSums(.SD)/ens_size,.SDcols = paste0("Res",1:9)]  
-      decor_factor = 1 / sqrt(length(Y)*(ens_size -1))
-    }
-    
-    dt_PCA[,c(paste0("Res",1:ens_size,"new")) := .SD - center, .SDcols = paste0("Res",1:9)]
-    
-    sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,.SD - center,.SDcols = paste0("Res",1:9)]))
-    
-    # sqrt_cov_mat = c()
-    # for( ens in 1:ens_size){
-    #   sqrt_cov_mat = c(sqrt_cov_mat, 
-    #                    na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens,"new")))]))
-    # }
-    # sqrt_cov_mat = matrix(sqrt_cov_mat,
-    #                       ncol = ens_size * length(Y))
-    
-    res_cov = decor_factor * matrix(sqrt_cov_mat,ncol = length(Y) * ens_size)
-    
-    save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
-    
-    rm(dt_PCA)
-  }
-}
-
-
-
-for_res_cov_wrtm = function(dt = NULL,
-                       Y = 1985:2000,
-                       M = 1:12,
-                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                       centering = "b",
-                       ens_size = 9){  
   
-  if(is.null(dt))
+  if(!(version == "aggr_by_season"))
   {
-    print("loading data")
-    dt = load_combined_wide(var = TRUE)
+    for(mon in M){
+      print(paste0("month =",mon))  
+      
+      dt_PCA = copy(dt[month == mon & year %in% Y,])
+      
+      dt_PCA[,paste0("Res",1:ens_size):= .SD-SST_bar,.SDcols = paste0("Ens",1:ens_size)]
+      
+      
+      if(version == "sum_of_squares")
+      {
+        dt_PCA[,"center" := - Bias_Est]
+        decor_factor = 1 / sqrt( length(Y) * ens_size )
+        
+        sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,.SD - center,.SDcols = paste0("Res",1:9)]))
+        res_cov = decor_factor * matrix(sqrt_cov_mat,ncol = length(Y) * ens_size)
+      }
+      if(version == "wrt_ens_mean")
+      {
+        dt_PCA[,"Res":= SST_bar - trc(Ens_bar + Bias_Est)]  
+        cor_factor = 1 / sqrt( length(Y))
+      
+        sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,Res]))
+        
+        res_cov = cor_factor * matrix(sqrt_cov_mat,ncol = length(Y) )
+      }
+      if(version == "frm")
+      {
+        dt_PCA[,"center" := mean(rowSums(.SD)/ens_size),.SDcols = paste0("Res",1:9), by =.(grid_id, month)]
+        decor_factor = 1 / sqrt(length(Y) * ens_size - 1)
+        
+        sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,.SD - center,.SDcols = paste0("Res",1:9)]))
+        res_cov = decor_factor * matrix(sqrt_cov_mat,ncol = length(Y) * ens_size)
+      }
+      if(version == "rmby")
+      {
+        dt_PCA[,"center" := rowSums(.SD)/ens_size,.SDcols = paste0("Res",1:9)]  
+        decor_factor = 1 / sqrt(length(Y)*(ens_size -1))
+      
+        sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,.SD - center,.SDcols = paste0("Res",1:9)]))  
+        res_cov = decor_factor * matrix(sqrt_cov_mat,ncol = length(Y) * ens_size)
+      }
+      if(version == "toymodel")
+      {
+        dt_PCA = copy(dt[month == mon & year %in% Y,])
+        
+        dt_PCA[,paste0("Res_mem",1:ens_size):= trc(.SD + Bias_Est)-SST_bar,.SDcols = paste0("Ens",1:ens_size)]
+      }
+      
+      
+      save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
+      
+      rm(dt_PCA)
+    }
   }
   
-  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
-  if(!identical(land_ids,integer(0)))
+  if(version == "aggr_by_season")
   {
-    dt = dt[-land_ids,]
-  }
-  
-  for(mon in M){
-    print(paste0("month =",mon))  
+    # get season fitting the month:
     
-    dt_PCA = copy(dt[month == mon & year %in% Y,])
-    
-    if(centering == "b")
+    month_to_season = function(m)
     {
+      if (m %in% 1:3) 
+      {
+        return(1:3)
+      } else if(m %in% 4:6)
+      {
+        return(4:6)
+      } else if(m %in% 7:9)
+      {
+        return(7:9)
+      } else if(m %in% 10:12)
+      {
+        return(10:12)
+      }
+    }
+  
+    for(mon in M)
+    {
+      season = month_to_season(mon)  
+    
+      dt_PCA = copy(dt[month %in% season & year %in% Y,])
+      
       dt_PCA[,"Res":= SST_bar - trc(Ens_bar + Bias_Est)]  
-      cor_factor = 1 / sqrt( length(Y))
+      cor_factor = 1 / sqrt( 3*length(Y))
+      
+      sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,Res]))
+      
+      res_cov = cor_factor * matrix(sqrt_cov_mat,ncol = 3 * length(Y) )
+      
+      save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
     }
-    
-    
-    sqrt_cov_mat = as.matrix(na.omit(dt_PCA[,Res]))
-    
-    # sqrt_cov_mat = c()
-    # for( ens in 1:ens_size){
-    #   sqrt_cov_mat = c(sqrt_cov_mat, 
-    #                    na.omit(dt_PCA[,eval(parse(text = paste0("Res",ens,"new")))]))
-    # }
-    # sqrt_cov_mat = matrix(sqrt_cov_mat,
-    #                       ncol = ens_size * length(Y))
-    
-    res_cov = cor_factor * matrix(sqrt_cov_mat,ncol = length(Y) )
-    
-    save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
-    
-    rm(dt_PCA)
   }
+  return(dim(res_cov))
 }
 
 
@@ -527,7 +530,7 @@ get_PCs = function(dt = NULL,
   {
     load(file = paste0(cov_dir,"CovRes_mon",mon,".RData"))
     
-    PCA = irlba::irlba(res_cov, nv = PCA_depth)
+    PCA = irlba::irlba(res_cov, nv = PCA_depth,fastpath = FALSE)
     
     for(y_0 in y)
     {

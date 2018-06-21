@@ -37,7 +37,7 @@ library(data.table)
 
 
 
-name_abbr = "NAO_2_new" # for northern atlantic ocean
+name_abbr = "NAO_2" # for northern atlantic ocean
 
 ens_size = 9 # size of forecast ensemble
 

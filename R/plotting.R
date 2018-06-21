@@ -115,11 +115,11 @@ plot_diagnostic = function( dt,
     color <- fields::designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
     }else{
        zero.ind = min(which(brk > set_white))/length(brk)
-       color <- designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
+       color <- fields::designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
     }
   }
   if(col_scheme == "wr"){
-    color <- designer.colors(n=length(brk)-1, col = c("white","darkred"))
+    color <- fields::designer.colors(n=length(brk)-1, col = c("white","darkred"))
   }
   if(col_scheme == "wb"){
     color <- fields::designer.colors(n=length(brk)-1, col = c("white","blue"))

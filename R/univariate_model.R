@@ -374,7 +374,7 @@ bias_lr = function(DT,
     
     # grouped by location
     
-    fits_by_loc = lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+    fits_by_loc = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
                          data=DT[year < y,])
     
     grid_ids = as.character(DT[,grid_id])
@@ -384,7 +384,7 @@ bias_lr = function(DT,
     # by both
     
     DT[,m_gid := interaction(month,grid_id)]
-    fits_by_both = lmList(formula = SST_bar ~ 1 + Ens_bar | m_gid,
+    fits_by_both = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | m_gid,
                           data=DT[year < y,])
     m_gids = as.character(DT[,m_gid])
     DT[,c("a","b"):= coef(fits_by_both)[m_gids,]]
@@ -528,5 +528,111 @@ bias_correct_training = function(dt = NULL,
     
   return(dt)
 }
+
+# Variance as in NGR
+
+var_est_NGR = function(dt,
+                       months = 1:12,
+                       validation_years = 2001:2010)
+{
+  na_loc = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
+  dt_new = dt[-na_loc,]
+  
+  #grouped by month:
+  
+  var_est_by_month = as.data.table(expand.grid(validation_years,months))
+  setnames(var_est_by_month,c("year","month"))
+  
+  
+  print("minimize CRPS for data grouped by month:")
+  for(y in validation_years)
+  {
+    print(y)
+    # grouped by month
+    for(m in months)
+    {
+      temp = dt_new[year < y & month == m,]
+      CRPS_by_month = function(cd)
+      {
+        return(mean(crps.na.rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
+      } 
+      opt_par = optim(par = c(0,1),fn = CRPS_by_month)
+      var_est_by_month[year == y & month == m, "c":= opt_par$par[1]]
+      var_est_by_month[year == y & month == m, "d":= opt_par$par[2]]
+      }
+  }
+  
+  dt = merge(dt,var_est_by_month,by = c("year","month"),all.x = TRUE)
+  dt[,SD_hat_lr_bm := c^2 + d^2*Ens_sd]
+  dt[,c("c","d"):=NULL]
+  
+  
+  #grouped by location:
+  
+  print("minimize CRPS for data grouped by location:")
+  
+  vebl_parallel = function(y)
+  { return_DT = data.table(grid_id = dt[,unique(grid_id)], year = y)
+    for(gid in dt_new[,unique(grid_id)])
+    {
+      temp = dt_new[year < y & grid_id == gid,]
+      CRPS_by_gid = function(cd)
+      {
+        return(mean(crps.na.rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
+      } 
+      opt_par = optim(par = c(0,1),fn = CRPS_by_gid)
+      return_DT[grid_id == gid, "c" := opt_par$par[1]]
+      return_DT[grid_id == gid, "d" := opt_par$par[2]]
+    }
+  return(return_DT)
+  }
+  
+  var_est_by_loc = parallel::mclapply(validation_years,vebl_parallel,mc.cores =  min(12,length(validation_years)))
+  var_est_by_loc = rbindlist(var_est_by_loc)
+  
+  dt = merge(dt,var_est_by_loc,by = c("year","grid_id"),all.x = TRUE)
+  dt[,SD_hat_lr_bl := c^2 + d^2*Ens_sd]
+  dt[,c("c","d"):=NULL]
+  
+  #grouped by both:
+  
+  print("minimize CRPS for data grouped by both:")
+  
+  vebb_parallel = function(y)
+  { return_DT = as.data.table(expand.grid(dt_new[,unique(grid_id)],months))
+    setnames(return_DT,c("grid_id","month"))
+    return_DT[,year := y]
+    
+    for(m in months)
+    {
+      temp = dt_new[year < y & month == m,]
+      
+      for(gid in dt_new[,unique(grid_id)])
+      {
+        temp_2 = temp[grid_id == gid,]
+        CRPS_by_both = function(cd)
+        {
+          return(mean(crps.na.rm(temp_2[,SST_bar], temp_2[,SST_hat], cd[1]^2 + cd[2]^2 * temp_2[,Ens_sd]), na.rm = TRUE))
+        } 
+        opt_par = optim(par = c(0,1),fn = CRPS_by_both)
+        return_DT[month == m & grid_id == gid, "c":= opt_par$par[1]]
+        return_DT[month == m & grid_id == gid, "d":= opt_par$par[2]]
+      }  
+    }
+    return(return_DT)
+  }
+  
+  var_est_by_both = parallel::mclapply(validation_years,vebb_parallel,mc.cores =  min(12,length(validation_years)))
+  var_est_by_both = rbindlist(var_est_by_both)
+  
+  dt = merge(dt,var_est_by_both,by = c("year","grid_id","month"),all.x = TRUE)
+  dt[,SD_hat_lr_bb := c^2 + d^2*Ens_sd]
+  dt[,c("c","d"):=NULL]
+
+  return(dt)
+  
+}
+
+
 
 
