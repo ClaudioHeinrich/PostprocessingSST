@@ -64,7 +64,7 @@ DT_calib[,"PIT_mc_sd" := sd(PIT_mc), by = grid_id]
 
 plot_diagnostic(DT_calib[year == min(year) & month == min(month), .(Lon,Lat,PIT_mc_mean)],
                 rr = c(0,1),set_white = 0.5,
-                mn = paste0("PIT mean for ",min(validation_years),"-",max(validation_years)),
+                mn = paste0("PIT mean"),
                 save_pdf = TRUE, save_dir = plot_dir, file_name = "PIT_mean")
 
 
@@ -72,6 +72,6 @@ unif_sd = sqrt(1/12) #standard deviation of uniform distribution
 
 plot_diagnostic(DT_calib[year == min(year) & month == min(month), .(Lon,Lat,PIT_mc_sd)],
                 rr = c(0,2*unif_sd),set_white = unif_sd,
-                mn = paste0("PIT standard deviation for ",min(validation_years),"-",max(validation_years)),
+                mn = paste0("PIT standard deviation"),
                 save_pdf = TRUE, save_dir = plot_dir, file_name = "PIT_sd")
 
