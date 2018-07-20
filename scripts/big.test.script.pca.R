@@ -18,16 +18,23 @@ library(data.table)
 
 # choose your favourite area for analysis and give it a name abbreviation
 
-#NAO_2:
+#NAO_large:
 
- lat_box = c(35,75)
- lon_box = c(-70,40)
-
-name_abbr = "NAO_large" # for northern atlantic ocean
+ # lat_box = c(35,75)
+ # lon_box = c(-70,40)
+ 
+ #south_afr:
+ 
+ lat_box = c(-50,50)
+ lon_box = c(-70,60)
+ 
+ 
+ 
+name_abbr = "NAO_2" # for northern atlantic ocean
 
 ens_size = 9 # size of forecast ensemble
 
-validation_years = 2001:2010 # all previous years are used for training 
+validation_years = 2005:2010 # all previous years are used for training 
 months = 1:12
 
 # create directories
@@ -253,6 +260,7 @@ for(i in 1:length(variance_methods))
 
 }
 
+DT[,SD := SD_hat_sv]
 
 
 ###### Compare to SD estimation in NGR fashion: #####
@@ -297,7 +305,7 @@ y_range = range(sc_sma[,2:( 1+length(variance_methods))], sc_ema[,2:( 1+length(v
 # sma plot
 
 pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
-  plot(sc_sma[,.SD,.SDcols = c("win_length",paste0("CRPS_",variance_methods[1]))],
+  plot(sc_sma[,.SD,.SDcols = c("win_length",paste0("sma_CRPS_",variance_methods[1]))],
        ylim = y_range,
        type = "l",
        col = col_vec[1],
@@ -307,7 +315,7 @@ pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
   )
   
   # highlight minimum 
-  min_loc_CRPS = which.min(sc_sma[,eval(parse(text = paste0("CRPS_",variance_methods[1])))])
+  min_loc_CRPS = which.min(sc_sma[,eval(parse(text = paste0("sma_CRPS_",variance_methods[1])))])
   points(x = sc_sma[,win_length][min_loc_CRPS],
          y = sc_sma[,2][min_loc_CRPS],
          col = col_vec[1],
@@ -316,10 +324,10 @@ pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
   
   for(i in 2:length(variance_methods))
   {
-    lines(sc_sma[,.SD,.SDcols = c("win_length",paste0("CRPS_",variance_methods[i]))],
+    lines(sc_sma[,.SD,.SDcols = c("win_length",paste0("sma_CRPS_",variance_methods[i]))],
           type = "l",col = col_vec[i]) 
     
-    min_loc_CRPS = which.min(sc_sma[,eval(parse(text = paste0("CRPS_",variance_methods[i])))])
+    min_loc_CRPS = which.min(sc_sma[,eval(parse(text = paste0("sma_CRPS_",variance_methods[i])))])
     points(x = sc_sma[,win_length][min_loc_CRPS],
            y = sc_sma[,1+i, with = FALSE][min_loc_CRPS],
            col = col_vec[i],
@@ -339,7 +347,7 @@ pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
   
   
   pdf(paste0(plot_dir,"/mean_scores_sd_ema.pdf"))
-  plot(sc_ema[,.SD,.SDcols = c("a",paste0("CRPS_",variance_methods[1]))],
+  plot(sc_ema[,.SD,.SDcols = c("a",paste0("ema_CRPS_",variance_methods[1]))],
        ylim = y_range,
        type = "l",
        col = col_vec[1],
@@ -349,7 +357,7 @@ pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
   )
   
   # highlight minimum 
-  min_loc_CRPS = which.min(sc_ema[,eval(parse(text = paste0("CRPS_",variance_methods[1])))])
+  min_loc_CRPS = which.min(sc_ema[,eval(parse(text = paste0("ema_CRPS_",variance_methods[1])))])
   points(x = sc_ema[,a][min_loc_CRPS],
          y = sc_ema[,2][min_loc_CRPS],
          col = col_vec[1],
@@ -358,10 +366,10 @@ pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
   
   for(i in 2:length(variance_methods))
   {
-    lines(sc_ema[,.SD,.SDcols = c("a",paste0("CRPS_",variance_methods[i]))],
+    lines(sc_ema[,.SD,.SDcols = c("a",paste0("ema_CRPS_",variance_methods[i]))],
           type = "l",col = col_vec[i]) 
     
-    min_loc_CRPS = which.min(sc_ema[,eval(parse(text = paste0("CRPS_",variance_methods[i])))])
+    min_loc_CRPS = which.min(sc_ema[,eval(parse(text = paste0("ema_CRPS_",variance_methods[i])))])
     points(x = sc_ema[,a][min_loc_CRPS],
            y = sc_ema[,1+i, with = FALSE][min_loc_CRPS],
            col = col_vec[i],
@@ -376,6 +384,8 @@ pdf(paste0(plot_dir,"/mean_scores_sd_sma.pdf"))
   
   dev.off()
   
+  save.image(file = paste0(save_dir,"bias.variance.modelling.RData"))
+  
   
 #########################################################
 ######## univariate rank histograms #####################
@@ -386,7 +396,7 @@ method_names = c(paste0("WMA w.r.t. ",variance_methods),paste0("NGR est. aggr. b
 
 na_loc = which(DT[,is.na(SST_bar) | is.na(Ens_bar)])  
 
-n=5000
+n=1000
 nbreaks = 20
 
 for(i in 1: length(methods_sdnames))
@@ -426,7 +436,7 @@ save.image(file = paste0(save_dir,"univariate.model.comparison.RData"))
 
 ##############################################################
 
-name_abbr = "NAO_2" # for northern atlantic ocean
+name_abbr = "south_afr" # for south of africa
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -436,11 +446,34 @@ load(file = paste0(save_dir,"univariate.model.comparison.RData"))
 ##########################################
 ##### testing different PCA versions #####
 ##########################################
+
+# get climatology
+
+DT[year %in% training_years, clim := mean(SST_bar), by = .(Lat,Lon,month)]
+
+for(y in validation_years)
+{
+  DT[year == y, clim := DT[year == min(training_years),clim]]
+}
+
+# get clim_sigma
+
+DT[year %in% training_years, clim_sigma := sd(SST_bar), by = .(Lat,Lon,month)]
+
+for(y in validation_years)
+{
+  DT[year == y, clim_sigma := DT[year == min(training_years),clim_sigma]]
+}
+
+
   
 versions = c("aggr_by_season","sum_of_squares","wrt_ens_mean")
 version_titles = c("aggr. by season","w.r.t. ensemble members","w.r.t. ensemble mean")
 version_abbrs = c("abs","ssq","scm")
   
+PCA_0_dir = paste0(save_dir,"PCA/")
+dir.create(PCA_0_dir, showWarnings = FALSE)
+
 for(ver_ind in 1:length(versions))
 {
   version = versions[ver_ind]
@@ -449,10 +482,9 @@ for(ver_ind in 1:length(versions))
  
   print(paste0("version = ",version))
    
-  PCA_dir = paste0(save_dir,"PCA/",version_abbr,"/")
+  PCA_dir = paste0(PCA_0_dir,version_abbr,"/")
   dir.create(PCA_dir, showWarnings = FALSE)
   
-  training_years = DT[!(year %in% validation_years),unique(year)]
   
   for_res_cov(Y = training_years,
               dt = DT, 
@@ -522,7 +554,7 @@ for(ver_ind in 1:length(versions))
     {
       var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
                      weighted = FALSE,
-                     file_name = paste0("var_sc_by_PC", weight_name_addition),
+                     file_name = paste0("var_sc_by_PC"),
                      marginal_correction = FALSE, 
                      cov_dir = PCA_dir, save_dir = PCA_dir)
     }
@@ -535,7 +567,7 @@ for(ver_ind in 1:length(versions))
       print(c(paste0("y = ",y),paste0("m = ",m)))
       var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
                      weighted = FALSE,
-                     file_name = paste0("var_sc_by_PC", weight_name_addition),
+                     file_name = paste0("var_sc_by_PC"),
                      cov_dir = PCA_dir, save_dir = PCA_dir)
     }
     parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
@@ -550,7 +582,7 @@ for(ver_ind in 1:length(versions))
   for(m in months){
     for(y in validation_years)
     {k=k+1
-    load(file = paste0(PCA_dir,"var_sc_by_PC",weight_name_addition,"_nmc_m",m,"_y",y,".RData"))
+    load(file = paste0(PCA_dir,"var_sc_by_PC_nmc_m",m,"_y",y,".RData"))
     scores_nmc[[k]] = scores
     }
   }
@@ -561,7 +593,7 @@ for(ver_ind in 1:length(versions))
   for(m in months){
     for(y in validation_years)
     {k=k+1
-    load(file = paste0(PCA_dir,"var_sc_by_PC",weight_name_addition,"_m",m,"_y",y,".RData"))
+    load(file = paste0(PCA_dir,"var_sc_by_PC_m",m,"_y",y,".RData"))
     scores_mc[[k]] = scores
     }
   }
@@ -577,15 +609,157 @@ for(ver_ind in 1:length(versions))
   # save
   
   save(scores_mc,scores_nmc,mean_sc,mean_sc_nmc,file = paste0(PCA_dir,"variogram_scores.RData"))
-  
+ 
 }
+
+  ###################### do the same again with standardized forecasts ###########################
+  
+  for(ver_ind in 1:length(versions))
+{
+  version = versions[ver_ind]
+  version_title = version_titles[ver_ind]
+  version_abbr = version_abbrs[ver_ind]
+ 
+  print(paste0("version = ",version))
+   
+  PCA_dir = paste0(PCA_0_dir,version_abbr,"/")
+  dir.create(PCA_dir, showWarnings = FALSE)
+  
+   for_res_cov(Y = training_years,
+              dt = DT, 
+              save_dir = PCA_dir,
+              ens_size = ens_size,
+              version = version)
+  
+  
+  
+  ### range of PCs to test ###
+  
+  
+  if(version == "aggr_by_season")
+  {
+    PCs = c(1:10,15,20)  
+  }
+  if(version == "sum_of_squares")
+  {
+    PCs = c(1:10,20,50)  
+  }
+  if(version == "wrt_ens_mean")
+  {
+    PCs = c(1:10)  
+  }
+  
+  #### variogram scores computation: ####
+  
+  
+  for(m in months)
+  { 
+    # setup: get principal components and marginal variances for the given month m:
+    
+    print(paste0("m = ",m))
+    load(file = paste0(PCA_dir,"CovRes_mon",m,".RData"))
+    PCA = irlba::irlba(res_cov, nv = max(PCs),fastpath = FALSE)
+    
+    land_ids = which(DT[year == min(year) & month == min(month),is.na(Ens_bar) | is.na(SST_bar)])
+    
+    PCA_DT = DT[year == min(year) & month == min(month),][-land_ids,.(Lon,Lat,grid_id)]
+    
+    for(d in  min(PCs):max(PCs))
+    {
+      PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
+    } 
+    
+    # also get marginal variances
+    variances = list()
+    d = min(PCs) 
+    vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+    variances[[d]] = vec^2
+    
+    if(length(PCs)>1)
+    {
+      for(d in (min(PCs)+1):max(PCs)){
+        vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+        variances[[d]] = variances[[d-1]] + vec^2
+      }
+    }
+    names(variances) = paste0("var",min(PCs):max(PCs))
+    PCA_DT = data.table(PCA_DT,rbindlist(list(variances)))    
+    
+    # now move to getting the variogram scores:
+    
+    # without marginal correction:
+    
+    dummy_fct = function(y)
+    {
+      var_sc_PCA_standardized(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
+                     weighted = FALSE,
+                     file_name = paste0("var_sc_by_PC_stan"),
+                     marginal_correction = FALSE, 
+                     cov_dir = PCA_dir, save_dir = PCA_dir)
+    }
+    parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
+    
+    # with marginal correction:
+    
+    dummy_fct = function(y)
+    {
+      print(c(paste0("y = ",y),paste0("m = ",m)))
+      var_sc_PCA_standardized(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
+                     weighted = FALSE,
+                     file_name = paste0("var_sc_by_PC_stan"),
+                     cov_dir = PCA_dir, save_dir = PCA_dir)
+    }
+    parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
+  }
+  
+  
+  
+  ###### combine: ######
+  
+  scores_stan_nmc = list()
+  k=0
+  for(m in months){
+    for(y in validation_years)
+    {k=k+1
+    load(file = paste0(PCA_dir,"var_sc_by_PC_stan_nmc_m",m,"_y",y,".RData"))
+    scores_stan_nmc[[k]] = scores
+    }
+  }
+  scores_stan_nmc = rbindlist(scores_stan_nmc)
+  
+  scores_stan_mc = list()
+  k=0
+  for(m in months){
+    for(y in validation_years)
+    {k=k+1
+    load(file = paste0(PCA_dir,"var_sc_by_PC_stan_m",m,"_y",y,".RData"))
+    scores_stan_mc[[k]] = scores
+    }
+  }
+  scores_stan_mc = rbindlist(scores_stan_mc)
+  
+  mean_sc = scores_stan_mc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
+  mean_sc = unique(mean_sc)
+  
+  
+  mean_sc_nmc = scores_stan_nmc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
+  mean_sc_nmc = unique(mean_sc_nmc)
+  
+  # save
+  
+  save(scores_stan_mc,scores_stan_nmc,mean_sc,mean_sc_nmc,file = paste0(PCA_dir,"variogram_scores_stan.RData"))
+  
+   }
+  
+  
+  
 
 ##### geostationary #####
 
 geostat_dir = paste0(save_dir, "GeoStat/")
 dir.create(geostat_dir, showWarnings = FALSE)
 
-geostationary_training(dt = DT, save_dir = geostat_dir,m = months)
+geostationary_training(dt = DT, save_dir = geostat_dir, training_years = training_years, m = months)
 
 
 for(m in months)
@@ -603,8 +777,8 @@ for(m in months)
   dummy_fct = function(y)
   {
     var_sc_geoStat_new( DT, m, y, Mod = Mod, Dist = Dist,
-                        weighted = weight_a_minute, weight_fct = weight_fct, 
-                        file_name = paste0("var_sc",weight_name_addition),
+                        weighted = FALSE,
+                        file_name = "var_sc",
                         save_dir = geostat_dir, data_dir = geostat_dir,
                         mar_var_cor = FALSE)
   }
@@ -615,8 +789,8 @@ for(m in months)
   dummy_fct = function(y)
   {
     var_sc_geoStat_new( DT,m, y, Mod = Mod, Dist = Dist,
-                        weighted = weight_a_minute, weight_fct = weight_fct, 
-                        file_name = paste0("var_sc",weight_name_addition),
+                        weighted = FALSE,
+                        file_name = "var_sc",
                         save_dir = geostat_dir, data_dir = geostat_dir,
                         mar_var_cor = TRUE)
   }
@@ -631,7 +805,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(geostat_dir,"var_sc",weight_name_addition,"_nmc_m",m,"_y",y,".RData"))
+  load(file = paste0(geostat_dir,"var_sc_nmc_m",m,"_y",y,".RData"))
   scores_geostat_nmc[[k]] = scores
   }
 }
@@ -642,7 +816,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(geostat_dir,"var_sc",weight_name_addition,"_m",m,"_y",y,".RData"))
+  load(file = paste0(geostat_dir,"var_sc_m",m,"_y",y,".RData"))
   scores_geostat_mc[[k]] = scores
   }
 }
@@ -658,11 +832,88 @@ mean_geostat_sc_nmc = unique(mean_geostat_sc_nmc)
 
 # save
 
-save(scores_geostat_mc,scores_geostat_nmc,mean_geostat_sc,mean_geostat_sc_nmc,file = paste0(geostat_dir,"variogram_scores",weight_name_addition,".RData"))
+save(scores_geostat_mc,scores_geostat_nmc,mean_geostat_sc,mean_geostat_sc_nmc,file = paste0(geostat_dir,"variogram_scores.RData"))
+
+
+##### the same for standardized variables #####
+
+for(m in months)
+{ 
+  # setup: get principal components and marginal variances for the given month m:
+  
+  print(paste0("m = ",m))
+  
+  load(paste0(geostat_dir,"variogram_exp_m",m,".RData")) 
+  
+    # variogram scores without marginal correction:
+  
+  dummy_fct = function(y)
+  {
+    var_sc_geoStat_standardized( DT, m, y, Mod = Mod, Dist = Dist,
+                        weighted = FALSE,
+                        save_dir = geostat_dir, data_dir = geostat_dir,
+                        mar_var_cor = FALSE)
+  }
+  parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
+  
+  # with marginal correction:
+  
+  dummy_fct = function(y)
+  {
+    var_sc_geoStat_standardized( DT,m, y, Mod = Mod, Dist = Dist,
+                        weighted = FALSE,
+                        save_dir = geostat_dir, data_dir = geostat_dir,
+                        mar_var_cor = TRUE)
+  }
+  parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
+}
+
+
+####### combine #########
+
+scores_stan_geostat_nmc = list()
+k=0
+for(m in months){
+  for(y in validation_years)
+  {k=k+1
+  load(file = paste0(geostat_dir,"var_sc_stan_nmc_m",m,"_y",y,".RData"))
+  scores_stan_geostat_nmc[[k]] = scores
+  }
+}
+scores_stan_geostat_nmc = rbindlist(scores_stan_geostat_nmc)
+
+scores_stan_geostat_mc = list()
+k=0
+for(m in months){
+  for(y in validation_years)
+  {k=k+1
+  load(file = paste0(geostat_dir,"var_sc_stan_m",m,"_y",y,".RData"))
+  scores_stan_geostat_mc[[k]] = scores
+  }
+}
+scores_stan_geostat_mc = rbindlist(scores_stan_geostat_mc)
+
+
+mean_geostat_sc_stan = scores_stan_geostat_mc[,mean_sc := mean(sc)][,.(mean_sc)]
+mean_geostat_sc_stan = unique(mean_geostat_sc_stan)
+
+
+mean_geostat_sc_stan_nmc = scores_stan_geostat_nmc[,mean_sc := mean(sc)][,.(mean_sc)]
+mean_geostat_sc_stan_nmc = unique(mean_geostat_sc_stan_nmc)
+
+# save
+
+save(scores_stan_geostat_mc,scores_stan_geostat_nmc,mean_geostat_sc_stan,mean_geostat_sc_stan_nmc,file = paste0(geostat_dir,"variogram_scores_stan.RData"))
 
 
 
+
+
+
+
+###############################
 ### plotting and comparison ###
+###############################
 
 for(ver_ind in 1:length(versions))
 {
@@ -716,7 +967,7 @@ abline(h = mean_geostat_sc[,mean_sc], lty = "dashed", col = adjustcolor("black")
 #abline(h = sc_ECC[,mean(sc)], lty = "dashed", col = adjustcolor("pink"))
 
 
-legend("topright",legend = c("w.r.t. ens. mem.","aggr. by season","w.r.t ens. mean","geostat"),
+legend("topright",legend = c("w.r.t. ens. mem.","w.r.t ens. mean","aggr. by season","geostat"),
        col = c("blue","darkgreen","darkred","black"),lty = c(1,1,1,2))
 # legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat","ECC"),
 #        col = c("blue","darkgreen","darkred","black","pink"),lty = c(1,1,2,2,2))
@@ -762,12 +1013,120 @@ abline(h = mean_geostat_sc[,mean_sc], lty = "dashed", col = adjustcolor("black")
 #abline(h = sc_ECC[,mean(sc)], lty = "dashed", col = adjustcolor("pink"))
 
 
-legend("topright",legend = c("w.r.t. ens. mem.","aggr. by season","w.r.t ens. mean","geostat"),
+legend("topright",legend = c("w.r.t. ens. mem.","w.r.t ens. mean","aggr. by season","geostat"),
        col = c("blue","darkgreen","darkred","black"),lty = c(1,1,1,2))
 # legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat","ECC"),
 #        col = c("blue","darkgreen","darkred","black","pink"),lty = c(1,1,2,2,2))
 dev.off()
 
+
+############# plotting standardized versions ######################
+
+### plotting and comparison ###
+
+for(ver_ind in 1:length(versions))
+{
+  version = versions[ver_ind]
+  version_title = version_titles[ver_ind]
+  version_abbr = version_abbrs[ver_ind]
+  
+  PCA_dir = paste0(save_dir,"PCA/",version_abbr,"/")
+  
+  load(file = paste0(PCA_dir,"variogram_scores_stan.RData"))
+  
+  assign(paste0("mean_sc_",version_abbr),mean_sc)
+  assign(paste0("mean_sc_nmc_",version_abbr),mean_sc_nmc)
+}
+
+
+##################################
+# plot with marginal correction: #
+##################################
+
+pdf(paste0(plot_dir,"/mean_variogram_scores_stan.pdf"))
+rr = range(c(mean_sc_abs[[2]],mean_sc_ssq[[2]],mean_sc_scm[[2]],mean_geostat_sc_stan))
+
+plot(x = mean_sc_ssq[[1]],
+     y = mean_sc_ssq[[2]],
+     ylim = rr,
+     type = "b",
+     col = "blue",
+     main = paste0("mean variogram scores"),
+     xlab = "number of principal components",
+     ylab = "mean score")
+
+#---- add minima: -----
+
+
+lines(x = mean_sc_abs[[1]],
+      y = mean_sc_abs[[2]],
+      type = "b",
+      col = "darkred")
+
+lines(x = mean_sc_scm[[1]],
+      y = mean_sc_scm[[2]],
+      type = "b",
+      col = "darkgreen")
+
+
+# --- add geostat value: ----
+
+abline(h = mean_geostat_sc_stan[,mean_sc], lty = "dashed", col = adjustcolor("black"))
+
+#abline(h = sc_ECC[,mean(sc)], lty = "dashed", col = adjustcolor("pink"))
+
+
+legend("topright",legend = c("w.r.t. ens. mem.","w.r.t ens. mean","aggr. by season","geostat"),
+       col = c("blue","darkgreen","darkred","black"),lty = c(1,1,1,2))
+# legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat","ECC"),
+#        col = c("blue","darkgreen","darkred","black","pink"),lty = c(1,1,2,2,2))
+dev.off()
+
+
+
+#####################################
+# plot without marginal correction: #
+#####################################
+
+pdf(paste0(plot_dir,"/mean_variogram_scores_stan_nmc.pdf"))
+rr = range(c(mean_sc_nmc_abs[[2]],mean_sc_nmc_ssq[[2]],mean_sc_nmc_scm[[2]],mean_geostat_sc_stan))
+
+plot(x = mean_sc_nmc_ssq[[1]],
+     y = mean_sc_nmc_ssq[[2]],
+     ylim = rr,
+     type = "b",
+     col = "blue",
+     main = paste0("mean variogram scores without mar. cor."),
+     xlab = "number of principal components",
+     ylab = "mean score")
+
+#---- add minima: -----
+
+
+lines(x = mean_sc_nmc_abs[[1]],
+      y = mean_sc_nmc_abs[[2]],
+      type = "b",
+      col = "darkred")
+
+lines(x = mean_sc_nmc_scm[[1]],
+      y = mean_sc_nmc_scm[[2]],
+      type = "b",
+      col = "darkgreen")
+
+
+# --- add geostat value: ----
+
+
+abline(h = mean_geostat_sc_stan[,mean_sc], lty = "dashed", col = adjustcolor("black"))
+
+#abline(h = sc_ECC[,mean(sc)], lty = "dashed", col = adjustcolor("pink"))
+
+
+legend("topright",legend = c("w.r.t. ens. mem.","w.r.t ens. mean","aggr. by season","geostat"),
+       col = c("blue","darkgreen","darkred","black"),lty = c(1,1,1,2))
+# legend("topright",legend = c("PCA, m.c.v.","PCA","geostat, m.c.v.","geostat","ECC"),
+#        col = c("blue","darkgreen","darkred","black","pink"),lty = c(1,1,2,2,2))
+dev.off()
 
 
 

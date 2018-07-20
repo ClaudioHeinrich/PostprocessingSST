@@ -25,7 +25,8 @@ for_res_cov = function(dt = NULL,
                        M = 1:12,
                        save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                        ens_size = 9,
-                       version = "sum_of_squares"){  
+                       version = "sum_of_squares")
+{  
   
   if(is.null(dt))
   {
@@ -42,7 +43,8 @@ for_res_cov = function(dt = NULL,
   
   if(!(version == "aggr_by_season"))
   {
-    for(mon in M){
+    for(mon in M)
+      {
       print(paste0("month =",mon))  
       
       dt_PCA = copy(dt[month == mon & year %in% Y,])
@@ -117,9 +119,8 @@ for_res_cov = function(dt = NULL,
         return(10:12)
       }
     }
-  
     for(mon in M)
-    {
+    { print(paste0("month =",mon)) 
       season = month_to_season(mon)  
     
       dt_PCA = copy(dt[month %in% season & year %in% Y,])
@@ -134,7 +135,9 @@ for_res_cov = function(dt = NULL,
       save(res_cov, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
     }
   }
+    
   return(dim(res_cov))
+  
 }
 
 

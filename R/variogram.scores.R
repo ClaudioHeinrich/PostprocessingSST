@@ -80,46 +80,17 @@ variogram_score_old = function(dt,
 #####################################################
 
 
-#' Computing variogram scores for PCA post-processing 
-#'
-#' @description  This function computes the variogram scores for
-#' the PCA post-processing method for a given month and year for a range of considered numbers of PCs.
-#'
-#' @param m,y The month and year.
-#' @param dt The data table.
-#' @param p The power for the variogram score.
-#' @param PCA,PCA_DT Optional. These objects depend only on the month, not the year. Therefore, to speed things up, they can be computed prior to running the function for a range of years.
-#' @param dvec Integer vector. Contains the numbers of principal components we want to test for.
-#' @param marginal_correction Logical. If TRUE, PCA with corrected marginal variance is considered (see paper).
-#' @param cov_dir String. The covariance directory for the PCA.
-#' @param ens_size The number of ensemble members.
-#' @param save_dir The directory to save in.
-#' @param file_name The file is saved as \code{file_name(_nmc)_m#_y##.RData}, where # is the month and ## the year and _nmc is added if no marginal correction is chosen, i.e. if marginal_correction == F.
-#' 
-#' @examples \dontrun{
-#' save_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO/"
-#' DT = load_combined_wide(data_dir = save_dir, output_name = "dt_combine_wide_bc_var.RData")
-#' var_sc_PCA(m = 1,y = 2000, dt = DT)}
-#'
-#' @author Claudio Heinrich
-#' 
-#' @export
-
-
-var_sc_PCA = function(m, y, dt,
-                      p = 0.5,
-                      PCA = NULL, PCA_DT = NULL,
-                      dvec = c(1:10,12,14,16,18,20,25,30,50,70),
-                      marginal_correction = TRUE,
-                      cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
-                      ens_size = 9,
-                      save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
-                      file_name = "var_sc_by_PC",
-                      weighted = TRUE,
-                      training_years = 1985:2000,
-                      weight_fct = NULL)
+var_sc_PCA_standardized = function(m, y, dt,
+                                   PCA = NULL, PCA_DT = NULL,
+                                   dvec = c(1:10,12,14,16,18,20,25,30,50,70),
+                                   marginal_correction = TRUE,
+                                   cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                                   ens_size = 9,
+                                   save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
+                                   file_name = "var_sc_by_PC_stan",
+                                   weighted = FALSE,
+                                   weight_fct = NULL)
 {
-  
   if(weighted)
   {
     # the weights are a function of the SST difference averaged over training_years
@@ -127,8 +98,7 @@ var_sc_PCA = function(m, y, dt,
     setnames(weight_dt,c("grid_id","mean_SST"))
   }
   
-  
-  # for computing pth moments we require the PCA data matrix, and we save it in form of a datatable:
+  # setting up:
   
   dt = dt[year %in% y & month %in% m,]
   
@@ -136,12 +106,19 @@ var_sc_PCA = function(m, y, dt,
   if(!identical(land_ids,integer(0)))
   {
     dt = dt[-land_ids,]
-    
     if(weighted)
     {
       weight_dt = weight_dt[-land_ids,]
     }
   }
+  
+  
+  trc_level = 0.01 
+  dt[clim_sigma < trc_level, clim_sigma := trc_level]
+  
+  clim = dt[,clim]
+  clim_sd = dt[,clim_sigma]
+  
   
   #get covariance matrix
   
@@ -158,11 +135,7 @@ var_sc_PCA = function(m, y, dt,
     PCA_DT = dt[,.(Lon,Lat,grid_id)]
     
     for(d in  min(dvec):max(dvec)){
-      if(d ==0) PCA_DT [,paste0("PC",d) := 0]
-      if(d>0)
-      {
       PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
-      }
     } 
     
     # also get marginal variances
@@ -180,20 +153,18 @@ var_sc_PCA = function(m, y, dt,
     }
     
     names(variances) = paste0("var",min(dvec):max(dvec))
-    PCA_DT = data.table(PCA_DT,rbindlist(list(variances)))
-    PCA_DT[,var0 := 0]
+    PCA_DT = data.table(PCA_DT,rbindlist(list(variances)))  
   }
   
   
   # marginal SD correction factor:
   SD = dt[,SD_hat]
   
+  crit_ind  = which(SD < 0.00001 | PCA_DT[,var1] < 1e-15)
   
-  
-  PCA_DT[,paste0("marSDcf",dvec) := SD/sqrt(.SD),.SDcols = paste0("var",dvec)]
+  PCA_DT[,paste0("marSDcf",dvec) := SD/(clim_sd * sqrt(.SD)),.SDcols = paste0("var",dvec)]
   
   # at critical indices we just use the SD of the PCA:
-  crit_ind  = which(SD < 0.001 | PCA_DT[,var1] < 1e-20)
   PCA_DT[crit_ind, paste0("marSDcf",dvec) := 1]
   
   
@@ -209,13 +180,13 @@ var_sc_PCA = function(m, y, dt,
   var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
   var_sc_prereq[, "key" := NULL]
   
-  
-  ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
-  ##--- for the predictive distribution with d principal components, first without marginal variance correction
+  # get pairs of indices of locations
   
   n_loc = dt_coor_1[,.N]
   id_1 = as.vector(mapply(rep,1:n_loc,times = n_loc))
   id_2 = rep(1:n_loc, times = n_loc)
+  
+  #get weights for variogram score
   
   if(weighted)
   {
@@ -223,18 +194,22 @@ var_sc_PCA = function(m, y, dt,
     {
       weight_fct = function(x)
       { y = rep(1, length(x))
-      y[abs(x)>1] = (1/x[abs(x)>1]^4)
+      y[abs(x)>1] = (1/x[abs(x)>1]^2)
       return(y)
       }
     }
     
     var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
     #normalizing:
-    var_sc_prereq[,"weights" := weights/sqrt(sum(weights^2))]
+    var_sc_prereq[,"weights" := weights/sum(weights)]
   } else {
-    var_sc_prereq[,"weights" := 1/sqrt(.N)]
+    var_sc_prereq[,"weights" := 1/.N]
   }
   
+  
+  
+  ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
+  ##--- for the predictive distribution with d principal components
   
   print("getting variances of differences:")
   
@@ -247,21 +222,21 @@ var_sc_PCA = function(m, y, dt,
     {
       print(paste0("d = ",d))
       mar_cor = PCA_DT[,eval(parse(text = paste0("marSDcf",d)))]
-      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)]
+      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)] 
       diff_var[[list_page]] =  rowSums((temp[id_1]-temp[id_2])^2)
       list_page = list_page + 1
     }  
     names(diff_var) = paste0("dvar",dvec)
     
-  } else if(!marginal_correction)
+  } else if(! marginal_correction)
   {
     d = min(dvec) 
-    vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+    vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]/clim_sd
     diff_var[[1]] = (vec[id_1]-vec[id_2])^2
     
     list_page = 2
     for(d in (min(dvec)+1):max(dvec)){
-      vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+      vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]/clim_sd
       diff_var[[list_page]] = diff_var[[list_page-1]] + (vec[id_1]-vec[id_2])^2
       list_page = list_page +1
     }
@@ -272,18 +247,11 @@ var_sc_PCA = function(m, y, dt,
   
   var_sc_prereq = data.table(var_sc_prereq,diff_var)
   
-  #complement var_sc_prereq by the suqared differences of the mean vectors and squared differences of observation:
+  #complement var_sc_prereq by the squared differences of the mean vectors and squared differences of observation:
   
-  sq_m_diff = 0
-  for(k in  1:ens_size)
-  {
-    vec = dt[,eval(parse(text = paste0("EMF",k)))]
-    sq_m_diff = sq_m_diff +(vec[id_1]-vec[id_2])^2
-  }
+  var_sc_prereq[,sq_m_diff := (dt[,(SST_hat-clim)/clim_sd][id_1]-dt[,(SST_hat-clim)/clim_sd][id_2])^2]
   
-  var_sc_prereq[,sq_m_diff := sq_m_diff/ens_size]
-  
-  var_sc_prereq[,"sq_obs_diff" := (dt[,SST_bar][id_1]-dt[,SST_bar][id_2])^2]
+  var_sc_prereq[,sq_obs_diff := (dt[,(SST_bar-clim)/clim_sd][id_1]-dt[,(SST_bar-clim)/clim_sd][id_2])^2]
   
   
   # get variogram scores
@@ -315,6 +283,7 @@ var_sc_PCA = function(m, y, dt,
   
   save(scores, file = paste0(save_dir,file_name,"_m",m,"_y",y,".RData"))
 }
+
 
 
 #' Computing variogram scores for PCA post-processing 
@@ -416,7 +385,7 @@ var_sc_PCA_old = function(m, y, dt,
   # marginal SD correction factor:
   SD = dt[,SD_hat]
   
-  crit_ind  = which(SD < 0.001 | PCA_DT[,var1] < 1e-20)
+  crit_ind  = which(SD < 0.00001 | PCA_DT[,var1] < 1e-20)
   
   PCA_DT[,paste0("marSDcf",dvec) := SD/sqrt(.SD),.SDcols = paste0("var",dvec)]
   
@@ -465,7 +434,7 @@ var_sc_PCA_old = function(m, y, dt,
   
   
   ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
-  ##--- for the predictive distribution with d principal components, first without marginal variance correction
+  ##--- for the predictive distribution with d principal components
   
     print("getting variances of differences:")
   
@@ -493,7 +462,7 @@ var_sc_PCA_old = function(m, y, dt,
     list_page = 2
     for(d in (min(dvec)+1):max(dvec)){
       vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
-      diff_var[[list_page]] = diff_var[[list_page-1]] + (vec[id_1]-vec[id_2])^2/ens_size
+      diff_var[[list_page]] = diff_var[[list_page-1]] + (vec[id_1]-vec[id_2])^2
       list_page = list_page +1
     }
     names(diff_var) = paste0("dvar",min(dvec):max(dvec))
@@ -505,9 +474,7 @@ var_sc_PCA_old = function(m, y, dt,
   
   #complement var_sc_prereq by the squared differences of the mean vectors and squared differences of observation:
   
-  vec = dt[,trc(Ens_bar + Bias_Est)]
-  
-  var_sc_prereq[,sq_m_diff := (vec[id_1]-vec[id_2])^2]
+  var_sc_prereq[,sq_m_diff := (dt[,SST_hat][id_1]-dt[,SST_hat][id_2])^2]
   
   var_sc_prereq[,sq_obs_diff := (dt[,SST_bar][id_1]-dt[,SST_bar][id_2])^2]
   
@@ -702,6 +669,149 @@ var_sc_geoStat_new = function(dt,m,y,
   dt_temp = var_sc_prereq[,.SD,.SDcols = c("sq_mean_diff","dvar","sq_obs_diff","weights")]
   scores[,sc := variogram_score_nrm_p2(dt_temp)]
     
+  if(!mar_var_cor)
+  {
+    file_name = paste0(file_name,"_nmc")
+  }
+  
+  save(scores, file = paste0(save_dir,file_name,"_m",m,"_y",y,".RData"))
+}
+
+
+
+var_sc_geoStat_standardized = function(dt,m,y,
+                              Mod = NULL,Dist = NULL,
+                              save_dir = "~/PostClimDataNoBackup/SFE/Derived/GeoStat/",
+                              file_name = "var_sc_stan",
+                              data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                              var_file_name = paste0("variogram_exp_m",m,".RData"),
+                              mar_var_cor = TRUE,
+                              weighted = FALSE,
+                              weight_fct = NULL)
+{
+  
+  if(weighted)
+  {
+    # the weights are a function of the SST difference averaged over training_years
+    weight_dt = dt[year %in% training_years & month == m,][,mean(SST_bar), by = grid_id]
+    setnames(weight_dt,c("grid_id","mean_SST"))
+  }
+  
+  
+  
+  # setting up:
+  
+  dt = dt[year %in% y & month %in% m,]
+  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt = dt[-land_ids,]
+    if(weighted)
+    {
+      weight_dt = weight_dt[-land_ids,]
+    }
+  }
+  
+  
+  dt_coor_1 = dt[YM == min(YM), .(Lat,Lon,grid_id)]
+  dt_coor_1[,grid_id_ind := match(grid_id,sort(grid_id))]
+  setkey(dt_coor_1,Lat,Lon) #ordering needs to be the same as in geostationary_training
+  setnames(dt_coor_1,c("Lat1","Lon1","grid_id1","grid_id_ind1"))
+  
+  # add dummy key, do outer full merge with a duplicate, and remove key again
+  
+  dt_coor_1[,"key" := 1]
+  dt_coor_2 = copy(dt_coor_1) 
+  setnames(dt_coor_2,c("Lat","Lon2","grid_id2","grid_id_ind2","key"))
+  var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
+  var_sc_prereq[, "key" := NULL]
+  
+  # indices for pairs of locations
+  
+  id_1 = var_sc_prereq[,grid_id_ind1]
+  id_2 = var_sc_prereq[,grid_id_ind2]
+  
+  #get weights for variogram score
+  
+  if(weighted)
+  {
+    if(is.null(weight_fct))
+    {
+      weight_fct = function(x)
+      { y = rep(1, length(x))
+      y[abs(x)>1] = (1/x[abs(x)>1]^2)
+      return(y)
+      }
+    }
+    
+    var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
+    #normalizing:
+    var_sc_prereq[,"weights" := weights/sum(weights)]
+  } else {
+    var_sc_prereq[,"weights" := 1/.N]
+  }
+  
+  # get covariance matrix
+  if(is.null(Mod) | is.null(Dist))
+  {
+    load(paste0(data_dir, var_file_name))  
+  }
+  
+  psill <- Mod$psill[2]
+  range <- Mod$range[2]
+  nugget <- Mod$psill[1]
+  
+  Sigma <- psill*exp(-Dist/range)
+  sills <- diag(Sigma) + nugget
+  diag(Sigma) <- sills
+  mar_var = Sigma[1]
+  
+  
+  #correcting marginal variances and moving over to covariance matrix for the standardized variables
+  
+  trc_level = 0.01
+  dt[clim_sigma < trc_level, clim_sigma := trc_level]
+  
+  if(mar_var_cor)
+  {
+    SDs = dt[,SD_hat]/(dt[,clim_sigma]*sqrt(mar_var))
+    # crit_ind = which(dt[,SD_hat]<.001)
+    # SDs[crit_ind] = .001/sqrt(mar_var)
+    D = diag(SDs)
+    Sigma = D %*% Sigma %*% D
+  }
+  
+  if(!mar_var_cor)
+  {
+    SDs = 1/(dt[,clim_sigma])
+    D = diag(SDs)
+    Sigma = D %*% Sigma %*% D
+  }
+  
+  #finding variance and covariance locations in Sigma:
+  n_loc = dim(Sigma)[1]
+  var_id_1 = id_1 + (id_1-1)*n_loc
+  var_id_2 = id_2 + (id_2-1)*n_loc
+  cov_id = id_1 + (id_2 - 1)*n_loc
+  
+  #getting variances for differences:
+  var_sc_prereq[,dvar := Sigma[var_id_1] + Sigma[var_id_2] - 2* Sigma[cov_id]] 
+  
+  
+  #complement var_sc_prereq by the squared differences of the mean vectors and squared differences of observation:
+  
+  var_sc_prereq[,sq_mean_diff := (dt[,(SST_hat-clim)/clim_sigma][id_1]-dt[,(SST_hat-clim)/clim_sigma][id_2])^2]
+  
+  var_sc_prereq[,sq_obs_diff := (dt[,(SST_bar-clim)/clim_sigma][id_1]-dt[,(SST_bar-clim)/clim_sigma][id_2])^2]
+  
+  # get variogram scores
+  
+  scores =  data.table(year = y, month = m)
+  
+  dt_temp = var_sc_prereq[,.SD,.SDcols = c("sq_mean_diff","dvar","sq_obs_diff","weights")]
+  scores[,sc := variogram_score_nrm_p2(dt_temp)]
+  
   if(!mar_var_cor)
   {
     file_name = paste0(file_name,"_nmc")

@@ -34,7 +34,7 @@
 
 
 geostationary_training = function (dt = NULL,
-                                   training_years = 1986:2000,
+                                   training_years = 1985:2000,
                                    m = 1:12,
                                    ens_size = 9,
                                    saveorgo = TRUE,
@@ -60,7 +60,7 @@ geostationary_training = function (dt = NULL,
   for(mon in m){
     print(paste0("month = ",mon))
     
-    DT = dt[month == mon,]
+    DT = dt[month == mon & year %in% training_years,]
     
     land_ids <- which(DT[, is.na(Ens_bar) | is.na(SST_bar)])
     if(!identical(land_ids,integer(0)))

@@ -27,7 +27,7 @@ cex = 1.1
 
 training_years = 1985:2000
 
-ex_years = 2001:2005
+ex_years = 2001
 
 
 # SST residuals
@@ -191,9 +191,12 @@ comparison_dt = data.table(prin_comp_ssq_dt[,1:6],comparison_dt)
 rr = c(-max(abs(range(comparison_dt[,.SD,.SDcols = paste0("PC",1:PCs)], na.rm = TRUE))),max(abs(range(comparison_dt[,.SD,.SDcols = paste0("PC",1:PCs)], na.rm = TRUE))))
 for(i in 1:PCs)
 {
-  plot_diagnostic(comparison_dt[year == 2005 & month == 9,.(Lon,Lat,eval(parse(text = paste0("PC",i))))],
+  plot_diagnostic(comparison_dt[year == 2002 & month == 9,.(Lon,Lat,eval(parse(text = paste0("PC",i))))],
                   rr = rr,
                   set_white = 0,
-                  mn = paste0("difference of PC ",i))  
+                  mn = paste0("difference of PC ",i),
+                  save_pdf = TRUE,
+                  save_dir = ex_plot_dir,
+                  file_name = paste0("diff_PC",i))  
 }
 

@@ -1,8 +1,9 @@
-## This produces the plots for the PIT marginal stuff
+## This produces the plots for the marginal PIT marginal stuff
 
 rm(list = ls())
 
-library(SeasonalForecasting)
+library(PostProcessing)
+library(data.table)
 setwd("~/NR/SFE")
 
 # Check marginal calibration of PCA ---
