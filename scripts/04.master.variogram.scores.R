@@ -70,10 +70,9 @@ training_years = DT[!(year %in% validation_years),unique(year)]
 for_res_cov(Y = training_years,
             dt = DT, 
             save_dir = PCA_dir,
-            ens_size = ens_size,
-            centering = "b")
+            ens_size = ens_size)
 
-PCs = c(1:10,15,20,30,50,70) # range of PCs to test
+PCs = c(1:10,15,20,30,50) # range of PCs to test
 
 
 

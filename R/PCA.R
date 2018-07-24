@@ -430,7 +430,7 @@ forecast_PCA_new = function(dt = NULL,
           var_correct_vec = fc[year == y_0,][month == mon,SD_hat] / mar_sds
           var_correct_vec[crit_ind] = 1
           var_correct = diag(var_correct_vec)
-          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n) / sqrt(ens_size)
+          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n) 
         }
             
         no <- rbind(no, a)
@@ -571,6 +571,114 @@ get_PCs = function(dt = NULL,
     save(fc, file = paste0(save_dir,file_name))
   }
   
+  return(fc)
+}
+
+
+forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x){ return(1/sqrt(x+1))},
+                                ens_size = 9,
+                               saveorgo = TRUE, save_dir = "./Data/PostClim/SFE/Derived/PCA/", file_name = "forecastPCA",
+                               cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                               truncate = TRUE) {
+  
+  
+  #find land grid ids:
+  
+  land_grid_id <- dt[year %in% y & month %in% m & (is.na(Ens_bar) | is.na(SST_bar)),
+                     .(Lon,Lat,grid_id,month,year,YM)]
+  SD_cols = c("Lon","Lat","grid_id","month","year","YM",
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
+  fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
+  
+  
+  #get covariance matrices
+  
+  print("data preparation complete - getting covariance matrices next:")
+  
+  for(mon in m){
+    load(file = paste0(cov_dir,"CovRes_mon",mon,".RData"))
+    
+    assign(paste0("A",mon),
+           matrix(res_cov, nrow = dim(res_cov)[1]))
+    
+    
+    PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max(PCA_depth))
+    
+    
+    assign(paste0("PCA",mon), PCA)
+    
+  }
+  
+  
+  print("setting up PCA complete - moving to forecasting")
+  
+  
+  #----- generate noise ------------
+  
+  for (d in PCA_depth){
+    
+    print(paste0("Depth of PCA: ",d))
+    
+    no <- c()
+    
+    for(mon in m){
+      A <- eval(parse(text = paste0("A",mon)))
+      PCA <- eval(parse(text = paste0("PCA",mon)))
+      eigen_vectors <- PCA$u[,1:d]
+      sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
+      mar_sds <- sqrt(rowSums((eigen_vectors %*% sing_values)^2))
+      crit_ind  = which(mar_sds < 1e-20)
+      
+      for(y_0 in y){
+        
+        if(d == 0)  {
+          a <- matrix(0,nrow =  dim(PCA$u)[1],ncol = n)
+        }else{ 
+          var_correct_vec = fc[year == y_0,][month == mon,SD_hat] / mar_sds
+          var_correct_vec[crit_ind] = 1
+          var_correct = diag(var_correct_vec)
+          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n) 
+        }
+        
+        no <- rbind(no, a)
+      }
+      
+    }
+    
+    for(i in 1:n) {
+      
+      fc = fc[,  paste0("no",i,"PC",d):= no[,i]]
+      
+      if(ens_member){
+        ens_mem = sample.int(ens_size,1) 
+        
+        fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), .SDcols = c(paste0("Ens",ens_mem),"Bias_Est",paste0("no",i,"PC",d))]
+      }else{
+        fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), 
+              .SDcols = c("Ens_bar","Bias_Est",paste0("no",i,"PC",d))]
+      }
+      
+      if(truncate){
+        fc[, paste0("fc",i,"PC",d) := lapply(.SD,trc), .SDcols = paste0("fc",i,"PC",d) ]
+      }  
+    }
+  }
+  
+  
+  #-------- add land --------------
+  
+  fc_land <- list()
+  fc_land[[1]] = fc
+  fc_land[[2]] = land_grid_id
+  fc_land = rbindlist(fc_land, fill = TRUE)
+  fc_land = fc_land[ order(year,month,grid_id)]
+  fc = fc_land
+  
+  #-------- save -------
+  
+  if(saveorgo){ 
+    save(fc, file = paste0(save_dir,file_name,".RData"))
+  }
   return(fc)
 }
 

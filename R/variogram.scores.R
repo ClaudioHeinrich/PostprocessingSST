@@ -509,7 +509,219 @@ var_sc_PCA_old = function(m, y, dt,
   save(scores, file = paste0(save_dir,file_name,"_m",m,"_y",y,".RData"))
 }
   
- 
+
+
+####################
+
+
+
+var_sc_PCA_new = function(m, y, dt,
+                          p = 0.5, phi = function(x){ return(1/sqrt(x/100+1))},
+                          PCA = NULL, PCA_DT = NULL,
+                          dvec = c(1:10,12,14,16,18,20,25,30,50,70),
+                          marginal_correction = TRUE,
+                          cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                          ens_size = 9,
+                          save_dir = "~/PostClimDataNoBackup/SFE/Derived/PCA/",
+                          file_name = "var_sc_by_PC",
+                          weighted = FALSE,
+                          weight_fct = NULL)
+{
+  if(weighted)
+  {
+    # the weights are a function of the SST difference averaged over training_years
+    weight_dt = dt[year %in% training_years & month == m,][,mean(SST_bar), by = grid_id]
+    setnames(weight_dt,c("grid_id","mean_SST"))
+  }
+  
+  # setting up:
+  
+  dt = dt[year %in% y & month %in% m,]
+  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt = dt[-land_ids,]
+    if(weighted)
+    {
+      weight_dt = weight_dt[-land_ids,]
+    }
+  }
+  
+  # get distance matrix
+  
+  sp <- sp::SpatialPoints(cbind(x=fc[YM == min(YM), Lon],
+                                y=fc[YM == min(YM), Lat]), 
+                          proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
+  Dist <- sp::spDists(sp, longlat = TRUE)
+  
+  
+  
+  #get covariance matrix
+  
+  if(is.null(PCA))
+  {
+    load(file = paste0(cov_dir,"CovRes_mon",m,".RData"))
+    
+    PCA = irlba::irlba(res_cov, nv = max(dvec))
+  }
+  
+  
+  if(is.null(PCA_DT))
+  {
+    PCA_DT = dt[,.(Lon,Lat,grid_id)]
+    
+    for(d in  min(dvec):max(dvec)){
+      PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
+    } 
+    
+    # also get marginal variances
+    variances = list()
+    d = min(dvec) 
+    vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+    variances[[d]] = vec^2
+    
+    if(length(dvec)>1)
+    {
+      for(d in (min(dvec)+1) : max(dvec)){
+        vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+        variances[[d]] = variances[[d-1]] + vec^2
+      }  
+    }
+    
+    names(variances) = paste0("var",min(dvec):max(dvec))
+    PCA_DT = data.table(PCA_DT,rbindlist(list(variances)))  
+  }
+  
+  
+  # marginal SD correction factor:
+  SD = dt[,SD_hat]
+  
+  crit_ind  = which(SD < 0.00001 | PCA_DT[,var1] < 1e-20)
+  
+  PCA_DT[,paste0("marSDcf",dvec) := SD/sqrt(.SD),.SDcols = paste0("var",dvec)]
+  
+  # at critical indices we just use the SD of the PCA:
+  PCA_DT[crit_ind, paste0("marSDcf",dvec) := 1]
+  
+  
+  
+  # build data table that contains pairs of coordinates for all coordinates contained in dt:
+  
+  dt_coor_1 = PCA_DT[,.(Lon,Lat,grid_id)]
+  setnames(dt_coor_1,c("Lon1","Lat1","grid_id1"))
+  # add dummy key, do outer full merge with a duplicate, and remove key again:
+  dt_coor_1[,"key" := 1]
+  dt_coor_2 = copy(dt_coor_1) 
+  setnames(dt_coor_2,c("Lon2","Lat2","grid_id2","key"))
+  var_sc_prereq = merge(dt_coor_1,dt_coor_2, by = "key",allow.cartesian = TRUE)
+  var_sc_prereq[, "key" := NULL]
+  
+  # get pairs of indices of locations
+  
+  n_loc = dt_coor_1[,.N]
+  id_1 = as.vector(mapply(rep,1:n_loc,times = n_loc))
+  id_2 = rep(1:n_loc, times = n_loc)
+  
+  #get weights for variogram score
+  
+  if(weighted)
+  {
+    if(is.null(weight_fct))
+    {
+      weight_fct = function(x)
+      { y = rep(1, length(x))
+      y[abs(x)>1] = (1/x[abs(x)>1]^2)
+      return(y)
+      }
+    }
+    
+    var_sc_prereq[,"weights" := weight_fct(weight_dt[,mean_SST][id_1] - weight_dt[,mean_SST][id_2])]
+    #normalizing:
+    var_sc_prereq[,"weights" := weights/sum(weights)]
+  } else {
+    var_sc_prereq[,"weights" := 1/.N]
+  }
+  
+  
+  
+  ##--- For each pair of coordinates (i,j) compute the variance of X_i-X_j 
+  ##--- for the predictive distribution with d principal components
+  
+  print("getting variances of differences:")
+  
+  diff_var = list()
+  
+  if(marginal_correction)
+  {
+    list_page = 1
+    for(d in dvec)
+    {
+      print(paste0("d = ",d))
+      mar_cor = PCA_DT[,eval(parse(text = paste0("marSDcf",d)))]
+      temp = mar_cor * PCA_DT[,.SD,.SDcols = paste0("PC",1:d)] 
+      diff_var[[list_page]] =  rowSums((temp[id_1]-temp[id_2])^2)
+      list_page = list_page + 1
+    }  
+    names(diff_var) = paste0("dvar",dvec)
+    
+  } else if(!marginal_correction)
+  {
+    d = min(dvec) 
+    vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+    diff_var[[1]] = (vec[id_1]-vec[id_2])^2/ens_size
+    
+    list_page = 2
+    for(d in (min(dvec)+1):max(dvec)){
+      vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
+      diff_var[[list_page]] = diff_var[[list_page-1]] + (vec[id_1]-vec[id_2])^2
+      list_page = list_page +1
+    }
+    names(diff_var) = paste0("dvar",min(dvec):max(dvec))
+  }
+  
+  diff_var = rbindlist(list(diff_var))
+  
+  var_sc_prereq = data.table(var_sc_prereq,diff_var)
+  
+  #complement var_sc_prereq by the squared differences of the mean vectors and squared differences of observation:
+  
+  var_sc_prereq[,sq_m_diff := (dt[,SST_hat][id_1]-dt[,SST_hat][id_2])^2]
+  
+  var_sc_prereq[,sq_obs_diff := (dt[,SST_bar][id_1]-dt[,SST_bar][id_2])^2]
+  
+  
+  # get variogram scores
+  print("done - compute variogram scores:")
+  scores = list()
+  
+  #var_sc_by_PC = function(d){
+  list_page = 1
+  
+  for(d in dvec){
+    print(paste0("d = ",d))
+    return_data =  data.table(year = y, d = d)
+    
+    dt_temp = var_sc_prereq[,.SD,.SDcols = c("sq_m_diff",paste0("dvar",d),"sq_obs_diff","weights")]
+    setnames(dt_temp,c("sq_mean_diff", "dvar", "sq_obs_diff","weights"))
+    return_data[,sc := variogram_score_nrm_p2(dt_temp)]
+    
+    
+    scores[[list_page]] = return_data[,month := m]  
+    list_page = list_page +1
+  }
+  
+  scores = rbindlist(scores)
+  
+  if(!marginal_correction)
+  {
+    file_name = paste0(file_name,"_nmc")
+  }
+  
+  save(scores, file = paste0(save_dir,file_name,"_m",m,"_y",y,".RData"))
+}
+
+
 
 
 ########################################################
