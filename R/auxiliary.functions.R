@@ -29,6 +29,8 @@ crps.na.rm = function(y, mean, sd){
 }
 
 
+#'@export
+
 GneitingWeightFct = function(x,L)
   {
     

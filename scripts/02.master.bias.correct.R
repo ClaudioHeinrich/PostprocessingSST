@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Aut_2018" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -43,7 +43,7 @@ num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
 
 sc_sma = list()
 dummy_function = function(k){
-  temp = bias_correct(dt = DT, 
+  temp = bias_correct(dt = DT[month %in% months,], 
                       method = "sma", 
                       par_1 = k,
                       scores = TRUE,
@@ -65,7 +65,7 @@ par_vec = seq(0.05,0.4,length.out = 24)
 sc_ema = list()
 
 dummy_function = function(k){
-  temp = bias_correct(dt = DT, 
+  temp = bias_correct(dt = DT[month %in% months,], 
                       method = "ema",
                       par_1 = par_vec[k], 
                       scores = TRUE,
@@ -135,15 +135,11 @@ pdf(paste0(plot_dir,"mean_scores_ema.pdf"))
 dev.off()
 
 
-###### finding and applying optimal way of bias correcion ######
+###### finding and applying optimal way of bias correcion, exponential moving averages are preferred, as the parameter estimation for them typically is more stable ######
 
-if(sc_sma[,min(MSE)] < sc_ema[,min(MSE)]){
-  print(paste0("optimal bias correction uses simple moving averages with window length of ",sc_sma[,which.min(MSE)], " years, and achieves a RMSE of ",round(sc_sma[,sqrt(min(MSE))],3),
-               ". Best correction with exponential moving averages achieves a RMSE of ",round(sc_ema[,sqrt(min(MSE))],3),"."))
+if(sc_sma[,min(MSE)] < 0.9 * sc_ema[,min(MSE)]){
   opt_par = c("sma",sc_sma[,which.min(MSE)])
 } else{
-  print(paste0("optimal bias correction uses exponential moving averages with parameter a = ",round(sc_ema[,a][sc_sma[,which.min(MSE)]],3),
-               ", and achieves a RMSE of ",round(sc_ema[,sqrt(min(MSE))],3),". Best correction with simple moving averages achieves a RMSE of ",round(sc_sma[,sqrt(min(MSE))],3),"."))
   opt_par = c("ema",sc_ema[,a][sc_sma[,which.min(MSE)]])
 }
 
@@ -152,17 +148,14 @@ DT = bias_correct(dt = DT,
              par_1 = as.double(opt_par[2]),
              save_dir = save_dir)
 
+# For the training years the bias correction considers also the future
+
 DT = bias_correct_training(dt = DT,
                            method = opt_par,
                            training_years = training_years,
                            save_dir = save_dir)
 
 
-###### compare to linear regression models ######
-
-RMSE_linear_models = bias_lr(DT,validation_years = validation_years)
-
-RMSE_linear_models
 
 #### save ####
 

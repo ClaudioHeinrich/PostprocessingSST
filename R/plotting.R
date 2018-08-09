@@ -85,9 +85,13 @@ plot_diagnostic = function( dt,
     Lats = seq(lat_min,lat_max,by = 1)  
   }
   
+  Lons = sort(Lons)
+  Lats = sort(Lats)
+  
   #--- data ---
   
   dt = dt[Lat %in% Lats & Lon %in% Lons] [order(Lat,Lon)]
+  
   
   n_lon = length(Lons)
   n_lat = length(Lats)

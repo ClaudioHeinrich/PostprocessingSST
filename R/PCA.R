@@ -25,7 +25,7 @@ for_res_cov = function(dt = NULL,
                        M = 1:12,
                        save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                        ens_size = 9,
-                       version = "sum_of_squares")
+                       version = "wrt_ens_mean")
 {  
   
   if(is.null(dt))
@@ -136,8 +136,7 @@ for_res_cov = function(dt = NULL,
     }
   }
     
-  return(dim(res_cov))
-  
+ 
 }
 
 
@@ -575,8 +574,8 @@ get_PCs = function(dt = NULL,
 }
 
 
-forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x){ return(1/sqrt(x+1))},
-                                ens_size = 9,
+forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = GneitingWeightFct, L = 2500,
+                               ens_size = 9,
                                saveorgo = TRUE, save_dir = "./Data/PostClim/SFE/Derived/PCA/", file_name = "forecastPCA",
                                cov_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
                                truncate = TRUE) {
@@ -590,6 +589,16 @@ forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x
               "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
   fc <- na.omit( dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols])
   
+  # get distance and weight matrix
+  
+  sp <- sp::SpatialPoints(cbind(x=fc[YM == min(YM), Lon],
+                                y=fc[YM == min(YM), Lat]), 
+                          proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
+  Dist <- sp::spDists(sp, longlat = TRUE)
+  
+  weights = phi(Dist, L=L)
+  weight_mat = matrix(weights, nrow = dim(Dist)[1])
+
   
   #get covariance matrices
   
@@ -598,19 +607,17 @@ forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x
   for(mon in m){
     load(file = paste0(cov_dir,"CovRes_mon",mon,".RData"))
     
-    assign(paste0("A",mon),
-           matrix(res_cov, nrow = dim(res_cov)[1]))
+    Sigma_1 = res_cov %*% t(res_cov)
+    Sigma = weight_mat * Sigma_1
     
-    
-    PCA = irlba::irlba(eval(parse(text = paste0 ("A",mon))), nv = max(PCA_depth))
-    
+    PCA = irlba::irlba(Sigma, nv = max(PCA_depth))
     
     assign(paste0("PCA",mon), PCA)
-    
   }
   
   
   print("setting up PCA complete - moving to forecasting")
+  
   
   
   #----- generate noise ------------
@@ -622,7 +629,7 @@ forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x
     no <- c()
     
     for(mon in m){
-      A <- eval(parse(text = paste0("A",mon)))
+      
       PCA <- eval(parse(text = paste0("PCA",mon)))
       eigen_vectors <- PCA$u[,1:d]
       sing_values <- diag(x = PCA$d[1:d], nrow = length(PCA$d[1:d]))
@@ -637,7 +644,9 @@ forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x
           var_correct_vec = fc[year == y_0,][month == mon,SD_hat] / mar_sds
           var_correct_vec[crit_ind] = 1
           var_correct = diag(var_correct_vec)
-          a = var_correct %*% eigen_vectors  %*% sing_values %*% matrix(rnorm(d * n),nrow = d, ncol = n) 
+          cov_mat_sqrt = var_correct %*% eigen_vectors  %*% sing_values
+          
+          a = cov_mat_sqrt %*% matrix(rnorm(d*n),nrow = d) 
         }
         
         no <- rbind(no, a)
@@ -649,20 +658,16 @@ forecast_PCA_newnew = function(dt, y, m, n = 1, PCA_depth = 15, phi = function(x
       
       fc = fc[,  paste0("no",i,"PC",d):= no[,i]]
       
-      if(ens_member){
-        ens_mem = sample.int(ens_size,1) 
-        
-        fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), .SDcols = c(paste0("Ens",ens_mem),"Bias_Est",paste0("no",i,"PC",d))]
-      }else{
-        fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), 
+      fc=fc[,paste0("fc",i,"PC",d):= rowSums(.SD), 
               .SDcols = c("Ens_bar","Bias_Est",paste0("no",i,"PC",d))]
-      }
       
-      if(truncate){
+      
+      if(truncate)
+        {
         fc[, paste0("fc",i,"PC",d) := lapply(.SD,trc), .SDcols = paste0("fc",i,"PC",d) ]
-      }  
+        }  
+      }
     }
-  }
   
   
   #-------- add land --------------

@@ -4,7 +4,7 @@
 
 #######################################################################################
 
-# This script compares several multivariate post-processing models based on their variogram scores.
+# This script compares the downweigh sample covariance matrix and then PCAing it based on their variogram scores.
 #
 # 
 # Files generated:
@@ -37,17 +37,51 @@ save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 load(file = paste0(save_dir,"setup.RData"))
 
 
-####### Do you want to use a weight function for the variogram scores?
+########################################
 
-weight_a_minute = FALSE
-
-weight_fct = function(x)
-{ y = rep(1, length(x))
-y[abs(x)>1] = (1/x[abs(x)>1])
-return(y)
+for_res_cov = function(dt,
+                       weight_mat,
+                       Y = 1985:2000,
+                       M = 1:12,
+                       save_dir = "~/PostClimDataNoBackup/SFE/PCACov/",
+                       ens_size = 9,
+                       version = "wrt_ens_mean")
+{  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt = dt[-land_ids,]
+  }
+  
+  for(mon in M)
+    {
+      print(paste0("month =",mon))  
+      
+      dt_SC = copy(dt[month == mon & year %in% Y,])
+      
+      if(version == "wrt_ens_mean")
+      {
+        dt_SC[,"Res":= SST_bar - trc(Ens_bar + Bias_Est)]  
+        cor_factor = 1 / sqrt( length(Y))
+        
+        sqrt_cov_mat = as.matrix(na.omit(dt_SC[,Res]))
+        
+        res_cov_sqrt = cor_factor * matrix(sqrt_cov_mat,ncol = length(Y) )
+        
+        Sigma = res_cov_sqrt %*% t(res_cov_sqrt)
+        Sigma = weight_mat * Sigma
+        
+        
+      }
+      
+      save(Sigma, file = paste0(save_dir,"CovRes_mon",mon,".RData"))
+      
+      rm(dt_SC)
+    }
+  
 }
 
-weight_name_addition = ""  
+
 
 ###############################
 ########### PCA ###############
@@ -62,19 +96,14 @@ weight_name_addition = ""
 
 ##### setting up ######
 
-PCA_dir = paste0(save_dir,"PCA/")
+PCA_dir = paste0(save_dir,"PCA_dw/")
 dir.create(PCA_dir, showWarnings = FALSE)
 
 training_years = DT[!(year %in% validation_years),unique(year)]
 
-for_res_cov(Y = training_years,
-            dt = DT, 
-            save_dir = PCA_dir,
-            ens_size = ens_size)
 
-PCs = c(200) # range of PCs to test
-
-L = 4000
+# get weight matrix:
+L = 2000
 
 NA_rows = DT[,which(is.na(SST_bar) | is.na(SST_hat) | is.na(SD_hat))]
 
@@ -88,8 +117,18 @@ Dist <- sp::spDists(sp, longlat = TRUE)
 weights = GneitingWeightFct(Dist, L=L)
 weight_mat = matrix(weights, nrow = dim(Dist)[1])
 
+# get downweighted covariance matrices:
 
+for_res_cov(Y = training_years,
+            dt = DT, 
+            weight_mat = weight_mat,
+            save_dir = PCA_dir,
+            ens_size = ens_size,
+            version = "wrt_mean")
 
+PCs = c(10,20,30,40,50,100,150,200,250) # range of PCs to test
+
+  
 #### variogram score computation: ####
 
 
@@ -98,11 +137,8 @@ for(m in months)
    # setup: get principal components and marginal variances for the given month m:
   
     print(paste0("m = ",m))
-    load(file = paste0(PCA_dir,"CovRes_mon",m,".RData"))
+     load(file = paste0(PCA_dir,"CovRes_mon",m,".RData"))
   
-    Sigma_1 = res_cov %*% t(res_cov)
-    Sigma = weight_mat * Sigma_1
-    
     PCA = irlba::irlba(Sigma, nv = max(PCs))
     
     assign(paste0("PCA",m), PCA)
@@ -112,25 +148,27 @@ for(m in months)
     
     PCA_DT = DT[year == min(year) & month == min(month),][-land_ids,.(Lon,Lat,grid_id)]
     
-    for(d in  min(PCs):max(PCs))
+    for(d in  1:max(PCs))
     {
       PCA_DT [,paste0("PC",d) := PCA$d[d]*PCA$u[,d]]
     } 
     
+    
+    
     # also get marginal variances
     variances = list()
-    d = min(PCs) 
+    d = 1 
     vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
     variances[[d]] = vec^2
     
-    if(length(PCs)>1)
+    if(max(PCs)>1)
     {
-      for(d in (min(PCs)+1):max(PCs)){
+      for(d in 2:max(PCs)){
         vec = PCA_DT[,eval(parse(text = paste0("PC",d)))]
         variances[[d]] = variances[[d-1]] + vec^2
       }
     }
-    names(variances) = paste0("var",min(PCs):max(PCs))
+    names(variances) = paste0("var",1:max(PCs))
     PCA_DT = data.table(PCA_DT,rbindlist(list(variances)))    
   
   # now move to getting the variogram scores:
@@ -140,8 +178,7 @@ for(m in months)
   dummy_fct = function(y)
   {
     var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
-                   weighted = weight_a_minute, weight_fct = weight_fct,
-                   file_name = paste0("var_sc_by_PC", weight_name_addition),
+                   file_name = "var_sc_by_PC_dw_before",
                    marginal_correction = FALSE, 
                    cov_dir = PCA_dir, save_dir = PCA_dir)
   }
@@ -150,13 +187,12 @@ for(m in months)
   # with marginal correction:
   
   dummy_fct = function(y)
-    {
-    print(c(paste0("y = ",y),paste0("m = ",m)))
+  {
     var_sc_PCA_old(m, y, DT, PCA = PCA, PCA_DT = PCA_DT, dvec = PCs, ens_size = ens_size,
-                   weighted = weight_a_minute, weight_fct = weight_fct,
-                   file_name = paste0("var_sc_by_PC", weight_name_addition),
+                   file_name = "var_sc_by_PC_dw_before",
+                   marginal_correction = TRUE, 
                    cov_dir = PCA_dir, save_dir = PCA_dir)
-    }
+  }
   parallel::mclapply(validation_years,dummy_fct,mc.cores = length(validation_years))
 }
 
@@ -169,7 +205,7 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(PCA_dir,"var_sc_by_PC",weight_name_addition,"_nmc_m",m,"_y",y,".RData"))
+  load(file = paste0(PCA_dir,"var_sc_by_PC_dw_before_nmc_m",m,"_y",y,".RData"))
   scores_nmc[[k]] = scores
   }
 }
@@ -180,18 +216,28 @@ k=0
 for(m in months){
   for(y in validation_years)
   {k=k+1
-  load(file = paste0(PCA_dir,"var_sc_by_PC",weight_name_addition,"_m",m,"_y",y,".RData"))
+  load(file = paste0(PCA_dir,"var_sc_by_PC_dw_before_m",m,"_y",y,".RData"))
   scores_mc[[k]] = scores
   }
 }
 scores_mc = rbindlist(scores_mc)
 
-mean_sc = scores_mc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
-mean_sc = unique(mean_sc)
 
 
-mean_sc_nmc = scores_nmc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
-mean_sc_nmc = unique(mean_sc_nmc)
+
+
+pdf(file = paste0(plot_dir,"vs_by_dist_Gn_wf_PCA50_wrtm.pdf"))
+plot(score_by_dist[,.(dist,mean_sc_mc)],type = "l",
+     main = "variogram score for comp. supp. cov. fct.",
+     xlab = "Parameter L", ylab = "mean vs")
+dev.off()
+
+
+
+
+
+
+
 
 print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(mean_sc),d][1],
              " principal components with a score of ",mean_sc[,min(mean_sc)],
@@ -200,7 +246,17 @@ print(paste0("Minimal variogram score is achieved for ",mean_sc[mean_sc == min(m
 
 # save
 
+mean_sc = scores_mc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
+mean_sc = unique(mean_sc)
+
+
+mean_sc_nmc = scores_nmc[,mean_sc := mean(sc), by = d][,.(d,mean_sc)]
+mean_sc_nmc = unique(mean_sc_nmc)
+
+
 save(scores_mc,scores_nmc,mean_sc,mean_sc_nmc,file = paste0(PCA_dir,"variogram_scores",weight_name_addition,".RData"))
+
+
 
 
 #########################################
@@ -248,7 +304,7 @@ for(m in months)
   
   dummy_fct = function(y)
   {
-    var_sc_geoStat_new( DT,m, y, Mod = Mod, Dist = Dist,
+    var_sc_geoStat_newnew( DT,m, y, Mod = Mod, Dist = Dist,
                         weighted = weight_a_minute, weight_fct = weight_fct, 
                         file_name = paste0("var_sc",weight_name_addition),
                         save_dir = geostat_dir, data_dir = geostat_dir,
@@ -339,9 +395,9 @@ sc_ECC = sc
 print(paste0("variogram score for ECC is ",sc_ECC[,mean(sc)]))
 
 
-pdf(paste0(plot_dir,"/mean_variogram_scores",weight_name_addition,".pdf"))
-  rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]],mean_geostat_sc[,mean_sc],mean_geostat_sc_nmc[,mean_sc]))
-  #rr = range(c(mean_sc[[2]],mean_sc_nmc[[2]]))
+pdf(paste0(plot_dir,"/mean_variogram_scores_dw_before.pdf"))
+  rr = range(c(scores_mc[,mean(sc),by =  d][,2],scores_nmc[,mean(sc),by = d][,2],mean_geostat_sc[,mean_sc],mean_geostat_sc_nmc[,mean_sc]))
+  
   
   
   #### with marginal correction ####

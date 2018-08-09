@@ -41,7 +41,7 @@ geostationary_training = function (dt = NULL,
                                    save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
                                    file_name = "variogram_exp_m",
                                    nintv = 50,
-                                   truncate = TRUE){
+                                   truncate = FALSE){
 
   
   if(is.null(dt))
@@ -185,7 +185,7 @@ forecast_geostat = function(dt = NULL,
     }
     
     SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-                "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est")
+                "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","SD_hat")
     
     fc = dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols]
     
@@ -210,25 +210,25 @@ forecast_geostat = function(dt = NULL,
       ns <- length(sp)
       
       print(paste0("generating noise for month ",mon))
-      no <- matrix(MASS::mvrnorm(n=n*length(y), mu=rep(0,length(sp)), Sigma=Sigma), nrow = n*length(y))
-      for (year in y){
+      for (y_0 in y){
+        mcf = fc_water[year == y_0 & month == mon, SD_hat]/sqrt(Sigma[1])
+        Sigma_hat = diag(mcf) %*% Sigma %*% diag(mcf)
+        no <- matrix(MASS::mvrnorm(n=n, mu=rep(0,length(sp)), Sigma=Sigma_hat),nrow = n) # The matrix part is only important for n=1
         for (i in 1:n){
-            y_ind = which(year == y)
-            yn_ind = (y_ind - 1)*n + i
-            fc_water[year == year & month == mon, paste0("no",i):= no[yn_ind,]]
-            fc_water[year ==year & month == mon,paste0("fc",i):= trc(Ens_bar + Bias_Est) + .SD, 
+            fc_water[year == y_0 & month == mon, paste0("no",i):= no[i,]]
+            fc_water[year == y_0 & month == mon,paste0("fc",i):= trc(Ens_bar + Bias_Est) + .SD, 
                     .SDcols = paste0("no",i)]
             
         }
       }
-      
-      #add land again:
-      fc = merge(fc,fc_water, by = colnames(fc), all.x = TRUE)
-      
-      if(saveorgo){
-        save(fc,file = paste0(save_dir,file_name))
-      }
-    
     }
+    #add land again:
+    fc = merge(fc,fc_water, by = colnames(fc), all.x = TRUE)
+    
+    if(saveorgo){
+      save(fc,file = paste0(save_dir,file_name))
+    }
+  
+    
 return(fc)
 }
