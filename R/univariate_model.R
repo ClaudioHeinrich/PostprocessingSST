@@ -16,6 +16,15 @@
 
 sim_mov_av = function(l,vec, years, skip = 0, twosided = FALSE){
   
+  #take out NA values:
+  na_loc = which(is.na(vec))
+  if(!identical(na_loc,integer(0)))
+  {
+    vec = vec[-na_loc]
+    years = years[-na_loc]
+  }
+  
+  
   all_years = min(years):max(years)
   
   sma = rep(0,length(vec))
@@ -64,11 +73,20 @@ sim_mov_av = function(l,vec, years, skip = 0, twosided = FALSE){
 
 exp_mov_av = function( a,vec, years, skip = 0,twosided = FALSE){
   
+  
+  #take out NA values:
+  na_loc = which(is.na(vec))
+  if(!identical(na_loc,integer(0)))
+  {
+    vec = vec[-na_loc]
+    years = years[-na_loc]
+  }
+  
   lv = length(vec)
   
   all_years = min(years):max(years)
   
-  exp_weights = exp(-a * (1:length(all_years)))
+  exp_weights = exp(-a * (0:(length(all_years)-1)))
   
   ema = rep(0,lv)
   
@@ -261,11 +279,7 @@ return(dt)
 #' 
 #' @export
 
-bias_correct = function(dt = NULL,
-                        method = "sma", # "sma" for 'simple moving average',
-                                        # "ema" for 'exponential moving average'
-                        par_1 = 16,   # if method == sma, par_1 is the length of window for the sma
-                                      # if method == ema, par_1 is the ratio of the exp. mov. av.
+bias_correct = function(dt, method, par_1,
                         scores = FALSE,
                         eval_years = 2001:2010,
                         saveorgo = TRUE,
@@ -273,17 +287,16 @@ bias_correct = function(dt = NULL,
                         file_name = "dt_combine_wide_bias.RData",
                         skip = 0){
   
-  if(is.null(dt)) dt = load_combined_wide(bias = FALSE) 
   
   if(method == "sma"){
-    dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
+       dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
                                       vec = SST_bar - Ens_bar, 
                                       years = year,
                                       skip = skip),
                     by = .(grid_id, month)]
   }
   if (method == "ema"){
-    dt = dt[,"Bias_Est" := exp_mov_av(a = par_1,
+       dt[,"Bias_Est" := exp_mov_av(a = par_1,
                                       vec = SST_bar - Ens_bar,
                                       years = year,
                                       skip = skip),
@@ -304,42 +317,6 @@ bias_correct = function(dt = NULL,
 }
 
 
-bias_correct_new = function(dt = NULL,
-                            training_years = 2001:2010,
-                            saveorgo = TRUE,
-                            save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                            file_name = "dt_combine_wide_bias.RData",
-                            skip = 0){
-  
-  if(is.null(dt)) dt = load_combined_wide(bias = FALSE) 
-  
-  if(method == "sma"){
-    dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
-                                      vec = SST_bar - Ens_bar, 
-                                      years = year,
-                                      skip = skip),
-            by = .(grid_id, month)]
-  }
-  if (method == "ema"){
-    dt = dt[,"Bias_Est" := exp_mov_av(a = par_1,
-                                      vec = SST_bar - Ens_bar,
-                                      years = year,
-                                      skip = skip),
-            by = .(grid_id, month)]
-  }
-  
-  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
-  
-  if(saveorgo){
-    save(dt, file = paste0(save_dir,file_name))
-  }
-  
-  if(scores){
-    mean_sc = global_mean_scores(dt, eval_years = eval_years, var = FALSE)
-    return(mean_sc)
-  } else return(dt)
-  
-}
 
 #' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR).
 #' 
