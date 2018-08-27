@@ -1,5 +1,5 @@
 
-# loading the SST data for the autumn forecast in 2018 and bringing it into the standard shape
+# loading the precipitation and surface temperature data for the autumn forecast in 2018 and bringing it into the standard shape
 
 rm(list = ls())
 

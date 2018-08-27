@@ -11,7 +11,7 @@
 #' @description Estimates the variogram for the residuals assuming anexponential covariance model and saves the results.
 #' 
 #' 
-#' @param dt the data table, if NULL, it is loaded.
+#' @param dt the data table.
 #' @param training_years,m Integer vectors containing the year(s) and month(s) of the training dataset.
 #' @param ens_size Integer. Size of the NWP ensemble.
 #' @param saveorgo Logical, whether we save or not. 
@@ -24,7 +24,7 @@
 #' @examples \dontrun{ DT = load_combined_wide(data_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO", output_name = "dt_combine_NAO_wide_bc.RData") \cr
 #'                     geostationary_training(dt = DT)}
 #' 
-#' @author Claudio Heinrich        
+#' @author Claudio Heinrich, Yuan Qifen        
 #' 
 #' @importFrom spacetime STFDF
 #' @importFrom sp SpatialPoints spDists SpatialPointsDataFrame
@@ -33,23 +33,15 @@
 #' @export
 
 
-geostationary_training = function (dt = NULL,
+geostationary_training = function (dt ,
                                    training_years = 1985:2000,
                                    m = 1:12,
-                                   ens_size = 9,
-                                   saveorgo = TRUE,
-                                   save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
+                                   save_dir,
                                    file_name = "variogram_exp_m",
-                                   nintv = 50,
-                                   truncate = FALSE){
+                                   nintv = 75,
+                                   truncate = TRUE){
 
   
-  if(is.null(dt))
-  {
-    print("load and prepare data")
-    dt = load_combined_wide(bias = TRUE)
-    dt = dt[year %in% training_years & month %in% m,]
-  }
   
   Lon_min  = dt[,range(Lon)][1]
   Lon_max  = dt[,range(Lon)][2]
@@ -72,7 +64,7 @@ geostationary_training = function (dt = NULL,
                                   y=DT[YM == min(YM), Lat]), 
                             proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
     
-    # Convert YM into date
+    # function to convert YM into the right date format:
     
     time_convert = function(YM){
       M = YM %% 12
@@ -88,9 +80,7 @@ geostationary_training = function (dt = NULL,
     data = DT[,.(trc(Ens_bar+Bias_Est)-SST_bar)] 
     setnames(data,"Res")
     
-    
     stfdf = spacetime::STFDF(sp, time, data)
-    
     
     #### Calculate the empirical semi-variogram
     #### ----------------------------------------------
@@ -105,24 +95,24 @@ geostationary_training = function (dt = NULL,
     bound_id = seq(1,length(up_Dist),length.out = nintv + 1)
     boundaries <- sort_up[bound_id]
     
-    
-    
-    empVgm <- gstat::variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries,assumeRegular = TRUE, na.omit = TRUE) #"gstat"
+    empVgm <- gstat::variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries, assumeRegular = TRUE, na.omit = TRUE) 
   
     #### Fit to the Exponential semi-variogram function
     #### -------------------------------------------------- 
   
     
-    ## set the cutoff - usually at least the last 10% of the variogram fit look quite bad
+    ## set the cutoff - sometimes performance improves if up to 10% of the largest distances are ignored in the variogram fit
     if(truncate) 
     {
       cutoff_ind  = ceiling(0.9*nintv)
       cutoff = empVgm$dist[cutoff_ind]
-    }
+    } else {
+      cutoff = max(empVgm$dist)
+      }
     
   
     ## prepare empirical variograms for fitting
-    spEmpVgm <- empVgm[empVgm$dist<=cutoff,]  
+    spEmpVgm <- empVgm[empVgm$dist<=cutoff,] 
     spEmpVgm <- spEmpVgm[spEmpVgm$timelag==0,]
     sSpEmpVgm <- spEmpVgm[spEmpVgm$np!=0,] 
     spEmpVgm <- sSpEmpVgm[,1:3] 
@@ -130,36 +120,31 @@ geostationary_training = function (dt = NULL,
     spEmpVgm$dir.hor <- 0
     spEmpVgm$dir.ver <- 0
     
-    
     ## Exponential semi-variogram function with nugget, see the 1st argument. 
     ## Fixing "psill", fit "nugget" and "range", the 2nd arg.
-    ## Using fit.method = 7, the 3rd arg.
-    Mod <- gstat::fit.variogram(spEmpVgm, gstat::vgm("Exp"), fit.sills = c(T,F), fit.method = 7)
-    if(saveorgo)
-    {
-      save(sp,stfdf,Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))
-    }
+    
+    Mod <- gstat::fit.variogram(spEmpVgm, gstat::vgm("Exp"), fit.sills = c(T,T))
+    
+    save(sp,stfdf,Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))
+    
   }
 }
+
+
 
 
 #' geostationary forecasts 
 #' 
 #' @description Generates forecasts using a geostationary model with exponential covariance function for post-processing
-#'      Creates output samples, see n below, and uses ensemble members plus noise as forecast. 
+#'      
 #' 
-#' @param dt the data table, if NULL, it is loaded.
-#' @param y,m Integer vectors containing year(s) and month(s).
+#' @param dt the data table.
+#' @param Y,M Integer vectors containing year(s) and month(s).
 #' @param n Integer. Size of the desired forecast ensemble. 
-#' @param ens_size Integer. Size of the NWP ensemble.
-#' @param saveorgo Logical, whether we save or not. 
-#' @param save_dir,file_name The directory to save in and the name of the saved file.
-#' @param data_dir,var_file_names Where the fitted variograms are stored.
+#' @param var_dir,var_file_names Where the fitted variograms are stored.
 #' 
 #' @return data table containing n columns with noise and n columns with forecasts.
 #' 
-#' @examples \dontrun{ DT = load_combined_wide(data_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO", output_name = "dt_combine_NAO_wide_bc.RData") \cr
-#'                     forecast_geostat(dt = DT)}
 #' 
 #' @author Claudio Heinrich        
 #' 
@@ -167,68 +152,86 @@ geostationary_training = function (dt = NULL,
 #' 
 #' @export
 
-forecast_geostat = function(dt = NULL,
-                            n=1,
-                            y = 2001:2010,
-                            m = 1:12,
-                            ens_size = 9,
-                            saveorgo = TRUE,
-                            save_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
-                            file_name = "geostat_fc.RData",
-                            data_dir = "./Data/PostClim/SFE/Derived/GeoStat/",
-                            var_file_names = paste0("variogram_exp_m",m,".RData"))
+forecast_GS = function(dt, Y, M,
+                       n=10, 
+                       var_dir, var_file_name = "variogram_exp")
 {
-    if(is.null(dt))
-    {
-      print("load and prepare data")
-      dt = load_combined_wide(bias = TRUE)
-    }
+
+  dt = dt[year %in% Y,][month %in% M,]
+  
+  #find land grid ids:
+  
+  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
+  if(!identical(land_ids,integer(0)))
+  {
+    dt_water = dt[-land_ids,]
+  } else {
+    dt_water = dt
+  }
+  
+  SD_cols = c("Lon","Lat","grid_id","month","year","YM",
+              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
+  SD_cols = SD_cols[which(SD_cols %in% colnames(dt))]
+  
+  fc_water <- na.omit( dt_water[,.SD,.SDcols = SD_cols])
+  
+  # parallelize:
+  forecast_by_month = function(m)
+  {
+    print( paste0("Month = ",m))
     
-    SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-                "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","SD_hat")
+    load(file = paste0(var_dir,var_file_name,"_m",m,".RData"))  
     
-    fc = dt[year %in% y & month %in% m ,.SD,.SDcols = SD_cols]
+    psill <- Mod$psill[2]
+    range <- Mod$range[2]
+    nugget <- max(Mod$psill[1],0)
     
-    #take land out
-    fc_land_ids = fc[,which(is.na(Ens_bar) | is.na(SST_bar))]
-    fc_water = fc[-fc_land_ids,]
+    Sigma <- psill*exp(-Dist/range)
+    sills <- diag(Sigma) + nugget
+    diag(Sigma) <- sills
     
-    for(mon in m){
+    ns <- length(sp)
     
-      # --- get variogram ---
+    dt_month = fc_water[month == m,]
+    
+    for (y in Y)
+      {
+      # marginally correct Sigma:
+      mcf = dt_month[year == y, SD_hat]/sqrt(Sigma[1])
+      Sigma_hat = diag(mcf) %*% Sigma %*% diag(mcf)
       
-      load(paste0(data_dir,var_file_names[which(mon == m)]))
-      
-      psill <- Mod$psill[2]
-      range <- Mod$range[2]
-      nugget <- max(Mod$psill[1],0.1)
-      
-      Sigma <- psill*exp(-Dist/range)
-      sills <- diag(Sigma) + nugget
-      diag(Sigma) <- sills
-      
-      ns <- length(sp)
-      
-      print(paste0("generating noise for month ",mon))
-      for (y_0 in y){
-        mcf = fc_water[year == y_0 & month == mon, SD_hat]/sqrt(Sigma[1])
-        Sigma_hat = diag(mcf) %*% Sigma %*% diag(mcf)
-        no <- matrix(MASS::mvrnorm(n=n, mu=rep(0,length(sp)), Sigma=Sigma_hat),nrow = n) # The matrix part is only important for n=1
-        for (i in 1:n){
-            fc_water[year == y_0 & month == mon, paste0("no",i):= no[i,]]
-            fc_water[year == y_0 & month == mon,paste0("fc",i):= trc(Ens_bar + Bias_Est) + .SD, 
-                    .SDcols = paste0("no",i)]
-            
+      # generate noise:
+      no <- matrix(MASS::mvrnorm(n=n, mu=rep(0,length(sp)), Sigma=Sigma_hat),nrow = n) # (function 'matrix' is necessary in case n=1)
+      for (i in 1:n)
+        {
+        dt_month[year == y, paste0("no",i) := no[i,]]
+        dt_month[year == y, paste0("fc",i) := trc(Ens_bar + Bias_Est) + .SD, 
+                 .SDcols = paste0("no",i)]
+        
         }
       }
-    }
-    #add land again:
-    fc = merge(fc,fc_water, by = colnames(fc), all.x = TRUE)
-    
-    if(saveorgo){
-      save(fc,file = paste0(save_dir,file_name))
-    }
+    return(dt_month)
+  }
   
+  temp = parallel::mclapply(M,forecast_by_month,mc.cores = length(M))
+  fc_water = rbindlist(temp)
     
-return(fc)
-}
+  #-------- add land --------------
+  
+  if(!identical(land_ids,integer(0)))
+  {
+    fc_land = dt[land_ids,]
+    fc_land[,  paste0("no",1:n):= NA]
+    fc_land[,  paste0("fc",1:n):= NA]
+    
+    fc = rbindlist(list(fc_water,fc_land), fill = TRUE)
+  }
+  
+  # order:
+  
+  fc = fc[ order(year,month,Lon,Lat)]
+  
+  return(fc)
+}  
+      
+ 

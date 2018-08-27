@@ -23,7 +23,7 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
   point_match = NULL
   for(j in 1:dim(dt_obs_grid)[1])
   {
-    if(j %% 1e2 == 0)print(j)
+    if(j %% 1e2 == 0)print(paste0(j,"/",dim(dt_obs_grid)[1]))
     ##---------------------------------------
     a = geosphere::distHaversine(as.vector(dt_obs_grid[j,.(Lon,Lat)]),as.matrix(dt_ens_grid[,.(Lon,Lat)]))
     point_match[j] = order(a)[1]

@@ -37,14 +37,17 @@ library(data.table)
 
 
 
-name_abbr = "Aut_2018" # for northern atlantic ocean
+name_abbr = "NAO_3" # for northern atlantic ocean
+
+ lat_box = c(50,85)
+ lon_box = c(-20,40)
+
 
 ens_size = 9 # size of forecast ensemble
 
-training_years = 1985:2013
-validation_years = 2014:2016 # all previous years are used for training 
-months = 8:11
-
+training_years = 1985:2011
+validation_years = 2012:2016 # all previous years are used for training 
+months = 1:12
 
 # create directories
 
@@ -58,7 +61,14 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 # takes time, avoid if possible: if the data hasn't changed and you're just trying out a new window, just run this:
 
-DT = load_combined_wide()#[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
+DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
+
+# prep data further:
+DT = DT[month %in% months,]
+DT[,YM := 12*year + month]
+DT = DT[order(year,month,Lon,Lat)]
+
+setcolorder(DT,c("year","month",'Lon','Lat','YM','grid_id','SST_bar','Ens_bar','Ens_sd',paste0('Ens',1:ens_size)))
 
 #DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 
@@ -69,6 +79,8 @@ DT = load_combined_wide()#[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_bo
 
 
 # save everything:
+
+
 
 save.image(file = paste0(save_dir,"setup.RData"))
 

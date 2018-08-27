@@ -9,17 +9,13 @@
 #' @description Generates forecasts post-processed by ensemble copula coupling (ECC)
 #' 
 #' @param dt the data table containing bias and variance estimates.
-#' @param y,m vectors contining the years and months for the forecast, default are all years and months in dt.
+#' @param Y,M vectors contining the years and months for the forecast, default are all years and months in dt.
 #' @param ens_size Integer. Size of the NWP ensemble.
 #' @param method takes "R" or "Q". Method of ECC, see Schefzik et al. 2013.
-#' @param truncate logical, whether the forecasted temperature is truncated at freezing temperature.
-#' @param saveorgo Logical, whether we save or not. 
-#' @param save_dir,file_name The directory to save in and the name of the saved file.
 #' 
-#' @return data table containing \code{ens_size} columns that are marginally calibrated, labelled "fc"1:ens_size, and the calibrated forecast by ECC, labelled "ecc_fc"1:ens_size
+#' @return data table containing \code{ens_size} forecast columns, labelled "fc"1:ens_size, and the corresponding noise columns, defined as fc - SST_hat
 #' 
-#' @examples \dontrun{ DT = load_combined_wide(data_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO", output_name = "dt_combine_NAO_wide_bc_var.RData") \cr
-#'                     forecast_ECC(dt = DT,save_dir = "./Data/PostClim/SFE/Derived/NAO/")}
+#' @examples \dontrun{}
 #' 
 #' @author Claudio Heinrich        
 #' 
@@ -29,30 +25,24 @@
 
 
 
-forecast_ECC = function(dt,
-                        y = NULL,
-                        m = NULL,
+forecast_ECC = function(dt, Y = NULL, M = NULL,
                         ens_size = 9,
-                        method = "Q",
-                        saveorgo = TRUE,
-                        save_dir = "./Data/PostClim/SFE/Derived/ECC/",
-                        file_name = "ECC_fc.RData")
+                        method = "Q")
 {
   # prepare data table:
   
-  if(!is.null(y))
+  if(!is.null(Y))
   {
-    dt = dt[year %in% y,]
+    dt = dt[year %in% Y,]
   }
   
   
-  if(!is.null(m))
+  if(!is.null(M))
   {
-    dt = dt[month %in% m,]
+    dt = dt[month %in% M,]
   }  
   
   na_rows = dt[ ,which(is.na(Bias_Est) |  is.na(Ens_bar) | is.na(SD_hat) )]
-  
   
   
   if(!identical(na_rows,integer(0)))
@@ -87,11 +77,15 @@ forecast_ECC = function(dt,
   }
   
   
-  # get rank order of the ensemble and reorder the post-processed ensemble to mach the rank order statistic of the ensemble
+  # get rank order of the ensemble and reorder the post-processed ensemble to mach the rank order statistic of the ensemble.
+  # the following is slow, would be nice to find a faster option:
+  rks_ens = t(apply(dt_temp[,.SD,.SDcols = paste0("Ens",1:ens_size)], MARGIN = 1, rank, ties = 'random'))
+  rks_fc = t(apply(dt_temp[,.SD,.SDcols = paste0("fc",1:ens_size)], MARGIN = 1, rank, ties = 'random'))
   
-  rks_ens = dt_temp[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("Ens",1:9)]
+  #Here is a faster option that does almost the same, but unfortunately it cannot resolve ties at random:
+  #rks_ens = dt_temp[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("Ens",1:ens_size)]
+  #rks_fc = dt_temp[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("fc",1:9)]
   
-  rks_fc = dt_temp[,matrixStats::rowRanks(as.matrix(.SD)),.SDcols = paste0("fc",1:9)]
   
   fcs = as.matrix(dt_temp[,.SD,.SDcols = paste0("fc",1:ens_size)])
   
@@ -110,7 +104,9 @@ forecast_ECC = function(dt,
   }
   
   ecc_fcs = data.table(ecc_fcs)
-  setnames(ecc_fcs,paste0("ecc_fc",1:ens_size))
+  setnames(ecc_fcs,paste0("fc",1:ens_size))
+  
+  dt_temp[,paste0("fc",1:ens_size) := NULL]
   
   dt_temp = data.table(dt_temp,ecc_fcs)
   
@@ -125,11 +121,6 @@ forecast_ECC = function(dt,
     dt = dt_temp
   }
   
-  
-  if(saveorgo)
-  {
-    save(dt, file = paste0(save_dir,file_name))
-  }
   
   return(dt)
 }

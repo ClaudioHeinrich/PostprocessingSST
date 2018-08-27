@@ -6,7 +6,7 @@
 #' @param vec,years vectors of the same length, vec[i] contains the value corresponding to year years[i]
 #' @skip Integer. If skip = n > 0 the moving average skips the most recent n years. Useful if realizations in the most recent past are missing.
 #'                                    
-#' @return a vector of the same length as the input vectors. At location j it contains the average of the values contained in vec that fall into the period of the last l years (excluding the present). First entry is 0.
+#' @return a vector of the same length as the input vectors. At location j it contains the average of the values contained in vec that fall into the period of the last l years (excluding the present). First entry is 0. NAs are ignored.
 #'
 #' @author Claudio Heinrich
 #' @examples sim_mov_av(5, rnorm(10), c(1990,1993,1995:2002))
@@ -16,16 +16,15 @@
 
 sim_mov_av = function(l,vec, years, skip = 0, twosided = FALSE){
   
-  #take out NA values:
+  all_years = min(years):max(years)
+  
+  #set NAs in vec to 0 in order to ignore them
+  vec_na_rm = vec
   na_loc = which(is.na(vec))
   if(!identical(na_loc,integer(0)))
   {
-    vec = vec[-na_loc]
-    years = years[-na_loc]
+    vec_na_rm[na_loc] = 0
   }
-  
-  
-  all_years = min(years):max(years)
   
   sma = rep(0,length(vec))
   
@@ -34,26 +33,26 @@ sim_mov_av = function(l,vec, years, skip = 0, twosided = FALSE){
     for (i in 1:length(vec)){
       y=years[i]
       weight_vec = rep(0,length(vec))
-      rel_loc = (y > years) & ((y - years) <= l)
+      rel_loc = (y > years) & ((y - years) <= l) & (!is.na(vec))
       skip_loc =  y-years <= skip
       weight_vec = rel_loc & !skip_loc
       if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
-      sma[i] = sum(weight_vec*vec)
+      sma[i] = sum(weight_vec * vec_na_rm)
     }
-    return(sma)  
   } else if(twosided)
   {
     for (i in 1:length(vec)){
       y=years[i]
       weight_vec = rep(0,length(vec))
-      rel_loc = abs(years - y) <= l 
+      rel_loc = abs(years - y) <= l & (!is.na(vec))
       skip_loc = abs(years - y) <= skip
       weight_vec = rel_loc & !skip_loc
       if(TRUE %in% weight_vec) weight_vec = weight_vec/sum(weight_vec)
-      sma[i] = sum(weight_vec*vec)
+      sma[i] = sum(weight_vec * vec_na_rm)
     }
-    return(sma)
   }
+  
+  return(sma)  
 }
 
 #' computes exponentially weighted moving averages, is resistant to missing values  
@@ -73,41 +72,56 @@ sim_mov_av = function(l,vec, years, skip = 0, twosided = FALSE){
 
 exp_mov_av = function( a,vec, years, skip = 0,twosided = FALSE){
   
-  
-  #take out NA values:
-  na_loc = which(is.na(vec))
-  if(!identical(na_loc,integer(0)))
-  {
-    vec = vec[-na_loc]
-    years = years[-na_loc]
-  }
-  
   lv = length(vec)
   
   all_years = min(years):max(years)
+  
+  #set NAs in vec to 0 in order to ignore them
+  vec_na_rm = vec
+  na_loc = which(is.na(vec))
+  if(!identical(na_loc,integer(0)))
+  {
+    vec_na_rm[na_loc] = 0
+  }
   
   exp_weights = exp(-a * (0:(length(all_years)-1)))
   
   ema = rep(0,lv)
   
-  if(!twosided)
+  if(lv > 1)
   {
-    for (i in (skip + 2):lv){
-      weight_vec = rev(exp_weights[which(all_years %in% years[1:(i-1-skip)])])
-      weight_vec = weight_vec/sum(weight_vec)
-      ema[i] = sum(weight_vec*vec[1:(i-1-skip)])
-    }
-  } else if(twosided)
-  {
+    if(!twosided)
+    {
+      for (i in (skip + 2):lv){
+        weight_vec = rev(exp_weights[which(all_years %in% years[1:(i-1-skip)])])
+        #normalize
+        if(!identical(na_loc,integer(0)))
+        {
+          weight_vec = weight_vec/sum(weight_vec[-na_loc])
+        } else {
+          weight_vec = weight_vec/sum(weight_vec)
+        }
+        ema[i] = sum(weight_vec*vec_na_rm[1:(i-1-skip)])
+      }
+    } else if(twosided)
+    {
       for (i in 1:lv){
         year_dist = abs(years[1 : lv] - years[i])
-        weights = rep(0,lv)
-        weights[!(year_dist <= skip)] = exp_weights[year_dist]
-        weights = weights/sum(weights)
-        ema[i] = sum(weights*vec)
+        weight_vec = rep(0,lv)
+        weight_vec[!(year_dist <= skip)] = exp_weights[year_dist]
+        #normalize
+        if(!identical(na_loc,integer(0)))
+        {
+          weight_vec = weight_vec/sum(weight_vec[-na_loc])
+        } else {
+          weight_vec = weight_vec/sum(weight_vec)
+        }
+        ema[i] = sum(weight_vec*vec_na_rm)
+      }
     }
   }
-  return(ema)
+  
+  return(ema)  
 }
 
 
@@ -224,7 +238,7 @@ ens_sd_est = function(dt,
   if(mean_est == "bcf"){
     get_variances = function(i)
     {
-      var_setup_dt = as.data.table(dt[, (trc(.SD + Bias_Est) - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
+      var_setup_dt = as.data.table(dt[, (SST_hat - SST_bar)^2/ens_size,.SDcols = paste0("Ens",i)])
       #var_setup_dt = as.data.table(var_setup_dt)
       return(var_setup_dt)
     }
@@ -290,17 +304,17 @@ bias_correct = function(dt, method, par_1,
   
   if(method == "sma"){
        dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
-                                      vec = SST_bar - Ens_bar, 
-                                      years = year,
-                                      skip = skip),
-                    by = .(grid_id, month)]
+                                         vec = SST_bar - Ens_bar, 
+                                         years = year,
+                                         skip = skip),
+               by = .(Lon,Lat, month)]
   }
   if (method == "ema"){
        dt[,"Bias_Est" := exp_mov_av(a = par_1,
-                                      vec = SST_bar - Ens_bar,
-                                      years = year,
-                                      skip = skip),
-                    by = .(grid_id, month)]
+                                    vec = SST_bar - Ens_bar,
+                                    years = year,
+                                    skip = skip),
+          by = .(Lon,Lat, month)]
   }
   
   dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
@@ -403,7 +417,7 @@ bias_lr = function(DT,
 #' 
 #' @export
 
-sd_est = function(dt = NULL,
+sd_est = function(dt ,
                   method = "sma", # "sma" for 'simple moving average',
                         # "ema" for 'exponential moving average'
                   par_1 = 16,   # if method == sma, par_1 is the length of window for the sma
@@ -414,14 +428,9 @@ sd_est = function(dt = NULL,
                   eval_years = 2001:2010,
                   saveorgo = TRUE,
                   save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                  file_name = "dt_combine_wide_bc_var.RData"){
-  
-  if(is.null(dt)) 
-    {
-    dt = load_combined_wide(bias = TRUE)
-    }
-  
-  
+                  file_name = "dt_combine_wide_bc_var.RData")
+{
+
   if(method == "sma"){
     dt[year != min(year),"SD_hat" := sqrt(sim_mov_av(l = par_1, 
                                                      vec = var_bar, 

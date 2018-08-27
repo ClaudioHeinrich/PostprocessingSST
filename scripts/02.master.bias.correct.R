@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Aut_2018" 
+name_abbr = "NAO_3" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -43,7 +43,7 @@ num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
 
 sc_sma = list()
 dummy_function = function(k){
-  temp = bias_correct(dt = DT[month %in% months,], 
+  temp = bias_correct(dt = DT, 
                       method = "sma", 
                       par_1 = k,
                       scores = TRUE,
@@ -65,7 +65,7 @@ par_vec = seq(0.05,0.4,length.out = 24)
 sc_ema = list()
 
 dummy_function = function(k){
-  temp = bias_correct(dt = DT[month %in% months,], 
+  temp = bias_correct(dt = DT, 
                       method = "ema",
                       par_1 = par_vec[k], 
                       scores = TRUE,
@@ -144,9 +144,9 @@ if(sc_sma[,min(MSE)] < 0.9 * sc_ema[,min(MSE)]){
 }
 
 DT = bias_correct(dt = DT,
-             method = opt_par[1],
-             par_1 = as.double(opt_par[2]),
-             save_dir = save_dir)
+                  method = opt_par[1],
+                  par_1 = as.double(opt_par[2]),
+                  save_dir = save_dir)
 
 # For the training years the bias correction considers also the future
 

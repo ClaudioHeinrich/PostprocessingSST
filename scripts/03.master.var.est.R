@@ -29,7 +29,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "NAO_3" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -40,7 +40,7 @@ load(file = paste0(save_dir,"setup.RData"))
 DT = ens_sd_est(dt = DT,
                 ens_size = ens_size,
                 save_dir = save_dir,
-                mean_est = "bcf",
+                mean_est = "sv",
                 file_name = paste0("dt_combine_wide_bc_var.RData"))
 
 
@@ -50,7 +50,7 @@ num_years = DT[,range(year)][2] - DT[,range(year)][1] + 1
 
 sc_sma_var = list()
 dummy_function = function(k){
-  temp = sd_est(dt = DT, 
+  temp = sd_est(dt = DT[year > min(year) ,], 
                 method = "sma", 
                 par_1 = k,
                 scores = TRUE,
@@ -62,7 +62,7 @@ dummy_function = function(k){
 sc_sma_var = parallel::mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = 8)
 sc_sma_var = rbindlist(sc_sma_var)
 
-save(sc_sma_var, file = paste0(save_dir,"/scores.bc.sd.sma.Rdata"))
+save(sc_sma_var, file = paste0(save_dir,"scores.bc.sd.sma.Rdata"))
 
 
 ###### getting scores for exponential moving averages ######
@@ -72,7 +72,7 @@ par_vec = seq(0.01,0.4,length.out = 24)
 sc_ema_var = list()
 
 dummy_function = function(k){
-  temp = sd_est(dt = DT[year > min(year),], 
+  temp = sd_est(dt = DT[year > min(year) ,], 
                 method = "ema",
                 par_1 = par_vec[k], 
                 scores = TRUE,
@@ -84,7 +84,7 @@ dummy_function = function(k){
 sc_ema_var = parallel::mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = 8)
 sc_ema_var = rbindlist(sc_ema_var)
 
-save(sc_ema_var, file = paste0(save_dir,"/scores.bc.sd.ema.Rdata"))
+save(sc_ema_var, file = paste0(save_dir,"scores.bc.sd.ema.Rdata"))
 
 
 #### plotting CRPS for different ways of variance estimation ####
@@ -149,23 +149,18 @@ dev.off()
 # we pick exponential moving averages, since they are more stable.
 
 if(sc_sma_var[,min(CRPS)] < sc_ema_var[,min(CRPS)]){
-  print(paste0("optimal variance estimation uses simple moving average with window length of ",sc_sma_var[,which.min(CRPS)], " years, and achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),
-               ". Best estimation with exponentially weighted sample variance achieves a RMSE of ",round(sc_ema_var[,min(CRPS)],3),"."))
-  opt_par = c("sma",sc_sma_var[,which.min(CRPS)])
+  opt_par_var = c("sma",sc_sma_var[,which.min(CRPS)])
 } else{
-  print(paste0("optimal variance estimation uses exponentially weighted sample variance with parameter a = ",round(sc_ema_var[,a][sc_ema_var[,which.min(CRPS)]],3),
-               ", and achieves a CRPS of ",round(sc_ema_var[,min(CRPS)],3),". Best estimation with simple moving averages achieves a CRPS of ",round(sc_sma_var[,min(CRPS)],3),"."))
-  opt_par = c("ema",sc_ema_var[,a][sc_sma_var[,which.min(CRPS)]])
+  opt_par_var = c("ema",sc_ema_var[,a][sc_sma_var[,which.min(CRPS)]])
 }
 
 ### variance estimation ###
 
 DT = sd_est(dt = DT,
-       method = opt_par[1],
-       par_1 = as.double(opt_par[2]),
-       save_dir =save_dir,
-       file_name = paste0("dt_combine_wide_bc_var.RData")
-)
+       method = opt_par_var[1],
+       par_1 = as.double(opt_par_var[2]),
+       save_dir = save_dir,
+       file_name = paste0("dt_combine_wide_bc_var.RData"))
 
 #####
 

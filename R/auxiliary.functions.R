@@ -53,7 +53,9 @@ GneitingWeightFct = function(x,L)
 ### functions from 'Assessing the Calibration of High-Dimensional Ensemble Forecasts Using Rank Histograms'
 
 
-## Minimum spanning tree ranks 
+#' Minimum spanning tree ranks
+#' @export
+
 mst.rank <- function (x) {
   l.mst <- NULL
   for(f in 1:(dim(x)[2])) {
@@ -64,7 +66,9 @@ mst.rank <- function (x) {
   return(x.rank)
 }
 
-## Multivariate ranks 
+#' Multivariate ranks 
+#' @export
+
 mv.rank <- function(x)
 {
   d <- dim(x)
@@ -76,7 +80,8 @@ mv.rank <- function(x)
   return(x.rank)
 }
 
-## Average ranks
+#' Average ranks
+#' @export
 avg.rank <- function(x)  {
   x.ranks <- apply(x,1,rank)
   x.preranks <- apply(x.ranks,1,mean)
@@ -84,7 +89,9 @@ avg.rank <- function(x)  {
   return(x.rank)
 }
 
-## Band depth ranks
+#' Band depth ranks
+#' @export
+
 bd.rank <- function(x)
 {
   d <- dim(x)
@@ -101,8 +108,14 @@ bd.rank <- function(x)
 
 ######### rank histograms for data tables ###########
 
-# The data table should have the key variable (most commonly YM) as first column and the ranks of the observations as second
 
+
+#' rank histograms for data tables
+#' 
+#' The data table should have the key variable (most commonly YM) as first column and the ranks of the observations as second
+#' 
+#' @export
+#' 
 rhist_dt <- function(B, ens_size = 9, breaks = ens_size + 1, hist_xlab="", hist_ylab="", hist_ylim=NULL)
 {
   hist(as.vector(B[[2]]),breaks=seq(0, max(as.vector(B[[2]])), length.out = breaks), main="",xlab=hist_xlab,ylab=hist_ylab,axes=FALSE,col="gray80",border="gray60",ylim=hist_ylim)
@@ -121,7 +134,7 @@ rhist_dt <- function(B, ens_size = 9, breaks = ens_size + 1, hist_xlab="", hist_
 #' @export
 
 trc = function (x){ 
-  truncation.value = -1.769995
+  truncation.value = -1.79
   x = truncation.value * (x < truncation.value) + x * (x >= truncation.value)
   return(x)}
 
