@@ -1,4 +1,4 @@
-## score maximum, minimum and average temperature along routes
+## score maximum, minimum and average temperature along routes or collections of locations
 
 ##### setting up ######
 
@@ -10,505 +10,306 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "NAO_3" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
 
-training_years = 1985:2000
-validation_years = 2001:2010
-months = 1:12
+# specify route by getting the corresponding grid ids
+# This is done by fixing two points p1 and p2 and connecting them as the crow flies and considering the grid ids lying along this route.
+# In particular we assume no land to be between p1 and p2
 
-PCA_dir = paste0(save_dir,"PCA/")
+p1 = data.table(Lon = 5.32, Lat = 60.4, Loc = "Bergen") 
+p2 = data.table(Lon = -21.83, Lat = 64.13, Loc = "Reykyavik") 
 
-forecasts = forecast_PCA_newnew(dt = DT, y = validation_years, m = months, n = 1, PCA_depth = 10, saveorgo = FALSE, cov_dir = PCA_dir)
+route_name = "Bergen to Reykyavik"
 
-geostat_fc = forecast_geostat(dt = DT, y = validation_years, m = months, n=1, saveorgo = FALSE, data_dir = geostat_dir)
+# get grid ids_along this route: First use gcIntermediate to find n coordinates on the route from p1 to p2 as the bird flies:
 
-ECC_fc = forecast_ECC (dt = DT, y = validation_years, m = months, saveorgo = FALSE)
-                                 
+n = 500
+route = geosphere::gcIntermediate(p1[,.(Lon,Lat)],p2[,.(Lon,Lat)],n = n)
+
+# now, find the grid_ids in DT closest to the coordinates on the route:
+
+grid_id_dt = unique(DT[,.(Lon,Lat,grid_id)])
+
+point_match = NULL
+for(j in 1:dim(route)[1])
+{
+  a = geosphere::distHaversine(as.vector(route[j,]),as.matrix(grid_id_dt[,.(Lon,Lat)]))
+  point_match[j] = which.min(a)
+}
+
+dt_route = unique(grid_id_dt[point_match,])
+route_ids = dt_route[,grid_id]
+
+################
+
+# get forecasts
+
+load(paste0(PCA_dir,"fc.RData"))
+load(paste0(SE_dir,"fc.RData"))
+load(paste0(GS_dir,"fc.RData"))
+load(paste0(ECC_dir,"fc.RData"))
 
 ########################################
 
 # pick route:
 
-route_ids = unique(DT[Lat == 50.5, grid_id])
-route = "Lat = 50.5"
+DT_route = DT[grid_id %in% route_ids & year %in% validation_years,]
+PCA_fc_route = PCA_fc[grid_id %in% route_ids,]
+SE_fc_route = SE_fc[grid_id %in% route_ids,]
+GS_fc_route = GS_fc[grid_id %in% route_ids,]
+ECC_fc_route = ECC_fc[grid_id %in% route_ids,]
+
+###### score maximum along route ########
+
+# initialize data table:
+
+validation_dt_max = as.data.table(expand.grid(months,validation_years))
+setnames(validation_dt_max,c("month","year"))
+
+# get maximum of observation
+
+DT_route[,SST_max := max(SST_bar,na.rm = TRUE),by = .(month,year)]
+temp = DT_route[grid_id == min(grid_id) ,SST_max]
+validation_dt_max[,"SST_max" := temp]
+
+# get maximum of PCA forecast:
+
+for(i in 1:fc_ens_size)
+{
+  PCA_fc_route[,paste0('PCA_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
+
+PCA_max = PCA_fc_route[,.SD,.SDcols = paste0('PCA_max_',1:fc_ens_size)]
+
+PCA_fc_route[, paste0('PCA_max_',1:fc_ens_size) := NULL]
+
+validation_dt_max = data.table(validation_dt_max,PCA_max)
+
+# get maximum of SE forecast:
+
+for(i in 1:fc_ens_size)
+{
+  SE_fc_route[,paste0('SE_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
+
+SE_max = SE_fc_route[,.SD,.SDcols = paste0('SE_max_',1:fc_ens_size)]
+
+SE_fc_route[, paste0('SE_max_',1:fc_ens_size) := NULL]
+
+validation_dt_max = data.table(validation_dt_max,SE_max)
+
+# get maximum of GS forecast:
+
+for(i in 1:fc_ens_size)
+{
+  GS_fc_route[,paste0('GS_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
+
+GS_max = GS_fc_route[,.SD,.SDcols = paste0('GS_max_',1:fc_ens_size)]
+
+GS_fc_route[, paste0('GS_max_',1:fc_ens_size) := NULL]
+
+validation_dt_max = data.table(validation_dt_max,GS_max)
+
+# get maximum of ECC forecast:
+
+for(i in 1:ens_size)
+{
+  ECC_fc_route[,paste0('ECC_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
+
+ECC_max = ECC_fc_route[,.SD,.SDcols = paste0('ECC_max_',1:ens_size)]
+
+ECC_fc_route[, paste0('ECC_max_',1:ens_size) := NULL]
+
+validation_dt_max = data.table(validation_dt_max,ECC_max)
+
+###########################
 
 
-DT_route = DT[grid_id %in% route_ids,]
-fc_route = forecasts[grid_id %in% route_ids,]
-fc_gs_route = geostat_fc[grid_id %in% route_ids,]
-fc_ecc_route = ECC_fc[grid_id %in% route_ids,]
+
+RMSEs_max = data.table("route" = route_name,
+                       "RMSE_PCA" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('PCA_max_',1:fc_ens_size)]),
+                       "RMSE_SE" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('SE_max_',1:fc_ens_size)]),
+                       "RMSE_GS" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('GS_max_',1:fc_ens_size)]),
+                       "RMSE_ECC" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('ECC_max_',1:ens_size)])
+                       )
+
+
+############# RMSEs for minimum temperature along route #####################
 
 
 # initialize data table:
 
-validation_dt = as.data.table(expand.grid(months,validation_years))
-setnames(validation_dt,c("month","year"))
+validation_dt_min = as.data.table(expand.grid(months,validation_years))
+setnames(validation_dt_min,c("month","year"))
 
-# get maximum, minimum, and mean of observation:
+# get minimum of observation
 
-fc_route[,SST_max := max(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_max]
-validation_dt[,"SST_max" := temp]
+DT_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
+temp = DT_route[grid_id == min(grid_id) ,SST_min]
+validation_dt_min[,"SST_min" := temp]
 
-fc_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_min]
-validation_dt[,"SST_min" := temp]
+# get minimum of PCA forecast:
 
-fc_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_mean]
-validation_dt[,"SST_mean" := temp]
+for(i in 1:fc_ens_size)
+{
+  PCA_fc_route[,paste0('PCA_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
+PCA_min = PCA_fc_route[,.SD,.SDcols = paste0('PCA_min_',1:fc_ens_size)]
 
-# get maximum, minimum, and mean of PCA forecast:
+PCA_fc_route[, paste0('PCA_min_',1:fc_ens_size) := NULL]
 
-fc_route[,PCA_max := max(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_max]
-validation_dt[,"PCA_max" := temp]
+validation_dt_min = data.table(validation_dt_min,PCA_min)
 
-fc_route[,PCA_min := min(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_min]
-validation_dt[,"PCA_min" := temp]
+# get minimum of SE forecast:
 
-fc_route[,PCA_mean := mean(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_mean]
-validation_dt[,"PCA_mean" := temp]
+for(i in 1:fc_ens_size)
+{
+  SE_fc_route[,paste0('SE_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
+SE_min = SE_fc_route[,.SD,.SDcols = paste0('SE_min_',1:fc_ens_size)]
 
-# get maximum, minimum, and mean of geostat forecast:
+SE_fc_route[, paste0('SE_min_',1:fc_ens_size) := NULL]
 
-fc_gs_route[,GS_max := max(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_max]
-validation_dt[,"GS_max" := temp]
+validation_dt_min = data.table(validation_dt_min,SE_min)
 
-fc_gs_route[,GS_min := min(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_min]
-validation_dt[,"GS_min" := temp]
+# get minimum of GS forecast:
 
-fc_gs_route[,GS_mean := mean(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_mean]
-validation_dt[,"GS_mean" := temp]
+for(i in 1:fc_ens_size)
+{
+  GS_fc_route[,paste0('GS_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
-# get maximum, minimum, and mean of ECC forecast:
+GS_min = GS_fc_route[,.SD,.SDcols = paste0('GS_min_',1:fc_ens_size)]
 
-fc_ecc_route[,ECC_max := max(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_max]
-validation_dt[,"ECC_max" := temp]
+GS_fc_route[, paste0('GS_min_',1:fc_ens_size) := NULL]
 
-fc_ecc_route[,ECC_min := min(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_min]
-validation_dt[,"ECC_min" := temp]
+validation_dt_min = data.table(validation_dt_min,GS_min)
 
-fc_ecc_route[,ECC_mean := mean(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_mean]
-validation_dt[,"ECC_mean" := temp]
+# get minimum of ECC forecast:
 
+for(i in 1:ens_size)
+{
+  ECC_fc_route[,paste0('ECC_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
+ECC_min = ECC_fc_route[,.SD,.SDcols = paste0('ECC_min_',1:ens_size)]
 
-#############################
+ECC_fc_route[, paste0('ECC_min_',1:ens_size) := NULL]
+
+validation_dt_min = data.table(validation_dt_min,ECC_min)
+
+###########################
 
 
 
-RMSEs = data.table("route" = route,
-                   "PCA_max" = validation_dt[,sqrt(mean((SST_max - PCA_max)^2))],
-                   "GS_max" = validation_dt[,sqrt(mean((SST_max - GS_max)^2))],
-                   "ECC_max" = validation_dt[,sqrt(mean((SST_max - ECC_max)^2))],
-                   "PCA_min" = validation_dt[,sqrt(mean((SST_min - PCA_min)^2))],
-                   "GS_min" = validation_dt[,sqrt(mean((SST_min - GS_min)^2))],
-                   "ECC_min" = validation_dt[,sqrt(mean((SST_min - ECC_min)^2))],
-                   "PCA_mean" = validation_dt[,sqrt(mean((SST_mean - PCA_mean)^2))],
-                   "GS_mean" = validation_dt[,sqrt(mean((SST_mean - GS_mean)^2))],
-                   "ECC_mean" = validation_dt[,sqrt(mean((SST_mean - ECC_mean)^2))])
+RMSEs_min = data.table("route" = route_name,
+                       "RMSE_PCA" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('PCA_min_',1:fc_ens_size)]),
+                       "RMSE_SE" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('SE_min_',1:fc_ens_size)]),
+                       "RMSE_GS" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('GS_min_',1:fc_ens_size)]),
+                       "RMSE_ECC" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('ECC_min_',1:ens_size)])
+)
 
 
-################# next route #########################
-
-# pick route:
-
-route_ids = unique(DT[Lat == 60.5, grid_id])
-route = "Lat = 60.5"
-
-
-DT_route = DT[grid_id %in% route_ids,]
-fc_route = forecasts[grid_id %in% route_ids,]
-fc_gs_route = geostat_fc[grid_id %in% route_ids,]
-fc_ecc_route = ECC_fc[grid_id %in% route_ids,]
+############# scoring the mean along the route #########################
 
 
 # initialize data table:
 
-validation_dt = as.data.table(expand.grid(months,validation_years))
-setnames(validation_dt,c("month","year"))
+validation_dt_mean = as.data.table(expand.grid(months,validation_years))
+setnames(validation_dt_mean,c("month","year"))
 
-# get maximum, minimum, and mean of observation:
+# get mean of observation
 
-fc_route[,SST_max := max(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_max]
-validation_dt[,"SST_max" := temp]
+DT_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
+temp = DT_route[grid_id == min(grid_id) ,SST_mean]
+validation_dt_mean[,"SST_mean" := temp]
 
-fc_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_min]
-validation_dt[,"SST_min" := temp]
+# get meanimum of PCA forecast:
 
-fc_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_mean]
-validation_dt[,"SST_mean" := temp]
+for(i in 1:fc_ens_size)
+{
+  PCA_fc_route[,paste0('PCA_mean_',i) := lapply(.SD, mean, na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
+PCA_mean = PCA_fc_route[,.SD,.SDcols = paste0('PCA_mean_',1:fc_ens_size)]
 
-# get maximum, minimum, and mean of PCA forecast:
+PCA_fc_route[, paste0('PCA_mean_',1:fc_ens_size) := NULL]
 
-fc_route[,PCA_max := max(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_max]
-validation_dt[,"PCA_max" := temp]
+validation_dt_mean = data.table(validation_dt_mean,PCA_mean)
 
-fc_route[,PCA_min := min(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_min]
-validation_dt[,"PCA_min" := temp]
+# get mean of SE forecast:
 
-fc_route[,PCA_mean := mean(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_mean]
-validation_dt[,"PCA_mean" := temp]
+for(i in 1:fc_ens_size)
+{
+  SE_fc_route[,paste0('SE_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
+SE_mean = SE_fc_route[,.SD,.SDcols = paste0('SE_mean_',1:fc_ens_size)]
 
-# get maximum, minimum, and mean of geostat forecast:
+SE_fc_route[, paste0('SE_mean_',1:fc_ens_size) := NULL]
 
-fc_gs_route[,GS_max := max(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_max]
-validation_dt[,"GS_max" := temp]
+validation_dt_mean = data.table(validation_dt_mean,SE_mean)
 
-fc_gs_route[,GS_min := min(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_min]
-validation_dt[,"GS_min" := temp]
+# get meanimum of GS forecast:
 
-fc_gs_route[,GS_mean := mean(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_mean]
-validation_dt[,"GS_mean" := temp]
+for(i in 1:fc_ens_size)
+{
+  GS_fc_route[,paste0('GS_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
-# get maximum, minimum, and mean of ECC forecast:
+GS_mean = GS_fc_route[,.SD,.SDcols = paste0('GS_mean_',1:fc_ens_size)]
 
-fc_ecc_route[,ECC_max := max(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_max]
-validation_dt[,"ECC_max" := temp]
+GS_fc_route[, paste0('GS_mean_',1:fc_ens_size) := NULL]
 
-fc_ecc_route[,ECC_min := min(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_min]
-validation_dt[,"ECC_min" := temp]
+validation_dt_mean = data.table(validation_dt_mean,GS_mean)
 
-fc_ecc_route[,ECC_mean := mean(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_mean]
-validation_dt[,"ECC_mean" := temp]
+# get meanimum of ECC forecast:
 
+for(i in 1:ens_size)
+{
+  ECC_fc_route[,paste0('ECC_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+}
 
+ECC_mean = ECC_fc_route[,.SD,.SDcols = paste0('ECC_mean_',1:ens_size)]
 
-#############################
+ECC_fc_route[, paste0('ECC_mean_',1:ens_size) := NULL]
+
+validation_dt_mean = data.table(validation_dt_mean,ECC_mean)
+
+###########################
 
 
 
-temp = data.table("route" = route,
-                   "PCA_max" = validation_dt[,sqrt(mean((SST_max - PCA_max)^2))],
-                   "GS_max" = validation_dt[,sqrt(mean((SST_max - GS_max)^2))],
-                   "ECC_max" = validation_dt[,sqrt(mean((SST_max - ECC_max)^2))],
-                   "PCA_min" = validation_dt[,sqrt(mean((SST_min - PCA_min)^2))],
-                   "GS_min" = validation_dt[,sqrt(mean((SST_min - GS_min)^2))],
-                   "ECC_min" = validation_dt[,sqrt(mean((SST_min - ECC_min)^2))],
-                   "PCA_mean" = validation_dt[,sqrt(mean((SST_mean - PCA_mean)^2))],
-                   "GS_mean" = validation_dt[,sqrt(mean((SST_mean - GS_mean)^2))],
-                   "ECC_mean" = validation_dt[,sqrt(mean((SST_mean - ECC_mean)^2))])
-
-RMSEs = rbindlist(list(RMSEs,temp))
+RMSEs_mean = data.table("route" = route_name,
+                       "RMSE_PCA" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('PCA_mean_',1:fc_ens_size)]),
+                       "RMSE_SE" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('SE_mean_',1:fc_ens_size)]),
+                       "RMSE_GS" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('GS_mean_',1:fc_ens_size)]),
+                       "RMSE_ECC" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('ECC_mean_',1:ens_size)])
+)
 
 
-################# next route #########################
+# pugging together, bringing in shape
+RMSEs = rbindlist(list(RMSEs_max[,fun := "max"],RMSEs_min[,fun := "min"],RMSEs_mean[,fun:= 'mean']))
 
-# pick route:
+RMSEs = RMSEs[,route := NULL]
 
-route_ids = unique(DT[Lon == -55.5, grid_id])
-route = "Lon = -55.5"
+setcolorder(RMSEs,'fun')
 
+temp <- round(RMSEs[,-1],3)
 
-DT_route = DT[grid_id %in% route_ids,]
-fc_route = forecasts[grid_id %in% route_ids,]
-fc_gs_route = geostat_fc[grid_id %in% route_ids,]
-fc_ecc_route = ECC_fc[grid_id %in% route_ids,]
-
-
-# initialize data table:
-
-validation_dt = as.data.table(expand.grid(months,validation_years))
-setnames(validation_dt,c("month","year"))
-
-# get maximum, minimum, and mean of observation:
-
-fc_route[,SST_max := max(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_max]
-validation_dt[,"SST_max" := temp]
-
-fc_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_min]
-validation_dt[,"SST_min" := temp]
-
-fc_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_mean]
-validation_dt[,"SST_mean" := temp]
-
-
-# get maximum, minimum, and mean of PCA forecast:
-
-fc_route[,PCA_max := max(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_max]
-validation_dt[,"PCA_max" := temp]
-
-fc_route[,PCA_min := min(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_min]
-validation_dt[,"PCA_min" := temp]
-
-fc_route[,PCA_mean := mean(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_mean]
-validation_dt[,"PCA_mean" := temp]
-
-
-# get maximum, minimum, and mean of geostat forecast:
-
-fc_gs_route[,GS_max := max(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_max]
-validation_dt[,"GS_max" := temp]
-
-fc_gs_route[,GS_min := min(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_min]
-validation_dt[,"GS_min" := temp]
-
-fc_gs_route[,GS_mean := mean(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_mean]
-validation_dt[,"GS_mean" := temp]
-
-# get maximum, minimum, and mean of ECC forecast:
-
-fc_ecc_route[,ECC_max := max(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_max]
-validation_dt[,"ECC_max" := temp]
-
-fc_ecc_route[,ECC_min := min(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_min]
-validation_dt[,"ECC_min" := temp]
-
-fc_ecc_route[,ECC_mean := mean(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_mean]
-validation_dt[,"ECC_mean" := temp]
-
+RMSEs = data.table(RMSEs[,.(fun)],temp)
 
 
 #############################
 
-
-
-temp = data.table("route" = route,
-                  "PCA_max" = validation_dt[,sqrt(mean((SST_max - PCA_max)^2))],
-                  "GS_max" = validation_dt[,sqrt(mean((SST_max - GS_max)^2))],
-                  "ECC_max" = validation_dt[,sqrt(mean((SST_max - ECC_max)^2))],
-                  "PCA_min" = validation_dt[,sqrt(mean((SST_min - PCA_min)^2))],
-                  "GS_min" = validation_dt[,sqrt(mean((SST_min - GS_min)^2))],
-                  "ECC_min" = validation_dt[,sqrt(mean((SST_min - ECC_min)^2))],
-                  "PCA_mean" = validation_dt[,sqrt(mean((SST_mean - PCA_mean)^2))],
-                  "GS_mean" = validation_dt[,sqrt(mean((SST_mean - GS_mean)^2))],
-                  "ECC_mean" = validation_dt[,sqrt(mean((SST_mean - ECC_mean)^2))])
-
-RMSEs = rbindlist(list(RMSEs,temp))
-
-################# next route #########################
-
-# pick route:
-
-route_ids = unique(DT[Lon == -45.5, grid_id])
-route = "Lon = -45.5"
-
-
-DT_route = DT[grid_id %in% route_ids,]
-fc_route = forecasts[grid_id %in% route_ids,]
-fc_gs_route = geostat_fc[grid_id %in% route_ids,]
-fc_ecc_route = ECC_fc[grid_id %in% route_ids,]
-
-
-# initialize data table:
-
-validation_dt = as.data.table(expand.grid(months,validation_years))
-setnames(validation_dt,c("month","year"))
-
-# get maximum, minimum, and mean of observation:
-
-fc_route[,SST_max := max(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_max]
-validation_dt[,"SST_max" := temp]
-
-fc_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_min]
-validation_dt[,"SST_min" := temp]
-
-fc_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_mean]
-validation_dt[,"SST_mean" := temp]
-
-
-# get maximum, minimum, and mean of PCA forecast:
-
-fc_route[,PCA_max := max(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_max]
-validation_dt[,"PCA_max" := temp]
-
-fc_route[,PCA_min := min(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_min]
-validation_dt[,"PCA_min" := temp]
-
-fc_route[,PCA_mean := mean(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_mean]
-validation_dt[,"PCA_mean" := temp]
-
-
-# get maximum, minimum, and mean of geostat forecast:
-
-fc_gs_route[,GS_max := max(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_max]
-validation_dt[,"GS_max" := temp]
-
-fc_gs_route[,GS_min := min(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_min]
-validation_dt[,"GS_min" := temp]
-
-fc_gs_route[,GS_mean := mean(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_mean]
-validation_dt[,"GS_mean" := temp]
-
-# get maximum, minimum, and mean of ECC forecast:
-
-fc_ecc_route[,ECC_max := max(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_max]
-validation_dt[,"ECC_max" := temp]
-
-fc_ecc_route[,ECC_min := min(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_min]
-validation_dt[,"ECC_min" := temp]
-
-fc_ecc_route[,ECC_mean := mean(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_mean]
-validation_dt[,"ECC_mean" := temp]
-
-
-
-#############################
-
-
-
-temp = data.table("route" = route,
-                  "PCA_max" = validation_dt[,sqrt(mean((SST_max - PCA_max)^2))],
-                  "GS_max" = validation_dt[,sqrt(mean((SST_max - GS_max)^2))],
-                  "ECC_max" = validation_dt[,sqrt(mean((SST_max - ECC_max)^2))],
-                  "PCA_min" = validation_dt[,sqrt(mean((SST_min - PCA_min)^2))],
-                  "GS_min" = validation_dt[,sqrt(mean((SST_min - GS_min)^2))],
-                  "ECC_min" = validation_dt[,sqrt(mean((SST_min - ECC_min)^2))],
-                  "PCA_mean" = validation_dt[,sqrt(mean((SST_mean - PCA_mean)^2))],
-                  "GS_mean" = validation_dt[,sqrt(mean((SST_mean - GS_mean)^2))],
-                  "ECC_mean" = validation_dt[,sqrt(mean((SST_mean - ECC_mean)^2))])
-
-RMSEs = rbindlist(list(RMSEs,temp))
-
-
-################# next route #########################
-
-# pick route:
-
-route_ids = unique(DT[Lon == -35.5, grid_id])
-route = "Lon = -35.5"
-
-
-DT_route = DT[grid_id %in% route_ids,]
-fc_route = forecasts[grid_id %in% route_ids,]
-fc_gs_route = geostat_fc[grid_id %in% route_ids,]
-fc_ecc_route = ECC_fc[grid_id %in% route_ids,]
-
-
-# initialize data table:
-
-validation_dt = as.data.table(expand.grid(months,validation_years))
-setnames(validation_dt,c("month","year"))
-
-# get maximum, minimum, and mean of observation:
-
-fc_route[,SST_max := max(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_max]
-validation_dt[,"SST_max" := temp]
-
-fc_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_min]
-validation_dt[,"SST_min" := temp]
-
-fc_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,SST_mean]
-validation_dt[,"SST_mean" := temp]
-
-
-# get maximum, minimum, and mean of PCA forecast:
-
-fc_route[,PCA_max := max(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_max]
-validation_dt[,"PCA_max" := temp]
-
-fc_route[,PCA_min := min(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_min]
-validation_dt[,"PCA_min" := temp]
-
-fc_route[,PCA_mean := mean(fc1PC10,na.rm = TRUE),by = .(month,year)]
-temp = fc_route[grid_id == min(grid_id) ,PCA_mean]
-validation_dt[,"PCA_mean" := temp]
-
-
-# get maximum, minimum, and mean of geostat forecast:
-
-fc_gs_route[,GS_max := max(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_max]
-validation_dt[,"GS_max" := temp]
-
-fc_gs_route[,GS_min := min(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_min]
-validation_dt[,"GS_min" := temp]
-
-fc_gs_route[,GS_mean := mean(fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_gs_route[grid_id == min(grid_id) ,GS_mean]
-validation_dt[,"GS_mean" := temp]
-
-# get maximum, minimum, and mean of ECC forecast:
-
-fc_ecc_route[,ECC_max := max(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_max]
-validation_dt[,"ECC_max" := temp]
-
-fc_ecc_route[,ECC_min := min(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_min]
-validation_dt[,"ECC_min" := temp]
-
-fc_ecc_route[,ECC_mean := mean(ecc_fc1,na.rm = TRUE),by = .(month,year)]
-temp = fc_ecc_route[grid_id == min(grid_id) ,ECC_mean]
-validation_dt[,"ECC_mean" := temp]
-
-
-
-#############################
-
-
-
-temp = data.table("route" = route,
-                  "PCA_max" = validation_dt[,sqrt(mean((SST_max - PCA_max)^2))],
-                  "GS_max" = validation_dt[,sqrt(mean((SST_max - GS_max)^2))],
-                  "ECC_max" = validation_dt[,sqrt(mean((SST_max - ECC_max)^2))],
-                  "PCA_min" = validation_dt[,sqrt(mean((SST_min - PCA_min)^2))],
-                  "GS_min" = validation_dt[,sqrt(mean((SST_min - GS_min)^2))],
-                  "ECC_min" = validation_dt[,sqrt(mean((SST_min - ECC_min)^2))],
-                  "PCA_mean" = validation_dt[,sqrt(mean((SST_mean - PCA_mean)^2))],
-                  "GS_mean" = validation_dt[,sqrt(mean((SST_mean - GS_mean)^2))],
-                  "ECC_mean" = validation_dt[,sqrt(mean((SST_mean - ECC_mean)^2))])
-
-RMSEs = rbindlist(list(RMSEs,temp))
 
 
 ##################################
@@ -557,4 +358,3 @@ lines(RMSEs[,GS_mean],type = "b", col = "darkred")
 
 legend(x = "topright", legend = c("PCA","GS","ECC"),col = c("blue","darkred","darkgreen"),lty = c(1,1,1))
 dev.off()
-

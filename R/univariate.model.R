@@ -1,5 +1,4 @@
 
-
 #' computes simple moving averages, is resistant to missing values  
 #'
 #' @param l length of the averaging window.

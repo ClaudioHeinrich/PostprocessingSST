@@ -17,37 +17,24 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-# choose your favourite area for analysis and give it a name abbreviation
+# choose an abbreviation for this run
 
-#NAO_2:
- # lat_box = c(40,70)
- # lon_box = c(-60,-30)
+name_abbr = "NAO_3"
 
-#NAO:
-# lat_box = c(30,70)
-# lon_box = c(-70,-25)
+# choose the area of the globe to consider
+lat_box = c(50,70)
+lon_box = c(-25,10)
 
-#Pres_Bergen: 
-# lat_box = c(50,80)
-# lon_box = c(-5,30)
-
-#Europe:
-# lat_box = c(30,70)
-# lon_box = c(-25,45)
-
-
-
-name_abbr = "NAO_3" # for northern atlantic ocean
-
- lat_box = c(50,85)
- lon_box = c(-20,40)
-
+# set a couple of parameters
 
 ens_size = 9 # size of forecast ensemble
 
-training_years = 1985:2011
-validation_years = 2012:2016 # all previous years are used for training 
+training_years = 1985:2009
+validation_years = 2010:2016 
+
 months = 1:12
+
+##### setting up complete - now move to creation #####
 
 # create directories
 
@@ -57,30 +44,29 @@ dir.create(save_dir, showWarnings = FALSE)
 plot_dir = paste0("./figures/", name_abbr,"/")
 dir.create(plot_dir, showWarnings = FALSE)
 
-### construct or load wide data set ###
-
-# takes time, avoid if possible: if the data hasn't changed and you're just trying out a new window, just run this:
+### construct load wide data set ###
 
 DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 
-# prep data further:
+# tidy up DT:
+
 DT = DT[month %in% months,]
 DT[,YM := 12*year + month]
 DT = DT[order(year,month,Lon,Lat)]
 
 setcolorder(DT,c("year","month",'Lon','Lat','YM','grid_id','SST_bar','Ens_bar','Ens_sd',paste0('Ens',1:ens_size)))
 
-#DT = load_combined_wide(data_dir = save_dir, output_name = paste0("dt_combine_",name_abbr,"_wide_bc.RData"))[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
+
+# save everything:
+
+save.image(file = paste0(save_dir,"setup.RData"))
+
+
+# The following line needs to be run if the full data table has not yet been created, i.e. if new data is available:
 
 # make_combined_wide_dataset(lat_box = lat_box,
 #                            lon_box = lon_box,
 #                            output_loc = save_dir,
 #                            output_name = paste0("dt_combine_",name_abbr,"_wide.RData"))
 
-
-# save everything:
-
-
-
-save.image(file = paste0(save_dir,"setup.RData"))
 

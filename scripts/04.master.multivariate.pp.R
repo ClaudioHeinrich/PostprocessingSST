@@ -29,7 +29,16 @@ name_abbr = "NAO_3"
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
+
 load(file = paste0(save_dir,"setup.RData"))
+
+name_abbr = "NAO_3/centered" 
+
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+dir.create(save_dir,showWarnings = FALSE)
+
+plot_dir = paste0("./figures/", name_abbr,"/")
+dir.create(plot_dir, showWarnings = FALSE)
 
 # specifications for the desired forecasts:
 
@@ -41,7 +50,7 @@ fc_ens_size = 50
 
 # decide whether you want to work with SST, or with SST centered around climatology, or with SST standardized w.r.t. climatology 
 
-SST = ""  # takes 'centered','standardized', or ''
+SST = "centered"  # takes 'centered','standardized', or ''
 
 clim_years = training_years
 
