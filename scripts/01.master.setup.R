@@ -19,11 +19,11 @@ library(data.table)
 
 # choose an abbreviation for this run
 
-name_abbr = "NAO_3"
+name_abbr = "Atl"
 
 # choose the area of the globe to consider
-lat_box = c(50,70)
-lon_box = c(-25,10)
+lat_box = c(-35,10)
+lon_box = c(-45,15)
 
 # set a couple of parameters
 

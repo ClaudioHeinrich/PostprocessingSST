@@ -24,7 +24,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Atl" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -56,9 +56,9 @@ load(file = paste0(save_dir,"scores.bc.sd.ema.Rdata"))
 CRPS_sma = sc_sma_var[,min(CRPS)]
 CRPS_ema = sc_ema_var[,min(CRPS)]
 
-CRPS_comparison = data.table(mean_CRPS_bm = DT[,mean(crps.na.rm(SST_bar,SST_hat,SD_hat_lr_bm),na.rm = TRUE)],
-                             mean_CRPS_bl = DT[,mean(crps.na.rm(SST_bar,SST_hat,SD_hat_lr_bl),na.rm = TRUE)],
-                             mean_CRPS_bb = DT[,mean(crps.na.rm(SST_bar,SST_hat,SD_hat_lr_bb),na.rm = TRUE)],
+CRPS_comparison = data.table(mean_CRPS_bm = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bm),na.rm = TRUE)],
+                             mean_CRPS_bl = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bl),na.rm = TRUE)],
+                             mean_CRPS_bb = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bb),na.rm = TRUE)],
                              mean_CRPS_sma = CRPS_sma,
                              mean_CRPS_ema = CRPS_ema)
 

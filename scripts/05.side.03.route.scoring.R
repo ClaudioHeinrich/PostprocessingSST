@@ -1,6 +1,6 @@
 ########################################################################################################
 
-#############  side script 4.3 - score various functionals that depend on areas of SST  ################
+#############  side script 5.3 - score various functionals that depend on areas of SST  ################
 
 ########################################################################################################
 
@@ -20,7 +20,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_3" 
+name_abbr = "Atl" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -35,11 +35,18 @@ load(file = paste0(save_dir,"setup.RData"))
 # Fix two points p1 and p2. These are then connected by a route (as the crow flies, not caring about land in between).
 # A grid point in dt is then considered for scoring if it is not on land and is nearest neighbour to a point on the route. 
 
-p1 = data.table(Lon = 5.32, Lat = 60.4, Loc = "Bergen") 
-p2 = data.table(Lon = -21.83, Lat = 64.13, Loc = "Reykyavik") 
+# p1 = data.table(Lon = 5.32, Lat = 60.4, Loc = "Bergen") 
+# p2 = data.table(Lon = -21.83, Lat = 64.13, Loc = "Reykyavik") 
+# 
+# route_name = "Bergen to Reykyavik"
+# file_name = "scores_Bergen_to_Reykyavik"
 
-route_name = "Bergen to Reykyavik"
-file_name = "scores_Bergen_to_Reykyavik"
+p1 = data.table(Lon = -46.5, Lat = -23.8, Loc = "Sao Paolo") 
+p2 = data.table(Lon = 18.6, Lat = -34.5, Loc = "Capetown") 
+
+route_name = "Sao Paolo to Capetown"
+file_name = "scores_SP_to_Capetown"
+
 
 # get grid ids_along this route: fix n and use gcIntermediate to find n coordinates on the route from p1 to p2 as the crow flies:
 
@@ -128,10 +135,11 @@ for(i in 1:fc_ens_size)
 }
 
 PCA_max = unique(PCA_fc_route[,.SD,.SDcols = paste0('PCA_max_',1:fc_ens_size)])
+PCA_max[,PCA_max_fc := rowMeans(.SD),.SDcols = paste0('PCA_max_',1:fc_ens_size)]
 
 PCA_fc_route[, paste0('PCA_max_',1:fc_ens_size) := NULL]
 
-validation_dt_max = data.table(validation_dt_max,PCA_max)
+validation_dt_max = data.table(validation_dt_max,PCA_max[,.(PCA_max_fc)])
 
 # get maximum of SE forecast:
 
@@ -141,10 +149,11 @@ for(i in 1:fc_ens_size)
 }
 
 SE_max = unique(SE_fc_route[,.SD,.SDcols = paste0('SE_max_',1:fc_ens_size)])
+SE_max[,SE_max_fc := rowMeans(.SD),.SDcols = paste0('SE_max_',1:fc_ens_size)]
 
 SE_fc_route[, paste0('SE_max_',1:fc_ens_size) := NULL]
 
-validation_dt_max = data.table(validation_dt_max,SE_max)
+validation_dt_max = data.table(validation_dt_max,SE_max[,.(SE_max_fc)])
 
 # get maximum of GS forecast:
 
@@ -154,10 +163,11 @@ for(i in 1:fc_ens_size)
 }
 
 GS_max = unique(GS_fc_route[,.SD,.SDcols = paste0('GS_max_',1:fc_ens_size)])
+GS_max[,GS_max_fc := rowMeans(.SD),.SDcols = paste0('GS_max_',1:fc_ens_size)]
 
 GS_fc_route[, paste0('GS_max_',1:fc_ens_size) := NULL]
 
-validation_dt_max = data.table(validation_dt_max,GS_max)
+validation_dt_max = data.table(validation_dt_max,GS_max[,.(GS_max_fc)])
 
 # get maximum of ECC forecast:
 
@@ -167,27 +177,28 @@ for(i in 1:ens_size)
 }
 
 ECC_max = unique(ECC_fc_route[,.SD,.SDcols = paste0('ECC_max_',1:ens_size)])
+ECC_max[,ECC_max_fc := rowMeans(.SD),.SDcols = paste0('ECC_max_',1:ens_size)]
 
 ECC_fc_route[, paste0('ECC_max_',1:ens_size) := NULL]
 
-validation_dt_max = data.table(validation_dt_max,ECC_max)
+validation_dt_max = data.table(validation_dt_max,ECC_max[,.(ECC_max_fc)])
+
+
 
 ############# putting together ##############
 
 RMSEs_max = data.table("route" = route_name,
-                       "RMSE_PCA" = sqrt(validation_dt_max[,(SST_max - rowMeans(.SD))^2),.SDcols = paste0('PCA_max_',1:fc_ens_size)]),
-                       "RMSE_SE" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('SE_max_',1:fc_ens_size)]),
-                       "RMSE_GS" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('GS_max_',1:fc_ens_size)]),
-                       "RMSE_ECC" = sqrt(validation_dt_max[,mean((SST_max - .SD)^2),.SDcols = paste0('ECC_max_',1:ens_size)]),
-                       "RMSE_PFC" = sqrt(validation_dt_max[,mean((SST_max - SST_hat_max)^2)])
+                       "RMSE_PFC" = validation_dt_max[,sqrt(mean((SST_max - SST_hat_max)^2))],
+                       "RMSE_PCA" = validation_dt_max[,sqrt(mean((SST_max - PCA_max_fc)^2))],
+                       "RMSE_SE" = validation_dt_max[,sqrt(mean((SST_max - SE_max_fc)^2))],
+                       "RMSE_GS" = validation_dt_max[,sqrt(mean((SST_max - GS_max_fc)^2))],
+                       "RMSE_ECC" = validation_dt_max[,sqrt(mean((SST_max - ECC_max_fc)^2))]
                        )
-
 
 
 ######################################################
 ###### Get RMSEs for the  minimum along route ########
 ######################################################
-
 
 # initialize data table:
 
@@ -196,7 +207,7 @@ setnames(validation_dt_min,c("month","year"))
 
 # get minimum of observation
 
-DT_route[,SST_min := min(SST_bar,na.rm = TRUE),by = .(month,year)]
+DT_route[,SST_min := min(SST_bar, na.rm = TRUE), by = .(month,year)]
 temp = DT_route[grid_id == min(grid_id) ,SST_min]
 validation_dt_min[,"SST_min" := temp]
 
@@ -214,10 +225,11 @@ for(i in 1:fc_ens_size)
 }
 
 PCA_min = unique(PCA_fc_route[,.SD,.SDcols = paste0('PCA_min_',1:fc_ens_size)])
+PCA_min[,PCA_min_fc := rowMeans(.SD),.SDcols = paste0('PCA_min_',1:fc_ens_size)]
 
 PCA_fc_route[, paste0('PCA_min_',1:fc_ens_size) := NULL]
 
-validation_dt_min = data.table(validation_dt_min,PCA_min)
+validation_dt_min = data.table(validation_dt_min,PCA_min[,.(PCA_min_fc)])
 
 # get minimum of SE forecast:
 
@@ -227,10 +239,11 @@ for(i in 1:fc_ens_size)
 }
 
 SE_min = unique(SE_fc_route[,.SD,.SDcols = paste0('SE_min_',1:fc_ens_size)])
+SE_min[,SE_min_fc := rowMeans(.SD),.SDcols = paste0('SE_min_',1:fc_ens_size)]
 
 SE_fc_route[, paste0('SE_min_',1:fc_ens_size) := NULL]
 
-validation_dt_min = data.table(validation_dt_min,SE_min)
+validation_dt_min = data.table(validation_dt_min,SE_min[,.(SE_min_fc)])
 
 # get minimum of GS forecast:
 
@@ -240,10 +253,11 @@ for(i in 1:fc_ens_size)
 }
 
 GS_min = unique(GS_fc_route[,.SD,.SDcols = paste0('GS_min_',1:fc_ens_size)])
+GS_min[,GS_min_fc := rowMeans(.SD),.SDcols = paste0('GS_min_',1:fc_ens_size)]
 
 GS_fc_route[, paste0('GS_min_',1:fc_ens_size) := NULL]
 
-validation_dt_min = data.table(validation_dt_min,GS_min)
+validation_dt_min = data.table(validation_dt_min,GS_min[,.(GS_min_fc)])
 
 # get minimum of ECC forecast:
 
@@ -253,61 +267,63 @@ for(i in 1:ens_size)
 }
 
 ECC_min = unique(ECC_fc_route[,.SD,.SDcols = paste0('ECC_min_',1:ens_size)])
+ECC_min[,ECC_min_fc := rowMeans(.SD),.SDcols = paste0('ECC_min_',1:ens_size)]
 
 ECC_fc_route[, paste0('ECC_min_',1:ens_size) := NULL]
 
-validation_dt_min = data.table(validation_dt_min,ECC_min)
+validation_dt_min = data.table(validation_dt_min,ECC_min[,.(ECC_min_fc)])
 
 
-########## putting together ###############
+
+############# putting together ##############
 
 RMSEs_min = data.table("route" = route_name,
-                       "RMSE_PCA" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('PCA_min_',1:fc_ens_size)]),
-                       "RMSE_SE" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('SE_min_',1:fc_ens_size)]),
-                       "RMSE_GS" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('GS_min_',1:fc_ens_size)]),
-                       "RMSE_ECC" = sqrt(validation_dt_min[,mean((SST_min - .SD)^2),.SDcols = paste0('ECC_min_',1:ens_size)]),
-                       "RMSE_PFC" = sqrt(validation_dt_min[,mean(SST_min - SST_hat_min)^2])
+                       "RMSE_PFC" = validation_dt_min[,sqrt(mean((SST_min - SST_hat_min)^2))],
+                       "RMSE_PCA" = validation_dt_min[,sqrt(mean((SST_min - PCA_min_fc)^2))],
+                       "RMSE_SE" = validation_dt_min[,sqrt(mean((SST_min - SE_min_fc)^2))],
+                       "RMSE_GS" = validation_dt_min[,sqrt(mean((SST_min - GS_min_fc)^2))],
+                       "RMSE_ECC" = validation_dt_min[,sqrt(mean((SST_min - ECC_min_fc)^2))]
 )
 
 
 
 
-###################################################
+######################################################
 ###### Get RMSEs for the  mean along route ########
-###################################################
-
+######################################################
 
 # initialize data table:
 
 validation_dt_mean = as.data.table(expand.grid(months,validation_years))
 setnames(validation_dt_mean,c("month","year"))
 
-# get mean of observation
+# get meanimum of observation
 
-DT_route[,SST_mean := mean(SST_bar,na.rm = TRUE),by = .(month,year)]
+DT_route[,SST_mean := mean(SST_bar, na.rm = TRUE), by = .(month,year)]
 temp = DT_route[grid_id == min(grid_id) ,SST_mean]
 validation_dt_mean[,"SST_mean" := temp]
 
-# get mean of point forecast
+# get meanimum of point forecast
 
 DT_route[,SST_hat_mean := mean(SST_hat,na.rm = TRUE),by = .(month,year)]
 temp = DT_route[grid_id == min(grid_id) ,SST_hat_mean]
 validation_dt_mean[,"SST_hat_mean" := temp]
 
-# get mean of PCA forecast:
+# get meanimum of PCA forecast:
 
 for(i in 1:fc_ens_size)
 {
-  PCA_fc_route[,paste0('PCA_mean_',i) := lapply(.SD, mean, na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
+  PCA_fc_route[,paste0('PCA_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
 }
 
 PCA_mean = unique(PCA_fc_route[,.SD,.SDcols = paste0('PCA_mean_',1:fc_ens_size)])
+PCA_mean[,PCA_mean_fc := rowMeans(.SD),.SDcols = paste0('PCA_mean_',1:fc_ens_size)]
 
 PCA_fc_route[, paste0('PCA_mean_',1:fc_ens_size) := NULL]
 
-validation_dt_mean = data.table(validation_dt_mean,PCA_mean)
+validation_dt_mean = data.table(validation_dt_mean,PCA_mean[,.(PCA_mean_fc)])
 
-# get mean of SE forecast:
+# get meanimum of SE forecast:
 
 for(i in 1:fc_ens_size)
 {
@@ -315,12 +331,13 @@ for(i in 1:fc_ens_size)
 }
 
 SE_mean = unique(SE_fc_route[,.SD,.SDcols = paste0('SE_mean_',1:fc_ens_size)])
+SE_mean[,SE_mean_fc := rowMeans(.SD),.SDcols = paste0('SE_mean_',1:fc_ens_size)]
 
 SE_fc_route[, paste0('SE_mean_',1:fc_ens_size) := NULL]
 
-validation_dt_mean = data.table(validation_dt_mean,SE_mean)
+validation_dt_mean = data.table(validation_dt_mean,SE_mean[,.(SE_mean_fc)])
 
-# get mean of GS forecast:
+# get meanimum of GS forecast:
 
 for(i in 1:fc_ens_size)
 {
@@ -328,12 +345,13 @@ for(i in 1:fc_ens_size)
 }
 
 GS_mean = unique(GS_fc_route[,.SD,.SDcols = paste0('GS_mean_',1:fc_ens_size)])
+GS_mean[,GS_mean_fc := rowMeans(.SD),.SDcols = paste0('GS_mean_',1:fc_ens_size)]
 
 GS_fc_route[, paste0('GS_mean_',1:fc_ens_size) := NULL]
 
-validation_dt_mean = data.table(validation_dt_mean,GS_mean)
+validation_dt_mean = data.table(validation_dt_mean,GS_mean[,.(GS_mean_fc)])
 
-# get mean of ECC forecast:
+# get meanimum of ECC forecast:
 
 for(i in 1:ens_size)
 {
@@ -341,20 +359,24 @@ for(i in 1:ens_size)
 }
 
 ECC_mean = unique(ECC_fc_route[,.SD,.SDcols = paste0('ECC_mean_',1:ens_size)])
+ECC_mean[,ECC_mean_fc := rowMeans(.SD),.SDcols = paste0('ECC_mean_',1:ens_size)]
 
 ECC_fc_route[, paste0('ECC_mean_',1:ens_size) := NULL]
 
-validation_dt_mean = data.table(validation_dt_mean,ECC_mean)
+validation_dt_mean = data.table(validation_dt_mean,ECC_mean[,.(ECC_mean_fc)])
 
-############ putting together ###############
+
+
+############# putting together ##############
 
 RMSEs_mean = data.table("route" = route_name,
-                       "RMSE_PCA" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('PCA_mean_',1:fc_ens_size)]),
-                       "RMSE_SE" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('SE_mean_',1:fc_ens_size)]),
-                       "RMSE_GS" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('GS_mean_',1:fc_ens_size)]),
-                       "RMSE_ECC" = sqrt(validation_dt_mean[,mean((SST_mean - .SD)^2),.SDcols = paste0('ECC_mean_',1:ens_size)]),
-                       "RMSE_PFC" = sqrt(validation_dt_mean[,mean((SST_mean - SST_hat_mean)^2)])
+                       "RMSE_PFC" = validation_dt_mean[,sqrt(mean((SST_mean - SST_hat_mean)^2))],
+                       "RMSE_PCA" = validation_dt_mean[,sqrt(mean((SST_mean - PCA_mean_fc)^2))],
+                       "RMSE_SE" = validation_dt_mean[,sqrt(mean((SST_mean - SE_mean_fc)^2))],
+                       "RMSE_GS" = validation_dt_mean[,sqrt(mean((SST_mean - GS_mean_fc)^2))],
+                       "RMSE_ECC" = validation_dt_mean[,sqrt(mean((SST_mean - ECC_mean_fc)^2))]
 )
+
 
 
 #############################################
@@ -391,75 +413,35 @@ PFC_CRPS = validation_dt_max[,mean(abs(SST_max - SST_hat_max))]
 
 ### PCA ###
 
-for(i in 1:fc_ens_size)
-{
-  PCA_fc_route[,paste0('PCA_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-PCA_max = unique(PCA_fc_route[,.SD,.SDcols = paste0('PCA_max_',1:fc_ens_size)])
-
-PCA_mean = rowMeans(PCA_max)
-
-PCA_sd = sqrt(rowMeans((PCA_max - PCA_mean)^2))
-
-PCA_CRPS = crps_na_rm(validation_dt_max[,SST_max], mean = PCA_mean, sd = PCA_sd)
-
+PCA_CRPS = scoringRules::crps_sample(y = validation_dt_max[,SST_max], 
+                                     dat = as.matrix(PCA_max[,.SD,.SDcols = paste0('PCA_max_',1:fc_ens_size)]))
 
 ### SE ###
 
-for(i in 1:fc_ens_size)
-{
-  SE_fc_route[,paste0('SE_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
+SE_CRPS = scoringRules::crps_sample(y = validation_dt_max[,SST_max], 
+                                     dat = as.matrix(SE_max[,.SD,.SDcols = paste0('SE_max_',1:fc_ens_size)]))
 
-SE_max = unique(SE_fc_route[,.SD,.SDcols = paste0('SE_max_',1:fc_ens_size)])
-
-SE_mean = rowMeans(SE_max)
-
-SE_sd = sqrt(rowMeans((SE_max - SE_mean)^2))
-
-SE_CRPS = crps_na_rm(validation_dt_max[,SST_max], mean = SE_mean, sd = SE_sd)
 
 ### GS ###
 
-for(i in 1:fc_ens_size)
-{
-  GS_fc_route[,paste0('GS_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-GS_max = unique(GS_fc_route[,.SD,.SDcols = paste0('GS_max_',1:fc_ens_size)])
-
-GS_mean = rowMeans(GS_max)
-
-GS_sd = sqrt(rowMeans((GS_max - GS_mean)^2))
-
-GS_CRPS = crps_na_rm(validation_dt_max[,SST_max], mean = GS_mean, sd = GS_sd)
+GS_CRPS = scoringRules::crps_sample(y = validation_dt_max[,SST_max], 
+                                     dat = as.matrix(GS_max[,.SD,.SDcols = paste0('GS_max_',1:fc_ens_size)]))
 
 ### ECC ###
 
-for(i in 1:ens_size)
-{
-  ECC_fc_route[,paste0('ECC_max_',i) := max(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
+ECC_CRPS = scoringRules::crps_sample(y = validation_dt_max[,SST_max], 
+                                     dat = as.matrix(ECC_max[,.SD,.SDcols = paste0('ECC_max_',1:ens_size)]))
 
-ECC_max = unique(ECC_fc_route[,.SD,.SDcols = paste0('ECC_max_',1:ens_size)])
-
-ECC_mean = rowMeans(ECC_max)
-
-ECC_sd = sqrt(rowMeans((ECC_max - ECC_mean)^2))
-
-ECC_CRPS = crps_na_rm(validation_dt_max[,SST_max], mean = ECC_mean, sd = ECC_sd)
 
 
 ######### putting together ###############
 
 CRPS_max = data.table("route" = route_name,
+                      "CRPS_PFC" = PFC_CRPS,
                       "CRPS_PCA" = mean(PCA_CRPS),
                       "CRPS_SE" = mean(SE_CRPS),
                       "CRPS_GS" = mean(GS_CRPS),
-                      "CRPS_ECC" = mean(ECC_CRPS),
-                      "CRPS_PFC" = PFC_CRPS)
-
+                      "CRPS_ECC" = mean(ECC_CRPS))
 
 
 
@@ -475,79 +457,41 @@ PFC_CRPS = validation_dt_min[,mean(abs(SST_min - SST_hat_min))]
 
 ### PCA ###
 
-for(i in 1:fc_ens_size)
-{
-  PCA_fc_route[,paste0('PCA_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-PCA_min = unique(PCA_fc_route[,.SD,.SDcols = paste0('PCA_min_',1:fc_ens_size)])
-
-PCA_mean = rowMeans(PCA_min)
-
-PCA_sd = sqrt(rowMeans((PCA_min - PCA_mean)^2))
-
-PCA_CRPS = crps_na_rm(validation_dt_min[,SST_min], mean = PCA_mean, sd = PCA_sd)
-
+PCA_CRPS = scoringRules::crps_sample(y = validation_dt_min[,SST_min], 
+                                     dat = as.matrix(PCA_min[,.SD,.SDcols = paste0('PCA_min_',1:fc_ens_size)]))
 
 ### SE ###
 
-for(i in 1:fc_ens_size)
-{
-  SE_fc_route[,paste0('SE_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
+SE_CRPS = scoringRules::crps_sample(y = validation_dt_min[,SST_min], 
+                                    dat = as.matrix(SE_min[,.SD,.SDcols = paste0('SE_min_',1:fc_ens_size)]))
 
-SE_min = unique(SE_fc_route[,.SD,.SDcols = paste0('SE_min_',1:fc_ens_size)])
-
-SE_mean = rowMeans(SE_min)
-
-SE_sd = sqrt(rowMeans((SE_min - SE_mean)^2))
-
-SE_CRPS = crps_na_rm(validation_dt_min[,SST_min], mean = SE_mean, sd = SE_sd)
 
 ### GS ###
 
-for(i in 1:fc_ens_size)
-{
-  GS_fc_route[,paste0('GS_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-GS_min = unique(GS_fc_route[,.SD,.SDcols = paste0('GS_min_',1:fc_ens_size)])
-
-GS_mean = rowMeans(GS_min)
-
-GS_sd = sqrt(rowMeans((GS_min - GS_mean)^2))
-
-GS_CRPS = crps_na_rm(validation_dt_min[,SST_min], mean = GS_mean, sd = GS_sd)
+GS_CRPS = scoringRules::crps_sample(y = validation_dt_min[,SST_min], 
+                                    dat = as.matrix(GS_min[,.SD,.SDcols = paste0('GS_min_',1:fc_ens_size)]))
 
 ### ECC ###
 
-for(i in 1:ens_size)
-{
-  ECC_fc_route[,paste0('ECC_min_',i) := min(.SD,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-ECC_min = unique(ECC_fc_route[,.SD,.SDcols = paste0('ECC_min_',1:ens_size)])
-
-ECC_mean = rowMeans(ECC_min)
-
-ECC_sd = sqrt(rowMeans((ECC_min - ECC_mean)^2))
-
-ECC_CRPS = crps_na_rm(validation_dt_min[,SST_min], mean = ECC_mean, sd = ECC_sd)
+ECC_CRPS = scoringRules::crps_sample(y = validation_dt_min[,SST_min], 
+                                     dat = as.matrix(ECC_min[,.SD,.SDcols = paste0('ECC_min_',1:ens_size)]))
 
 
-#  mean CRPS
+
+######### putting together ###############
 
 CRPS_min = data.table("route" = route_name,
+                      "CRPS_PFC" = PFC_CRPS,
                       "CRPS_PCA" = mean(PCA_CRPS),
                       "CRPS_SE" = mean(SE_CRPS),
                       "CRPS_GS" = mean(GS_CRPS),
-                      "CRPS_ECC" = mean(ECC_CRPS),
-                      "CRPS_PFC" = PFC_CRPS)
+                      "CRPS_ECC" = mean(ECC_CRPS))
+
 
 
 
 ######################################################
-###### Get CRPS for the  mean along route #########
+###### Get CRPS for the  meanimum along route #########
 ######################################################
 
 ### PFC ###
@@ -556,77 +500,40 @@ CRPS_min = data.table("route" = route_name,
 
 PFC_CRPS = validation_dt_mean[,mean(abs(SST_mean - SST_hat_mean))]
 
-
 ### PCA ###
 
-for(i in 1:fc_ens_size)
-{
-  PCA_fc_route[,paste0('PCA_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-PCA_mean = unique(PCA_fc_route[,.SD,.SDcols = paste0('PCA_mean_',1:fc_ens_size)])
-
-PCA_mn = rowMeans(PCA_mean)
-
-PCA_sd = sqrt(rowMeans((PCA_mean - PCA_mn)^2))
-
-PCA_CRPS = crps_na_rm(validation_dt_mean[,SST_mean], mean = PCA_mn, sd = PCA_sd)
-
+PCA_CRPS = scoringRules::crps_sample(y = validation_dt_mean[,SST_mean], 
+                                     dat = as.matrix(PCA_mean[,.SD,.SDcols = paste0('PCA_mean_',1:fc_ens_size)]))
 
 ### SE ###
 
-for(i in 1:fc_ens_size)
-{
-  SE_fc_route[,paste0('SE_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
+SE_CRPS = scoringRules::crps_sample(y = validation_dt_mean[,SST_mean], 
+                                    dat = as.matrix(SE_mean[,.SD,.SDcols = paste0('SE_mean_',1:fc_ens_size)]))
 
-SE_mean = unique(SE_fc_route[,.SD,.SDcols = paste0('SE_mean_',1:fc_ens_size)])
-
-SE_mn = rowMeans(SE_mean)
-
-SE_sd = sqrt(rowMeans((SE_mean - SE_mn)^2))
-
-SE_CRPS = crps_na_rm(validation_dt_mean[,SST_mean], mean = SE_mn, sd = SE_sd)
 
 ### GS ###
 
-for(i in 1:fc_ens_size)
-{
-  GS_fc_route[,paste0('GS_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-GS_mean = unique(GS_fc_route[,.SD,.SDcols = paste0('GS_mean_',1:fc_ens_size)])
-
-GS_mn = rowMeans(GS_mean)
-
-GS_sd = sqrt(rowMeans((GS_mean - GS_mn)^2))
-
-GS_CRPS = crps_na_rm(validation_dt_mean[,SST_mean], mean = GS_mn, sd = GS_sd)
+GS_CRPS = scoringRules::crps_sample(y = validation_dt_mean[,SST_mean], 
+                                    dat = as.matrix(GS_mean[,.SD,.SDcols = paste0('GS_mean_',1:fc_ens_size)]))
 
 ### ECC ###
 
-for(i in 1:ens_size)
-{
-  ECC_fc_route[,paste0('ECC_mean_',i) := lapply(.SD,mean,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]  
-}
-
-ECC_mean = unique(ECC_fc_route[,.SD,.SDcols = paste0('ECC_mean_',1:ens_size)])
-
-ECC_mn = rowMeans(ECC_mean)
-
-ECC_sd = sqrt(rowMeans((ECC_mean - ECC_mn)^2))
-
-ECC_CRPS = crps_na_rm(validation_dt_mean[,SST_mean], mean = ECC_mn, sd = ECC_sd)
+ECC_CRPS = scoringRules::crps_sample(y = validation_dt_mean[,SST_mean], 
+                                     dat = as.matrix(ECC_mean[,.SD,.SDcols = paste0('ECC_mean_',1:ens_size)]))
 
 
-########### putting together ##############
+
+######### putting together ###############
 
 CRPS_mean = data.table("route" = route_name,
+                      "CRPS_PFC" = PFC_CRPS,
                       "CRPS_PCA" = mean(PCA_CRPS),
                       "CRPS_SE" = mean(SE_CRPS),
                       "CRPS_GS" = mean(GS_CRPS),
-                      "CRPS_ECC" = mean(ECC_CRPS),
-                      "CRPS_PFC" = PFC_CRPS)
+                      "CRPS_ECC" = mean(ECC_CRPS))
+
+
+
 
 ###########################################
 

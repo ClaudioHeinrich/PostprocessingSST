@@ -29,7 +29,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_3" 
+name_abbr = "Atl" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -149,9 +149,9 @@ dev.off()
 # we pick exponential moving averages, since they are more stable.
 
 if(sc_sma_var[,min(CRPS)] < sc_ema_var[,min(CRPS)]){
-  opt_par_var = c("sma",sc_sma_var[,which.min(CRPS)])
+  opt_par_var = c("sma",sc_sma_var[,win_length][sc_sma_var[,which.min(CRPS)]])
 } else{
-  opt_par_var = c("ema",sc_ema_var[,a][sc_sma_var[,which.min(CRPS)]])
+  opt_par_var = c("ema",sc_ema_var[,a][sc_ema_var[,which.min(CRPS)]])
 }
 
 ### variance estimation ###

@@ -29,7 +29,7 @@ mv_rank_hist = function(dt_fc,
                         breaks = 10,
                         save_pdf = FALSE, plot_dir = "", file_name = "")
 {
-  ym = unique(dt[,YM])
+  ym = unique(dt_fc[,YM])
   
   ranks_matrix = matrix(ym,nrow = length(ym),ncol = 1+3*(fc_ens_size +1)) 
   #ncol: 1 col for YM, 3 methods of ranking, for each we get ranks for observation and each Monte Carlo sample
@@ -43,7 +43,7 @@ mv_rank_hist = function(dt_fc,
     print(paste0("YM = ",yearmonth-min(ym)+1,"/",ym[length(ym)]-min(ym)+1))  
     
     YM_ind = YM_ind + 1
-    fc_obs_mat = dt[YM == yearmonth,.SD,.SDcols = c("SST_bar",paste0("fc",1:fc_ens_size))]
+    fc_obs_mat = dt_fc[YM == yearmonth,.SD,.SDcols = c("SST_bar",paste0("fc",1:fc_ens_size))]
     
     # get ranks
     ranks_matrix[YM_ind,2:drm[2]] = c(mst.rank(as.matrix(fc_obs_mat)),

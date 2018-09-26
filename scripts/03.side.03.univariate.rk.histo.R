@@ -22,18 +22,18 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Atl" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
 
-
-
 DT[,SST_bar := trc(SST_bar)]
 
 na_loc = which(DT[,is.na(SST_bar) | is.na(Ens_bar) ])  
 
+
+# number of simulations and of breaks in the histogram: choose n = 10*k-1 and nbreaks = 10*k
 n=99
 nbreaks = 21
 
@@ -56,7 +56,3 @@ pdf(file=paste0(plot_dir,"rkh.pdf"))
   abline(a=dim(rank_mat)[1]/(nbreaks-1), b=0, lty=2, col="gray30")
 dev.off()
 
-
-DT[,SD_hat := SD_hat_sv]
-
-save.image(file = paste0(save_dir,"univariate.model.comparison.RData"))

@@ -1,6 +1,6 @@
 #######################################################################################
 
-###################  side script 3.1 - PIT plots  ######################
+###################  side script 3.2 - PIT plots  ######################
 
 #######################################################################################
 
@@ -25,7 +25,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_2" 
+name_abbr = "Atl" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 

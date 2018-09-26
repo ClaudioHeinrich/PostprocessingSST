@@ -133,14 +133,14 @@ exp_mov_av = function( a,vec, years, skip = 0,twosided = FALSE){
 #' @return vector of the same length as y containing crps scores.
 #'
 #' @author Claudio Heinrich
-#' @examples crps.na.rm(c(NA,rnorm(10)), 1,1)
+#' @examples crps_na_rm(c(NA,rnorm(10)), 1,1)
 #' 
 #' @importFrom scoringRules crps
 #' 
 #' @export
 
 
-crps.na.rm = function(y, mean, sd){
+crps_na_rm = function(y, mean, sd){
   
   na_loc = which( is.na(y) | is.na(mean) | is.na(sd) | sd == 0)
   
@@ -202,7 +202,7 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
   
   if(var){
     glob_mean_sc = DT[year %in% eval_years, 
-                    .("CRPS" = mean (crps.na.rm(SST_bar, mean = SST_hat,sd = SD_hat),na.rm = TRUE))]
+                    .("CRPS" = mean (crps_na_rm(SST_bar, mean = SST_hat,sd = SD_hat),na.rm = TRUE))]
   } else glob_mean_sc = DT[year %in% eval_years, 
                            .("MSE" = mean( (SST_bar - SST_hat)^2, na.rm=TRUE))]
   
@@ -514,7 +514,18 @@ bias_correct_training = function(dt = NULL,
   return(dt)
 }
 
-# Variance as in NGR
+#' Estimates the variance as has been suggested for NGR
+#' 
+#' @param dt the data table.
+#' @param months The considered months.
+#' @param validation_years Training years and validation years.
+#' 
+#' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
+#'
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
 
 var_est_NGR = function(dt,
                        months = 1:12,
@@ -539,7 +550,7 @@ var_est_NGR = function(dt,
       temp = dt_new[year < y & month == m,]
       CRPS_by_month = function(cd)
       {
-        return(mean(crps.na.rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
+        return(mean(crps_na_rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
       } 
       opt_par = optim(par = c(0,1),fn = CRPS_by_month)
       var_est_by_month[year == y & month == m, "c":= opt_par$par[1]]
@@ -563,7 +574,7 @@ var_est_NGR = function(dt,
       temp = dt_new[year < y & grid_id == gid,]
       CRPS_by_gid = function(cd)
       {
-        return(mean(crps.na.rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
+        return(mean(crps_na_rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
       } 
       opt_par = optim(par = c(0,1),fn = CRPS_by_gid)
       return_DT[grid_id == gid, "c" := opt_par$par[1]]
@@ -597,7 +608,7 @@ var_est_NGR = function(dt,
         temp_2 = temp[grid_id == gid,]
         CRPS_by_both = function(cd)
         {
-          return(mean(crps.na.rm(temp_2[,SST_bar], temp_2[,SST_hat], cd[1]^2 + cd[2]^2 * temp_2[,Ens_sd]), na.rm = TRUE))
+          return(mean(crps_na_rm(temp_2[,SST_bar], temp_2[,SST_hat], cd[1]^2 + cd[2]^2 * temp_2[,Ens_sd]), na.rm = TRUE))
         } 
         opt_par = optim(par = c(0,1),fn = CRPS_by_both)
         return_DT[month == m & grid_id == gid, "c":= opt_par$par[1]]

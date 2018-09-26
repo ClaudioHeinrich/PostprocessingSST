@@ -30,7 +30,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_3" 
+name_abbr = "Atl" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -138,9 +138,9 @@ dev.off()
 ###### finding and applying optimal way of bias correcion, exponential moving averages are preferred, as the parameter estimation for them typically is more stable ######
 
 if(sc_sma[,min(MSE)] < 0.9 * sc_ema[,min(MSE)]){
-  opt_par = c("sma",sc_sma[,which.min(MSE)])
+  opt_par = c("sma",sc_sma[,win_length][,which.min(MSE)])
 } else{
-  opt_par = c("ema",sc_ema[,a][sc_sma[,which.min(MSE)]])
+  opt_par = c("ema",sc_ema[,a][sc_ema[,which.min(MSE)]])
 }
 
 DT = bias_correct(dt = DT,

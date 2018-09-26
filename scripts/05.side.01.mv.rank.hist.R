@@ -1,0 +1,67 @@
+
+###############################################################################
+
+#############  side script 5.1 - multivariate rank histograms  ################
+
+###############################################################################
+
+# This script compares the multivariate post-processing methods by means of their multivariate rank histograms
+# 
+# Plots generated: rank_histo_PCA.pdf, rank_histo_SE.pdf, rank_histo_GS.pdf, rank_histo_ECC.pdf,
+#   
+# Requires previous run of 04.master.multiv.pp.R with the same value of name_abbr as below.
+
+##### setting up ######
+
+
+rm(list = ls())
+
+setwd("~/NR/SFE")
+options(max.print = 1e3)
+
+library(PostProcessing)
+library(data.table)
+
+name_abbr = "Atl" 
+
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+
+load(file = paste0(save_dir,"setup.RData"))
+
+##################
+
+brks = 10
+
+### PCA ###
+
+# get forecast:
+load(paste0(PCA_dir,"fc.RData"))
+
+mv_rank_hist(PCA_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "PCA rank histograms",
+             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA")
+
+### SE ###
+
+# get forecast:
+load(paste0(SE_dir,"fc.RData"))
+
+mv_rank_hist(SE_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "SE rank histograms",
+             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_SE")
+
+### geostationary ###
+
+# get forecast:
+load(paste0(GS_dir,"fc.RData"))
+
+mv_rank_hist(GS_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "GS rank histograms",
+             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_GS")
+
+
+### ECC ###
+
+# get forecast:
+load(paste0(ECC_dir,"fc.RData"))
+
+
+mv_rank_hist(ECC_fc, fc_ens_size = ens_size, breaks = brks, , mn = "ECC rank histograms",
+             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_ECC")
