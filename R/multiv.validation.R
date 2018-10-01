@@ -66,16 +66,15 @@ mv_rank_hist = function(dt_fc,
   
   par(mfrow=c(1,3),mex=0.5,oma = c(0,0,2.5,0),mar=c(2.5,2.5,2.5,2.5)+0.1,mgp=c(0.5,0,0))
   
-  rhist_dt(ranks[,.(YM,mst.rk.obs)], ens_size = fc_ens_size, breaks = breaks,  hist_xlab = "minimum spanning tree")
-  rhist_dt(ranks[,.(YM,av.rk.obs)], ens_size = fc_ens_size, breaks = breaks, hist_xlab = "average")
-  rhist_dt(ranks[,.(YM,bd.rk.obs)], ens_size = fc_ens_size, breaks = breaks, hist_xlab = "band depth")
+  rhist_dt(ranks[,.(YM,mst.rk.obs)], breaks = breaks,  hist_xlab = "minimum spanning tree")
+  rhist_dt(ranks[,.(YM,av.rk.obs)], breaks = breaks, hist_xlab = "average")
+  rhist_dt(ranks[,.(YM,bd.rk.obs)], breaks = breaks, hist_xlab = "band depth")
   
   title(mn,outer = TRUE)
   
   if(save_pdf)
   {
-    dev.off()
-  }
+    dev.off()  }
   
 }
 
@@ -258,7 +257,7 @@ var_sc_emp = function(m,y,dt_fc,n,p)
 #'  
 #' @export
 
-var_sc_par = function(dt_fc, years = validation_years, ms = months, n = fc_ens_size, p = 0.5,
+var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
                       save_dir = NULL, file_name = "vs")
 {
   vs = list()
