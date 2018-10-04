@@ -30,17 +30,20 @@ save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
 
+time_s52 = proc.time()
+
 ##################
 
 # choose power for variogram score:
 
-p = 0.5
+pp = 0.5
 
 ### PCA ###
 
 load(paste0(PCA_dir,"fc.RData"))
 
-vs_PCA = var_sc_par(dt_fc = PCA_fc,  p = p,
+
+vs_PCA = var_sc_par(dt_fc = PCA_fc,  p = pp,
                     years = validation_years, ms = months, n = fc_ens_size,
                     save_dir = NULL)
 
@@ -49,7 +52,7 @@ vs_PCA = var_sc_par(dt_fc = PCA_fc,  p = p,
 
 load(paste0(SE_dir,"fc.RData"))
 
-vs_SE = var_sc_par(dt_fc = SE_fc,  p = p,
+vs_SE = var_sc_par(dt_fc = SE_fc,  p = pp,
                    years = validation_years, ms = months, n = fc_ens_size,
                    save_dir = NULL)
   
@@ -57,7 +60,7 @@ vs_SE = var_sc_par(dt_fc = SE_fc,  p = p,
 
 load(paste0(GS_dir,"fc.RData"))
 
-vs_GS = var_sc_par(dt_fc = GS_fc,  p = p,
+vs_GS = var_sc_par(dt_fc = GS_fc,  p = pp,
                    years = validation_years, ms = months, n = fc_ens_size,
                    save_dir = NULL)
 
@@ -65,7 +68,7 @@ vs_GS = var_sc_par(dt_fc = GS_fc,  p = p,
 
 load(paste0(ECC_dir,"fc.RData"))
 
-vs_ECC = var_sc_par(dt_fc = ECC_fc,  p = p,
+vs_ECC = var_sc_par(dt_fc = ECC_fc,  p = pp,
                     years = validation_years, ms = months, n = ens_size, 
                     save_dir = NULL)
   
@@ -80,3 +83,7 @@ boxplot( list (vs_PCA[,vs],vs_SE[,vs],vs_GS[,vs], vs_ECC[,vs]),names = c("PCA","
 dev.off()
 
 save(vs_dt,vs_PCA,vs_SE,vs_GS,vs_ECC,file = paste0(save_dir,"vs.RData"))
+
+time_s52 = proc.time() - time_s52
+
+save.image(file = paste0(save_dir,"setup.RData"))

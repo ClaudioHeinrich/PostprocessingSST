@@ -22,11 +22,13 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl" 
+name_abbr = "Atl/standardized" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
+
+time_s51 = proc.time()
 
 ##################
 
@@ -39,6 +41,8 @@ load(paste0(PCA_dir,"fc.RData"))
 
 mv_rank_hist(PCA_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "PCA rank histograms",
              save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA")
+
+proc.time()
 
 ### SE ###
 
@@ -63,5 +67,10 @@ mv_rank_hist(GS_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "GS rank hist
 load(paste0(ECC_dir,"fc.RData"))
 
 
-mv_rank_hist(ECC_fc, fc_ens_size = ens_size, breaks = brks, , mn = "ECC rank histograms",
+mv_rank_hist(ECC_fc, fc_ens_size = ens_size, breaks = brks, mn = "ECC rank histograms",
              save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_ECC")
+
+
+time_s51 = proc.time() - time_s51
+
+save.image(file = paste0(save_dir,"setup.RData"))

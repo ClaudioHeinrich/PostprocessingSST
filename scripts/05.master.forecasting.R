@@ -18,17 +18,21 @@
 
 rm(list = ls())
 
+
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl" 
+name_abbr = "Atl/standardized" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
+
+time_s5 = proc.time()
 
 # specifications for the desired forecasts:
 
@@ -94,5 +98,7 @@ save(ECC_fc,file = paste0(ECC_dir,"fc.RData"))
 rm(ECC_fc)
 
 #####
+
+time_s5 = proc.time() - time_s5
 
 save.image(file = paste0(save_dir,"setup.RData"))

@@ -20,11 +20,13 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl" 
+name_abbr = "Atl/standardized" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
+
+time_s53 = proc.time()
 
 ####################################
 ####### area specification #########
@@ -555,7 +557,7 @@ CRPS
 
 save(RMSEs,CRPS,file = paste0(save_dir,file_name,".RData"))
 
-
+time_s53 = proc.time() - time_s53
 
 
 

@@ -269,8 +269,9 @@ var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
     pp=p
     dt_fcc = dt_fc
     
-    dummy_fct = function(month){return(var_sc_emp(m = month, y = year, dt_fc = dt_fcc, n = nn, p = pp))}
-    vs = rbindlist(list(vs,rbindlist(parallel::mclapply(X = months, FUN = dummy_fct, mc.cores = length(months)))))
+    vs = rbindlist(list(vs,rbindlist(parallel::mclapply(X = months, FUN = var_sc_emp, 
+                                                        y = year, dt_fc = dt_fcc, n = nn, p = pp,
+                                                        mc.cores = length(months)))))
   }
   
   if(!is.null(save_dir))

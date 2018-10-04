@@ -23,6 +23,8 @@
 
 rm(list = ls())
 
+time_s3 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
@@ -161,6 +163,8 @@ DT = sd_est(dt = DT,
        par_1 = as.double(opt_par_var[2]),
        save_dir = save_dir,
        file_name = paste0("dt_combine_wide_bc_var.RData"))
+
+time_s3 = proc.time() - time_s3
 
 #####
 

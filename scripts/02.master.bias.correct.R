@@ -24,6 +24,8 @@
 
 rm(list = ls())
 
+time_s2 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
@@ -156,6 +158,8 @@ DT = bias_correct_training(dt = DT,
                            save_dir = save_dir)
 
 
+
+time_s2 = proc.time() - time_s2
 
 #### save ####
 

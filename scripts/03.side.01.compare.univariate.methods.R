@@ -18,6 +18,8 @@
 
 rm(list = ls())
 
+time_s31 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
@@ -64,4 +66,8 @@ CRPS_comparison = data.table(mean_CRPS_bm = DT[,mean(crps_na_rm(SST_bar,SST_hat,
 
 CRPS_comparison = round(CRPS_comparison,3)
 
+time_s31 = proc.time() - time_s31
+
 save(RMSE_linear_models,CRPS_comparison,file = paste0(save_dir,'univ_scores_comp_NGR.RData'))
+
+save.image(file = paste0(save_dir,"setup.RData"))

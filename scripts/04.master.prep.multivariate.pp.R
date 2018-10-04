@@ -20,6 +20,8 @@
 
 rm(list = ls())
 
+time_s4 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
@@ -37,7 +39,7 @@ load(file = paste0(save_dir,"setup.RData"))
 
 # decide whether you want to work with SST, or with SST centered around climatology, or with SST standardized w.r.t. climatology 
 
-SST = ""  # takes 'centered','standardized', or ''
+SST = "standardized"  # takes 'centered','standardized', or ''
 
 clim_years = training_years
 
@@ -120,5 +122,7 @@ ECC_dir = paste0(save_dir, "ECC/")
 dir.create(ECC_dir, showWarnings = FALSE)
 
 #####
+
+time_s4 = proc.time() - time_s4
 
 save.image(file = paste0(save_dir,"setup.RData"))

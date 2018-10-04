@@ -11,13 +11,17 @@
 
 rm(list = ls())
 
+time_s1 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
 library(PostProcessing)
 library(data.table)
+library(tictoc)
 
 # choose an abbreviation for this run
+
 
 name_abbr = "Atl"
 
@@ -57,6 +61,8 @@ DT = DT[order(year,month,Lon,Lat)]
 setcolorder(DT,c("year","month",'Lon','Lat','YM','grid_id','SST_bar','Ens_bar','Ens_sd',paste0('Ens',1:ens_size)))
 
 
+
+time_s1 = proc.time() - time_s1
 # save everything:
 
 save.image(file = paste0(save_dir,"setup.RData"))

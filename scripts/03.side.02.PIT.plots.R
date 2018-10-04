@@ -19,6 +19,8 @@
 
 rm(list = ls())
 
+time_s32 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
@@ -75,3 +77,7 @@ plot_diagnostic(DT_calib[year == min(year) & month == min(month), .(Lon,Lat,PIT_
                 mn = paste0("PIT standard deviation"),
                 save_pdf = TRUE, save_dir = plot_dir, file_name = "PIT_sd")
 
+
+time_s32 = proc.time() - time_s32
+
+save.image(file = paste0(save_dir,"setup.RData"))

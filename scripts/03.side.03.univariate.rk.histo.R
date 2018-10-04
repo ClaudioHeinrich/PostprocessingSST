@@ -16,6 +16,8 @@
 
 rm(list = ls())
 
+time_s33 = proc.time()
+
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
@@ -56,3 +58,6 @@ pdf(file=paste0(plot_dir,"rkh.pdf"))
   abline(a=dim(rank_mat)[1]/(nbreaks-1), b=0, lty=2, col="gray30")
 dev.off()
 
+time_s33 = proc.time() - time_s33
+
+save.image(file = paste0(save_dir,"setup.RData"))
