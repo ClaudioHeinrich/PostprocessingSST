@@ -42,15 +42,8 @@ forecast_ECC = function(dt, Y = NULL, M = NULL,
     dt = dt[month %in% M,]
   }  
   
-  na_rows = dt[ ,which(is.na(Bias_Est) |  is.na(Ens_bar) | is.na(SD_hat) )]
   
-  
-  if(!identical(na_rows,integer(0)))
-  {
-    dt_temp = dt[-na_rows,]
-  } else {
-    dt_temp = dt
-  }
+  dt_temp = dt[!(is.na(Bias_est) | is.na(Ens_bar) | is.na(SD_hat))]
   
   # do univariate postprocessing:  
   
