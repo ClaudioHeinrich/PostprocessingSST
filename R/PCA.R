@@ -16,11 +16,7 @@ weight_mat = function(dt, phi = GneitingWeightFct, L = 2500)
   
   dt = dt[year == min(year) & month ==min (month),]
   
-  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
-  if(!identical(land_ids,integer(0)))
-  {
-    dt = dt[-land_ids,]
-  } 
+  dt = dt[!(is.na(Bias_est) | is.na(Ens_bar) | is.na(SD_hat))]
   
   # find distance matrix
   sp <- sp::SpatialPoints(cbind(x=dt[, Lon],
@@ -56,11 +52,7 @@ sam_cov = function(dt, weight_mat,
 { 
   dt = dt[year %in% Y & month %in% M,]
   
-  na_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
-  if(!identical(na_ids,integer(0)))
-  {
-    dt = dt[-na_ids,]
-  }
+  dt = dt[!(is.na(Bias_est) | is.na(Ens_bar) | is.na(SD_hat))]
   
   num_loc = dt[year == min(year) & month == min(month),.N]
   
@@ -112,13 +104,9 @@ forecast_PCA = function(dt, Y, M,
   #find land grid ids:
   dt = dt[year %in% Y,][month %in% M,]
   
-  land_ids <- which(dt[, is.na(Ens_bar) | is.na(SST_bar)])
-  if(!identical(land_ids,integer(0)))
-  {
-    dt_water = dt[-land_ids,]
-  } else {
-    dt_water = dt
-  }
+  
+  dt_water = dt[!(is.na(Ens_bar) | is.na(SST_bar))]
+  
   
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
               "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
@@ -170,14 +158,12 @@ forecast_PCA = function(dt, Y, M,
     
   #-------- add land --------------
   
-  if(!identical(land_ids,integer(0)))
-  {
-    fc_land = dt[land_ids,]
-    fc_land[,  paste0("no",1:n):= NA]
-    fc_land[,  paste0("fc",1:n):= NA]
+  fc_land = dt[is.na(Ens_bar) | is.na(SST_bar)]
+  fc_land[,  paste0("no",1:n):= NA]
+  fc_land[,  paste0("fc",1:n):= NA]
     
-    fc = rbindlist(list(fc_water,fc_land), fill = TRUE)
-  }
+  fc = rbindlist(list(fc_water,fc_land), fill = TRUE)
+  
   
   # order:
   
