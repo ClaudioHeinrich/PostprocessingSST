@@ -250,7 +250,7 @@ var_sc_emp = function(m,y,dt_fc,n,p)
 #' @param n number of forecasts available for moment estimation.
 #' @param p Power used in the variogram score.
 #' @param save_dir,file_name If we should save and where. \code{file_name} ought not contain '.RData'.
-#' 
+#' @param mc.cores How many cores do you want to use?
 #' @return a data table with three columns: year, month and vs.
 #' 
 #' @author Claudio Heinrich
@@ -258,26 +258,42 @@ var_sc_emp = function(m,y,dt_fc,n,p)
 #' @export
 
 var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
-                      save_dir = NULL, file_name = "vs")
+                      save_dir = NULL, file_name = "vs",
+                      mc.cores = NULL)
 {
-  vs = list()
-  for(year in years)
-  {
-    print(year)
-    # to avoid errors in mclapply:
-    nn=n
-    pp=p
-    dt_fcc = dt_fc
+    if(is.null(mc.cores)) mc.cores = length(ms)
     
-    vs = rbindlist(list(vs,rbindlist(parallel::mclapply(X = months, FUN = var_sc_emp, 
-                                                        y = year, dt_fc = dt_fcc, n = nn, p = pp,
-                                                        mc.cores = length(months)))))
-  }
+    vs_all = list()
+    for(i in 1:length(years))
+    {
+        year_i = years[i]
+        print(year_i)
+        ## to avoid errors in mclapply:
+        if(mc.cores == 1){
+            l = list()
+            for(j in 1:length(ms)){
+                l[[j]] = var_sc_emp(m = ms[j],
+                                    y = year_i,
+                                    dt_fc = dt_fc,
+                                    n = n,
+                                    p = p)
+            }
+        }else{
+            l = parallel::mclapply(X = ms,
+                                   FUN = var_sc_emp, 
+                                   y = year_i,
+                                   dt_fc = dt_fc,
+                                   n = n,
+                                   p = p,
+                                   mc.cores = mc.cores)
+        }
+        vs_all[[i]] = rbindlist(l)
+    }
+    vs = rbindlist(vs_all)
+    if(!is.null(save_dir))
+    {
+        save(vs,file = paste0(save_dir,file_name,".RData"))
+    }
   
-  if(!is.null(save_dir))
-  {
-    save(vs,file = paste0(save_dir,file_name,".RData"))
-  }
-  
-  return(vs)
+    return(vs)
 }
