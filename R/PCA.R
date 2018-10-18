@@ -101,12 +101,10 @@ forecast_PCA = function(dt, Y, M,
                         n = 10, nPCs = 300,
                         cov_dir, cov_file_name = "sam_cov") 
 {
-  #find land grid ids:
+  
   dt = dt[year %in% Y,][month %in% M,]
   
-  
   dt_water = dt[!(is.na(Ens_bar) | is.na(SST_bar))]
-  
   
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
               "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
