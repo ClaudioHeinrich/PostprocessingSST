@@ -248,6 +248,8 @@ setnames(gm,c("Lon2","Lat2","Lon","Lat"))
 
 save(gm, file = "./grid_mapping_2mt.RData")
 
+load( file = "./grid_mapping_2mt.RData")
+
 ### project on new grid
 
 # easiest and fastest way is merging data tables:
@@ -283,7 +285,7 @@ DT_new = DT_new[order(year,month,Lon,Lat)]
 DT = DT_new
 
 DT[, Ens_bar := rowMeans(.SD),.SDcols = paste0("Ens",1:15)]
-DT[, Ens_sd := rowMeans(.SD^2 - Ens_bar),.SDcols = paste0("Ens",1:15)]
+DT[, Ens_sd := rowMeans((.SD - Ens_bar)^2),.SDcols = paste0("Ens",1:15)]
 
 
 save(DT,file = "./DT_2mt.RData")
