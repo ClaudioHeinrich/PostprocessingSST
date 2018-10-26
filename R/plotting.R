@@ -6,7 +6,7 @@
 #' @description Takes a data table that contains cols Lon, Lat and var. If it has multiple years and months, the minimum is taken
 #' 
 #' @param dt The data table.
-#' @param var Character string. The name of the column containing the values for the plot.
+#' @param var Character string. The name of the column containing the values for the plot. Default is third column, for subset data tables of the form .(Lon,Lat,var).
 #' @param mn Title of the plot.
 #' @param col_scheme Either "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
 #' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
@@ -27,7 +27,7 @@
 #' @importFrom fields designer.colors image.plot
 #' @importFrom maps map
 
-plot_diagnostic = function( dt, var = "SST_bar", mn = var,
+plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
                             rr = NULL,
                             col_scheme = "bwr", set_white = NULL,
                             xlab = "", ylab = "", cex = 1,
@@ -127,7 +127,7 @@ plot_diagnostic = function( dt, var = "SST_bar", mn = var,
 #' @description Takes a data table of the form .(Lon,Lat,value) or .(Lat,Lon,value) and plots values on the globe after applying a kernel smoothing
 #' 
 #' @param dt The data table.
-#' @param var Character string. The name of the column containing the values for the plot.
+#' @param var Character string. The name of the column containing the values for the plot. Default is the name of the third column of dt, to be used for subset data tables of the form .(Lon,Lat,var).
 #' @param mn,rr Title and range of the plot.
 #' @param theta parameter for the Gaussian smoothing kernel
 #' @param pixels Resolution of the plot
@@ -152,7 +152,7 @@ plot_diagnostic = function( dt, var = "SST_bar", mn = var,
 #' @import sp maptools
 
 
-plot_smooth = function( dt, var = "SST_bar", mn = var, rr = NULL,
+plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
                         theta = 0.5, pixels = 256,
                         col_scheme = "bwr", set_white = NULL,
                         xlab = "", ylab = "",cex = 1,
