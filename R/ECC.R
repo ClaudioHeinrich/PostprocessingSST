@@ -43,7 +43,7 @@ forecast_ECC = function(dt, Y = NULL, M = NULL,
   }  
   
   
-  dt_temp = dt[!(is.na(Bias_est) | is.na(Ens_bar) | is.na(SD_hat))]
+  dt_temp = dt[!(is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat))]
   
   # do univariate postprocessing:  
   

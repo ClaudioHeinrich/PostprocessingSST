@@ -331,69 +331,114 @@ bias_correct = function(dt, method, par_1,
 
 
 
-#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR).
+#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by month.
 #' 
 #' @param DT the data table.
 #' @param months The considered months.
 #' @param training_years,validation_years Training years and validation years.
 #' 
-#' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
 #'
 #' @examples \dontrun{ DT = load_combined_wide()
-#'                     bias_lr(DT = DT)}
+#'                     bias_lr_bm(DT = DT)}
 #'   
 #' @author Claudio Heinrich
 #' 
 #' @export
 
-bias_lr = function(DT,
-                   months = 1:12,
-                   validation_years = 2001:2010)
+bias_lr_bm = function(DT,
+                      months = 1:12,
+                      validation_years = 2001:2010
+)
 {
   
-  for(y in validation_years)
+  for(y in validation_years) # parallelizing runs into memory issues, and for some reason is not faster?
   {
     print(y)
     # grouped by month
     
     fits_by_month = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | month,
-                                 data=DT[year < y,])
-    months = as.character(DT[,month])
-    DT[,c("a","b"):= coef(fits_by_month)[months,]]
+                                 data=DT[year < y,.(SST_bar,Ens_bar,month)])
+    
+    months = as.character(DT[year == y,month])
+    DT[year == y, c("a","b"):= coef(fits_by_month)[months,]]
     DT[year == y, T_hat_lr_m := a + b * Ens_bar]
-    
-    # grouped by location
-    
-    fits_by_loc = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
-                         data=DT[year < y,])
-    
-    grid_ids = as.character(DT[,grid_id])
-    DT[,c("a","b"):= coef(fits_by_loc)[grid_ids,]]
-    DT[year == y,T_hat_lr_loc := a + b * Ens_bar]
-    
-    # by both
-    
-    DT[,m_gid := interaction(month,grid_id)]
-    fits_by_both = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | m_gid,
-                          data=DT[year < y,])
-    m_gids = as.character(DT[,m_gid])
-    DT[,c("a","b"):= coef(fits_by_both)[m_gids,]]
-    DT[year == y,T_hat_lr_both := a + b * Ens_bar]
-    
   }
   
+}
+
+
+#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by location.
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param training_years,validation_years Training years and validation years.
+#' 
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr_bl(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+
+bias_lr_bl = function(DT,
+                      months = 1:12,
+                      validation_years = 2001:2010)
+{
   
-  RMSE_lr_m = sqrt(DT[year %in% validation_years,mean((T_hat_lr_m-SST_bar)^2, na.rm = TRUE)])
-  RMSE_lr_loc = sqrt(DT[year %in% validation_years,mean((T_hat_lr_loc-SST_bar)^2, na.rm = TRUE)])
-  RMSE_lr_both = sqrt(DT[year %in% validation_years,mean((T_hat_lr_both-SST_bar)^2, na.rm = TRUE)])
+  # grouped by location
+  for(y in validation_years)
+  {
+    print(y)
+    
+    fits_by_loc = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+                               data=DT[year < y,.(SST_bar,Ens_bar,grid_id)])
+    
+    grid_ids = as.character(DT[year == y,grid_id])
+    DT[year == y,c("a","b"):= coef(fits_by_loc)[grid_ids,]]
+    DT[year == y,T_hat_lr_loc := a + b * Ens_bar]
+  }
   
-  new_col_names = c("a","b","T_hat_lr_m","T_hat_lr_loc","T_hat_lr_both","m_gid")
-  DT[,(new_col_names) := NULL]
+}
+
+#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by both month and location.
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param training_years,validation_years Training years and validation years.
+#' 
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr_bm(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+bias_lr_bb = function(DT,
+                      months = 1:12,
+                      validation_years = 2001:2010)
+{
   
-  RMSE_linear_models = data.table(RMSE_lr_m = RMSE_lr_m, RMSE_lr_loc = RMSE_lr_loc, RMSE_lr_both = RMSE_lr_both)
-  
-  return(RMSE_linear_models)
-  
+  # grouped by location
+  for(y in validation_years)
+  {
+    for(m in months)
+    {
+      print(c(y,m))
+      
+      data = DT[month == m][year < y,.(SST_bar,Ens_bar,grid_id)]
+      data[,grid_id := as.factor(grid_id)]
+      fits_by_both = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+                                  data=data)
+      gids = as.character(DT[month == m][year == y,grid_id])
+      DT[month == m & year == y,c("a","b"):= coef(fits_by_both)[gids,]]
+      DT[month == m & year == y,T_hat_lr_both := a + b * Ens_bar]
+      
+    }
+    
+  }
 }
 
 
@@ -514,7 +559,7 @@ bias_correct_training = function(dt = NULL,
   return(dt)
 }
 
-#' Estimates the variance as has been suggested for NGR
+#' Estimates the variance as has been suggested for NGR, grouped by month
 #' 
 #' @param dt the data table.
 #' @param months The considered months.
@@ -527,9 +572,9 @@ bias_correct_training = function(dt = NULL,
 #' 
 #' @export
 
-var_est_NGR = function(dt,
-                       months = 1:12,
-                       validation_years = 2001:2010)
+var_est_NGR_bm = function(dt,
+                          months = 1:12,
+                          validation_years = 2001:2010)
 {
   na_loc = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
   dt_new = dt[-na_loc,]
@@ -547,39 +592,63 @@ var_est_NGR = function(dt,
     # grouped by month
     for(m in months)
     {
-      temp = dt_new[year < y & month == m,]
-      CRPS_by_month = function(cd)
+      temp = dt_new[year < y & month == m,][,Ens_var := Ens_sd^2]
+      score_by_month = function(cd)
       {
-        return(mean(crps_na_rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
+        return(mean((temp[,var_bar]  - (cd[1]^2 + cd[2]^2 * temp[,Ens_var]))^2, na.rm = TRUE))
       } 
-      opt_par = optim(par = c(0,1),fn = CRPS_by_month)
+      opt_par = optim(par = c(0,1),fn = score_by_month)
       var_est_by_month[year == y & month == m, "c":= opt_par$par[1]]
       var_est_by_month[year == y & month == m, "d":= opt_par$par[2]]
-      }
+    }
   }
   
   dt = merge(dt,var_est_by_month,by = c("year","month"),all.x = TRUE)
-  dt[,SD_hat_lr_bm := c^2 + d^2*Ens_sd]
+  dt[,SD_hat_lr_bm := sqrt(c^2 + d^2*Ens_sd^2)]
   dt[,c("c","d"):=NULL]
   
+  return(dt)
+}
+
+
+#' Estimates the variance as has been suggested for NGR, grouped by location
+#' 
+#' @param dt the data table.
+#' @param months The considered months.
+#' @param validation_years Training years and validation years.
+#' 
+#' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
+#'
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+
+var_est_NGR_bl = function(dt,
+                          months = 1:12,
+                          validation_years = 2001:2010)
+{
+  na_loc = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
+  dt_new = dt[-na_loc,]
   
   #grouped by location:
   
-  print("minimize CRPS for data grouped by location:")
+  print("minimize variance score for data grouped by location:")
   
   vebl_parallel = function(y)
   { return_DT = data.table(grid_id = dt[,unique(grid_id)], year = y)
-    for(gid in dt_new[,unique(grid_id)])
+  for(gid in dt_new[,unique(grid_id)])
+  {
+    temp = dt_new[year < y & grid_id == gid,][,Ens_var := Ens_sd^2]
+    score_by_gid = function(cd)
     {
-      temp = dt_new[year < y & grid_id == gid,]
-      CRPS_by_gid = function(cd)
-      {
-        return(mean(crps_na_rm(temp[,SST_bar], temp[,SST_hat], cd[1]^2 + cd[2]^2 * temp[,Ens_sd]), na.rm = TRUE))
-      } 
-      opt_par = optim(par = c(0,1),fn = CRPS_by_gid)
-      return_DT[grid_id == gid, "c" := opt_par$par[1]]
-      return_DT[grid_id == gid, "d" := opt_par$par[2]]
-    }
+      return(mean((temp[,var_bar]  - (cd[1]^2 + cd[2]^2 * temp[,Ens_var]))^2, na.rm = TRUE))
+    } 
+    opt_par = optim(par = c(0,1),fn = score_by_gid)
+    return_DT[grid_id == gid, "c" := opt_par$par[1]]
+    return_DT[grid_id == gid, "d" := opt_par$par[2]]
+  }
   return(return_DT)
   }
   
@@ -587,46 +656,70 @@ var_est_NGR = function(dt,
   var_est_by_loc = rbindlist(var_est_by_loc)
   
   dt = merge(dt,var_est_by_loc,by = c("year","grid_id"),all.x = TRUE)
-  dt[,SD_hat_lr_bl := c^2 + d^2*Ens_sd]
+  dt[,SD_hat_lr_bl := sqrt(c^2 + d^2*Ens_sd^2)]
   dt[,c("c","d"):=NULL]
+  
+  return(dt) 
+}
+
+#' Estimates the variance as has been suggested for NGR, grouped by both month and location
+#' 
+#' @param dt the data table.
+#' @param months The considered months.
+#' @param validation_years Training years and validation years.
+#' 
+#' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
+#'
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+
+var_est_NGR_bb = function(dt,
+                          months = 1:12,
+                          validation_years = 2001:2010)
+{
+  na_loc = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
+  dt_new = dt[-na_loc,][,c:=NA][,d:=NA]
   
   #grouped by both:
   
-  print("minimize CRPS for data grouped by both:")
+  print("minimize variance score for data grouped by both:")
   
-  vebb_parallel = function(y)
-  { return_DT = as.data.table(expand.grid(dt_new[,unique(grid_id)],months))
-    setnames(return_DT,c("grid_id","month"))
-    return_DT[,year := y]
-    
-    for(m in months)
+  res_dt = list()
+  for (y in validation_years)
+  {print(y)
+    vebb_parallel = function(m)
     {
       temp = dt_new[year < y & month == m,]
       
+      return_DT = data.table(grid_id = dt_new[,unique(grid_id)])
+      return_DT[,"year":=y][,"month":=m]
       for(gid in dt_new[,unique(grid_id)])
       {
-        temp_2 = temp[grid_id == gid,]
-        CRPS_by_both = function(cd)
+        temp_2 = temp[grid_id == gid,][,Ens_var := Ens_sd^2]
+        score_by_both = function(cd)
         {
-          return(mean(crps_na_rm(temp_2[,SST_bar], temp_2[,SST_hat], cd[1]^2 + cd[2]^2 * temp_2[,Ens_sd]), na.rm = TRUE))
+          return(mean((temp_2[,var_bar] - (cd[1]^2 + cd[2]^2 * temp_2[,Ens_var]))^2, na.rm = TRUE))
         } 
-        opt_par = optim(par = c(0,1),fn = CRPS_by_both)
-        return_DT[month == m & grid_id == gid, "c":= opt_par$par[1]]
-        return_DT[month == m & grid_id == gid, "d":= opt_par$par[2]]
+        opt_par = optim(par = c(0,1),fn = score_by_both)
+        return_DT[ grid_id == gid, "c":= opt_par$par[1]]
+        return_DT[ grid_id == gid, "d":= opt_par$par[2]]
       }  
+      return(return_DT)
     }
-    return(return_DT)
+    var_est_by_both = parallel::mclapply(months,vebb_parallel,mc.cores =  min(length(months)))
+    var_est_by_both = rbindlist(var_est_by_both)
+    
+    res_dt = rbindlist(list(res_dt,var_est_by_both[,year := y]))
   }
   
-  var_est_by_both = parallel::mclapply(validation_years,vebb_parallel,mc.cores =  min(12,length(validation_years)))
-  var_est_by_both = rbindlist(var_est_by_both)
+  dt  = merge(dt,res_dt,by = c("year","grid_id","month"),all.x = TRUE,)
   
-  dt = merge(dt,var_est_by_both,by = c("year","grid_id","month"),all.x = TRUE)
-  dt[,SD_hat_lr_bb := c^2 + d^2*Ens_sd]
-  dt[,c("c","d"):=NULL]
-
+  dt[,SD_hat_lr_bb := c^2 + d^2*Ens_sd^2]
+  
   return(dt)
-  
 }
 
 

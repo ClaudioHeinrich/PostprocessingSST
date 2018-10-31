@@ -16,7 +16,7 @@ weight_mat = function(dt, phi = GneitingWeightFct, L = 2500)
   
   dt = dt[year == min(year) & month ==min (month),]
   
-  dt = dt[!(is.na(Bias_est) | is.na(Ens_bar) | is.na(SD_hat))]
+  dt = dt[!(is.na(Bias_Est) | is.na(Ens_bar) )]
   
   # find distance matrix
   sp <- sp::SpatialPoints(cbind(x=dt[, Lon],
@@ -52,7 +52,7 @@ sam_cov = function(dt, weight_mat,
 { 
   dt = dt[year %in% Y & month %in% M,]
   
-  dt = dt[!(is.na(Bias_est) | is.na(Ens_bar) | is.na(SD_hat))]
+  dt = dt[!(is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat))]
   
   num_loc = dt[year == min(year) & month == min(month),.N]
   
