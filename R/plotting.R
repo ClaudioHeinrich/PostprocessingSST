@@ -97,9 +97,16 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
   
   #--- plotting ---
   
-  if (is.null(stretch_par)) stretch_par = n_lat/n_lon
-  
-  if(save_pdf) pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
+  if(save_pdf) 
+  {
+    if (is.null(stretch_par)) stretch_par = n_lat/n_lon
+    
+    par_0 = par() # allow to set par manually before calling the function
+    
+    pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
+    
+    suppressWarnings(par(par_0))
+  }
   
   par(mar = c(2,2,2,2))
   
