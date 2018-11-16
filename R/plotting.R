@@ -10,7 +10,7 @@
 #' @param mn Title of the plot.
 #' @param col_scheme Either "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
 #' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
-#' @param xlab,ylab,cex Labeling and font size.
+#' @param xlab,ylab Labeling.
 #' @param save_pdf,save_dir,file_name Whether, where and under which name the plot should be saved.
 #' @param stretch_par Numeric. Only used when save_pdf == TRUE. Stretches the pdf output. Default is NULL, where it is stretched to #Lons/#Lats.
 #'
@@ -30,7 +30,7 @@
 plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
                             rr = NULL,
                             col_scheme = "bwr", set_white = NULL,
-                            xlab = "", ylab = "", cex = 1,
+                            xlab = "", ylab = "",
                             save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot",stretch_par = NULL)
 {
  
@@ -101,6 +101,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
   
   if(save_pdf) pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
   
+  par(mar = c(2,2,2,2))
   
   fields::image.plot(Lons,Lats,A,
              zlim=rr, main = mn,
@@ -108,10 +109,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
              ylim = range(Lats), ylab=ylab,
              breaks=brk,
              col=color,
-             cex.main=cex,cex.lab=1.4,
-             cex.axis=1,
-             axis.args=list(cex.axis=1,
-                            at = brk.at,
+             axis.args=list(at = brk.at,
                             label = brk.lab))
    # add world map
   maps::map("world", add = TRUE)
@@ -133,7 +131,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
 #' @param pixels Resolution of the plot
 #' @param col_scheme Either "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
 #' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
-#' @param xlab,ylab,cex Labeling and font size.
+#' @param xlab,ylab Labeling.
 #' @param save_pdf,save_dir,file_name Whether, where and under which name the plot should be saved.
 #' @param stretch_par Numeric. Only used when save_pdf == TRUE. Stretches the pdf output. Default is NULL, where it is stretched to #Lons/#Lats.
 #'
@@ -155,7 +153,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
 plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
                         theta = 0.5, pixels = 256,
                         col_scheme = "bwr", set_white = NULL,
-                        xlab = "", ylab = "",cex = 1,
+                        xlab = "", ylab = "",
                         save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot", stretch_par = NULL)
 {
   # prepare data table
@@ -237,9 +235,20 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
   
   #--- plotting ---
   
-  if (is.null(stretch_par)) stretch_par = n_lat/n_lon
   
-  if(save_pdf) pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
+  
+  if(save_pdf) 
+    {
+    if (is.null(stretch_par)) stretch_par = n_lat/n_lon
+    
+    par_0 = par() # allow to set par manually before calling the function
+    
+    pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
+    
+    suppressWarnings(par(par_0))
+    }
+  
+  par(mar = c(2,2,2,2))
   
   fields::image.plot(im_0,
                      zlim=rr, main = mn,
@@ -247,10 +256,7 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
                      ylim = range(Lats), ylab=ylab,
                      breaks=brk,
                      col=color,
-                     cex.main=cex,cex.lab=1.4,
-                     cex.axis=1,
-                     axis.args=list(cex.axis=1,
-                                    at = brk.at,
+                     axis.args=list(at = brk.at,
                                     label = brk.lab))
   
   # add world map
