@@ -46,4 +46,3 @@ DT_final[,ukmo_anamoly := ukmo_ts_bar - ukmo_climatology]
 DT_final[,obs_anamoly_1 := shift(obs_anamoly,1,NA,"lag"),.(grid_id,month)]
 
 save(DT_final, file = "./FcNov2018/ts_hindcast_slimmed.RData")
-

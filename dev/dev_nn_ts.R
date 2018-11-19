@@ -56,7 +56,6 @@ for(y in 2006:2017){
     X = DT_train[,.SD, .SDcols = nms_X]
     X_test = DT_final[year == y, .SD, .SDcols = nms_X]
     DT_final[year == y, p_hat := climatology + standard_mlp(X,Y,X_test, epochs = 10, lambda = .01, hidden_config = 8)]
-
     mod = lm(obs_anamoly ~  climatology + obs_anamoly_1 + norcpm_anamoly + ecmwf_anamoly + mf_anamoly + ukmo_anamoly, data = DT_train)
     DT_final[year == y, p_lm := climatology + predict(mod, newdata = DT_final[year == y])]
 }
@@ -69,4 +68,3 @@ Score = DT_final[between(Lat,Lat_nordic[1], Lat_nordic[2]) & between(Lon, Lon_no
                  lapply(.SD,gg,obs_erai_ts),
                  month,
                  .SDcols = c("climatology", "p_hat","p_lm")]
-
