@@ -1,5 +1,6 @@
 rm(list = ls())
 
+library(PostProcessing)
 library(data.table)
 setwd("~/PostClimDataNoBackup/SFE/")
 
@@ -13,10 +14,12 @@ DT = readr::read_rds("./FcNov2018/ts_hindcast2.rds")
 
 setkey(DT,"lon","lat","month","year")
 
-DT_obs = DT[is.finite(obs_erai_ts)]
-
-DT[!is.finite(obs_erai_ts)] = NA
-DT_small = DT_obs[,.(lon,lat,norcpm_ts_bar,
+Lon_bounds = c(-10,28)
+Lat_bounds = c(31,80)
+DT[,"Lon" := lon]
+DT[, "Lat" := lat]
+DT_obs = DT[is.finite(obs_erai_ts) & between(Lon,Lon_bounds[1], Lon_bounds[2]) & between(Lat, Lat_bounds[1], Lat_bounds[2])]
+DT_small = DT_obs[,.(Lon,Lat,norcpm_ts_bar,
                      ecmwf_ts_bar,
                      mf_ts_bar,
                      ukmo_ts_bar,
@@ -26,7 +29,7 @@ DT_small = DT_obs[,.(lon,lat,norcpm_ts_bar,
 
 DT_final = DT_small[!(is.na(ecmwf_ts_bar) | is.na(mf_ts_bar) | is.na(ukmo_ts_bar))]
 
-DT_final[,grid_id:=.GRP,.(lon,lat)]
+DT_final[,grid_id:=.GRP,.(Lon,Lat)]
 DT_final[,N:=.N,grid_id]
 DT_final = DT_final[N ==268]
 DT_final[,climatology := ff_mean(obs_erai_ts),.(grid_id,month)]
@@ -43,3 +46,4 @@ DT_final[,ukmo_anamoly := ukmo_ts_bar - ukmo_climatology]
 DT_final[,obs_anamoly_1 := shift(obs_anamoly,1,NA,"lag"),.(grid_id,month)]
 
 save(DT_final, file = "./FcNov2018/ts_hindcast_slimmed.RData")
+

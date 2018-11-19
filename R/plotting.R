@@ -152,7 +152,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
 #' plot_smooth(dt)
 #' }
 #' 
-#' @importFrom fields as.image designer.colors image.plot image.smooth
+#' @importFronm fields as.image designer.colors image.plot image.smooth
 #' @importFrom maps map
 #' @import sp maptools
 
