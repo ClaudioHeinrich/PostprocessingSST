@@ -125,6 +125,28 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
   
 }
 
+#' Take a data.table on an incomplete grid and "squarify" so that the image function can work on it
+#' @param dt A data.table with Lon and Lat plus another variable
+#' @param var The name of the variable to be squarified
+#' @export
+squarify = function(dt, var = names(dt)[3])
+{
+    lons = dt[,unique(Lon)]
+    lats = dt[,unique(Lat)]
+
+    DT_c = data.table(Lon = rep(lons,each = length(lats)), Lat  = rep(lats, times = length(lons)))
+    DT_plot = merge(DT_c,
+                    dt[,.SD,.SDcols = c("Lon","Lat",var)],
+                    by = c("Lon","Lat"),
+                    all.x = TRUE,
+                    all.y = FALSE)
+
+    return(DT_plot)
+    
+
+}
+
+
 
 
 #' smooth plotting function
@@ -141,7 +163,8 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
 #' @param xlab,ylab Labeling.
 #' @param save_pdf,save_dir,file_name Whether, where and under which name the plot should be saved.
 #' @param stretch_par Numeric. Only used when save_pdf == TRUE. Stretches the pdf output. Default is NULL, where it is stretched to #Lons/#Lats.
-#'
+#'@param exclude_land Should pixels on land be grayed out?
+#' @param exclude_ocean Should pixels on ocean be grayed out?
 #' @return none
 #'  
 #' @export
@@ -161,7 +184,12 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
                         theta = 0.5, pixels = 256,
                         col_scheme = "bwr", set_white = NULL,
                         xlab = "", ylab = "",
-                        save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot", stretch_par = NULL)
+                       save_pdf = FALSE,
+                       save_dir = "./figures/",
+                       file_name = "diag_plot",
+                       stretch_par = NULL,
+                       exclude_land = FALSE,
+                       exclude_ocean = FALSE)
 {
   # prepare data table
   
@@ -177,7 +205,7 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
     dt = dt[,.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
   }
   
-  
+    dt = squarify(dt)
   #--- create image ---
   
   x = dt[,.(Lon,Lat)]
@@ -200,7 +228,12 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
   all_loc = expand.grid(lat = im_0$x,lon = im_0$y)
   pts <- sp::SpatialPoints(all_loc, proj4string=CRS(proj4string(wrld_simpl)))
   ii <- !is.na(over(pts, wrld_simpl)$FIPS)
-  im_0$z[ii] = NA
+    if(exclude_land){
+        im_0$z[ii] = NA
+    }
+    if(exclude_ocean){
+        im_0$z[-which(ii)] = NA
+    }
   
   # --- fix range of plot and fill in values for points out of range ---
   

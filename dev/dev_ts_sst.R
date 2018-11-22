@@ -1,41 +1,20 @@
 rm(list = ls())
 
-library(PostProcessing)
 library(data.table)
-library(party)
+setwd("~/PostClimDataNoBackup/SFE/")
+path_out = "/home/alex/NR/SFE/Presentations/20181120_TLT/fig_alex/"
 print_figs = FALSE
 
-setwd("~/PostClimDataNoBackup/SFE/")
-
-load("./FcNov2018/ts_hindcast_slimmed.RData")
-out_path = "/home/alex/NR/SFE/Presentations/20181120_TLT/fig_alex/"
-theta = 0.5
-pixels = 256
-col_scheme = "bwr"
-set_white = NULL
-
-plot_smooth2 = function(dt,
-                        var = colnames(dt)[3],
-                        mn = var, rr = NULL,
+plot_smooth2 = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
                         theta = 0.5, pixels = 256,
                         col_scheme = "bwr", set_white = NULL,
                         xlab = "", ylab = "",
                         save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot", stretch_par = NULL)
 {
   # prepare data table
-    if("year" %in% colnames(dt))
-    {
-        if("month" %in% colnames(dt))
-        {
-            dt = dt[year == min(year) & month == min(month),.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
-        } else {
-            dt = dt[month == min(month),.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
-        }
-    } else {
-        dt = dt[,.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
-    }
+  
+    dt = dt[,.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
 
-    dt = squarify(dt)
   
   
   #--- create image ---
@@ -151,29 +130,39 @@ square_image = function(dt, var = names(dt)[3])
 
 }
 
-ctl = mob_control(verbose = FALSE)
-y = 2010
+load("./FcNov2018/ts_hindcast_slimmed.RData")
+load("./Derived/SST_loadings.RData")
+
+ens_names = c("norcpm_ts_bar", "ecmwf_ts_bar","mf_ts_bar","ukmo_ts_bar")
+
+DT = merge(DT_final, DT_fl, by = c("year","month"), all.x = )
+for(y in 2006:2017){
+
+    print(y)
+    DT_train = DT[between(year, 1995, y - 1)]
+    mod1 = lm(obs_anamoly ~  ecmwf_anamoly, data = DT_train)
+    mod2 = party::mob(obs_anamoly ~ ecmwf_anamoly + SST_mean_anamoly | Lon + Lat, data = DT_train)
+    for(j in 1:2){
+        DT[year == y,
+           eval((paste0("pred",j))) := climatology + predict(get(paste0("mod",j)),
+                                                             newdata = DT[year == y])]
+    }
+}
+
 print(y)
-DT_train = DT_final[year < y]
-mod = mob(obs_anamoly ~ ecmwf_anamoly| Lon + Lat,
-          data = DT_train,
-          control = ctl)
+y = 2017
+DT_train = DT[between(year, 1995, y - 1)]
+mod2 = party::mob(obs_anamoly ~ ecmwf_anamoly + SST_mean_anamoly | Lon + Lat, data = DT_train)
+DT_pred = data.table(DT[year == 2012 & month == 2, .(Lon,Lat,ecmwf_anamoly,SST_mean_anamoly)])
+DT_pred[,ecmwf_anamoly:=0]
+DT_pred[,SST_mean_anamoly:=0]
+DT_pred[,alpha := predict(mod2, newdata = DT_pred)]
+DT_pred[,SST_mean_anamoly:=1.0]
+DT_pred[,beta := predict(mod2, newdata = DT_pred) - alpha]
 
-DT_test = DT_final[year == y & month == 7]
-DT_test[, ecmwf_anamoly := 0]
-
-DT_test[,pred_alpha:=predict(mod, newdata = DT_test)]
-
-DT_test[, ecmwf_anamoly := 1.0]
-
-DT_test[,pred_beta:=predict(mod, newdata = DT_test) - pred_alpha]
-
-DT_plot = square_image(DT_test,var = "pred_alpha")
-if(print_figs){pdf(paste0(out_path,"mob_alpha.pdf"))}else{X11()}
-plot_smooth2(DT_plot, col_scheme = "bwr", rr = c(-.33,.33), mn = "Intercept")
-if(print_figs) dev.off()
-
-DT_plot = square_image(DT_test,var = "pred_beta")
-if(print_figs){pdf(paste0(out_path,"mob_beta.pdf"))}else{X11()}
-plot_smooth2(DT_plot, col_scheme = "bwr", rr = c(.8,1.2), mn = "ECMWF Slope")
-if(print_figs) dev.off()
+gg = function(a,b){return( sqrt(mean( (a - b)^2)))}
+Lat_nordic = c(55,80)
+Lon_nordic = c(5,30)
+Score = DT[between(Lat,Lat_nordic[1], Lat_nordic[2]) & between(Lon, Lon_nordic[1], Lon_nordic[2]) & year > 2005 & !is.na(pred2),
+           lapply(.SD,gg,obs_erai_ts),
+           .SDcols = paste0("pred",1:2)]
