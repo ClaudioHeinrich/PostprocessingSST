@@ -13,6 +13,9 @@ ff_mean = function(x){
 DT = readr::read_rds("./FcNov2018/wfc_ts_hindcast.rds")
 setkey(DT,"lon","lat","month","year")
 
+DT_clean = DT[is.finite(lon) & is.finite(obs_erai_ts)]
+
+save(DT_clean, file = "./FcNov2018/ts_hindcast_cleaned.RData")
 DT[,grid_id:=.GRP,.(lon,lat)]
 DT[,N:=.N,grid_id]
 DT_info = DT[is.finite(lon)]

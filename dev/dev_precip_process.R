@@ -31,7 +31,7 @@ ff = function(x){return(60 * 60 * 24 * 30 * 1e3 * x)}
 for(j in 1:length(nms_adjust)){
     DT_small[,eval(nms_adjust[j]) := ff(get(nms_adjust[j]))]
 }
-DT_final = DT_small[!(is.na(ecmwf_prect_bar))]
+jDT_final = DT_small[!(is.na(ecmwf_prect_bar))]
 DT_final[,grid_id:=.GRP,.(Lon,Lat)]
 DT_final[,climatology := ff_mean(obs_erai_prect),.(grid_id,month)]
 DT_final[,norcpm_climatology := ff_mean(norcpm_prect_bar),.(grid_id,month)]

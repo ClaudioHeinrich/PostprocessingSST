@@ -13,11 +13,9 @@ for(y in 2006:2017){
 
     print(y)
     DT_train = DT_final[year < y]
-    mod1 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + norcpm_anamoly, data = DT_train)
+    mod1 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + ecmwf_anamoly, data = DT_train)
     mod2 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + ecmwf_anamoly, data = DT_train)
-    mod3 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + mf_anamoly, data = DT_train)
-    mod4 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + ukmo_anamoly, data = DT_train)
-    mod5 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + norcpm_anamoly + ecmwf_anamoly + mf_anamoly + ukmo_anamoly, data = DT_train)
+    mod3 = lm(obs_anamoly ~  climatology + obs_anamoly_1 + ukmo_anamoly, data = DT_train)
     for(j in 1:5){
         DT_final[year == y,
                  eval((paste0("pred",j))) := climatology + predict(get(paste0("mod",j)),
