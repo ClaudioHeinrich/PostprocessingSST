@@ -67,4 +67,4 @@ for(s in 1:99){
     DT_fit_prect[,eval(paste0("q_",s)) := climatology + predict(mod, newdata = DT_fit_prect)]
 }
 
-save(Score_prect, DT_fit_prect,file = "./FcNov2018/Forecast_ts.RData")
+save(Score_prect, DT_fit_prect,file = "./FcNov2018/Forecast_prect.RData")

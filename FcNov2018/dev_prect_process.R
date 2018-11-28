@@ -10,7 +10,8 @@ ff_mean = function(x){
     return(c(0,x_s[-1]/1:(length(x_s) - 1)))
 }
 
-DT = readr::read_rds("./FcNov2018/wfc_prect_hindcast.rds")
+DT_mf = readr::read_rds("./FcNov2018/mf_prect_hindcast.rds")
+DT = readr::read_rds("./FcNov2018/wfc_prect_hindcast_vintage-11.rds")
 DT_forecast = readr::read_rds("./FcNov2018/wfc_prect_forecast.rds")
 
 setkey(DT,"lon","lat","month","year")
@@ -19,7 +20,7 @@ DT[,grid_id:=.GRP,.(lon,lat)]
 DT[,"Lon" := lon]
 DT[,"Lat" := lat]
 Lon_bounds = c(-10,40)
-DT_train = DT[is.finite(obs_erai_prect) & is.finite(ecmwf_prect_bar) & between(Lon, Lon_bounds[1], Lon_bounds[2])]
+DT_train = DT[is.finite(obs_erai_prect) & between(Lon, Lon_bounds[1], Lon_bounds[2])]
 setkey(DT_train,"lon","lat","month","year")
 
 nms_adjust = c("ecmwf_prect_bar","ukmo_prect_bar")
