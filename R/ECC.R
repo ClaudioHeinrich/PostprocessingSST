@@ -103,12 +103,14 @@ forecast_ECC = function(dt, Y = NULL, M = NULL,
   
   dt_temp = data.table(dt_temp,ecc_fcs)
   
+  dt_temp[,lapply(X = .SD,FUN = trc),.SDcols = paste0("fc",1:ens_size)]
+  
   # put back missing locations
 
-  if(!identical(na_rows,integer(0)))
+  if(!(dt[is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat),.N]==0))
   {
     key_dt = key(dt)
-    dt = rbindlist(list(dt_temp,dt[na_rows,]),fill = TRUE)
+    dt = rbindlist(list(dt_temp,dt[is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat),]),fill = TRUE)
     setkeyv(dt,key_dt)
   } else {
     dt = dt_temp

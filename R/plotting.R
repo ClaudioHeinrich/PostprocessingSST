@@ -198,7 +198,7 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
   if(!exists("wrld_simpl")) data(wrld_simpl, package = 'maptools') 
   
   all_loc = expand.grid(lat = im_0$x,lon = im_0$y)
-  pts <- sp::SpatialPoints(all_loc, proj4string=CRS(proj4string(wrld_simpl)))
+  pts <- sp::SpatialPoints(all_loc, proj4string=sp::CRS(proj4string(wrld_simpl)))
   ii <- !is.na(over(pts, wrld_simpl)$FIPS)
   im_0$z[ii] = NA
   
@@ -241,8 +241,6 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
   brk = c(brk,rr[2]) # extend the vector of breaks
   
   #--- plotting ---
-  
-  
   
   if(save_pdf) 
     {

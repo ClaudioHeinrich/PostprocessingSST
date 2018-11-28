@@ -22,19 +22,20 @@ library(tictoc)
 
 # choose an abbreviation for this run
 
-
-name_abbr = "Atl"
+name_abbr = "Full/lv"
 
 # choose the area of the globe to consider
-lat_box = c(-35,10)
-lon_box = c(-45,15)
+lat_box = c(40,55)
+lon_box = c(-10,15)
 
-# set a couple of parameters
+
+
+# # set a couple of parameters
 
 ens_size = 9 # size of forecast ensemble
 
-training_years = 1985:2009
-validation_years = 2010:2016 
+training_years = 1985:2000
+validation_years = 2001:2016 
 
 months = 1:12
 
@@ -50,7 +51,7 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 ### construct load wide data set ###
 
-DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
+DT = load_combined_wide()#[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 
 # tidy up DT:
 

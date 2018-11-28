@@ -22,7 +22,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl/standardized" 
+name_abbr = "NAO/2" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -37,20 +37,26 @@ brks = 10
 ### PCA ###
 
 # get forecast:
-load(paste0(PCA_dir,"fc.RData"))
+load(paste0(PCA_dir,"fc_mc.RData"))
 
-mv_rank_hist(PCA_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "PCA rank histograms",
-             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA")
+mv_rank_hist(PCA_fc_mc, fc_ens_size = fc_ens_size, breaks = brks, mn = "PCA_mc rank histograms",
+             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_mc")
 
 proc.time()
 
+load(paste0(PCA_dir,"fc_ac.RData"))
+
+mv_rank_hist(PCA_fc_ac, fc_ens_size = fc_ens_size, breaks = brks, mn = "PCA_ac rank histograms",
+             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_ac")
+
+
 ### SE ###
 
-# get forecast:
-load(paste0(SE_dir,"fc.RData"))
-
-mv_rank_hist(SE_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "SE rank histograms",
-             save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_SE")
+# # get forecast:
+# load(paste0(SE_dir,"fc.RData"))
+# 
+# mv_rank_hist(SE_fc, fc_ens_size = fc_ens_size, breaks = brks, mn = "SE rank histograms",
+#              save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_SE")
 
 ### geostationary ###
 

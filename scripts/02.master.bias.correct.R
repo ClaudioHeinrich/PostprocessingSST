@@ -32,11 +32,13 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl" 
+name_abbr = "Full/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
+
+
 
 
 ###### run bias analysis for simple moving averages ######
@@ -54,7 +56,7 @@ dummy_function = function(k){
   sc_sma[[k]] = temp[,"win_length" := k]
 }
 
-sc_sma = parallel::mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = 8)
+sc_sma = parallel::mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = mc_cores)
 sc_sma = rbindlist(sc_sma)
 
 save(sc_sma, file = paste0(save_dir,"scores.bc.sma.RData"))
@@ -76,7 +78,7 @@ dummy_function = function(k){
   sc_ema[[k]] = temp[,"a" := par_vec[k]]
 }
 
-sc_ema = parallel::mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = 8)
+sc_ema = parallel::mclapply(X = 1:length(par_vec), FUN = dummy_function,mc.cores = mc_cores)
 sc_ema = rbindlist(sc_ema)
 
 save(sc_ema, file = paste0(save_dir,"scores.bc.ema.RData"))

@@ -347,8 +347,7 @@ bias_correct = function(dt, method, par_1,
 
 bias_lr_bm = function(DT,
                       months = 1:12,
-                      validation_years = 2001:2010
-)
+                      validation_years = 2001:2010)
 {
   
   for(y in validation_years) # parallelizing runs into memory issues, and for some reason is not faster?
@@ -363,7 +362,7 @@ bias_lr_bm = function(DT,
     DT[year == y, c("a","b"):= coef(fits_by_month)[months,]]
     DT[year == y, T_hat_lr_m := a + b * Ens_bar]
   }
-  
+  return(DT)
 }
 
 
@@ -399,7 +398,7 @@ bias_lr_bl = function(DT,
     DT[year == y,c("a","b"):= coef(fits_by_loc)[grid_ids,]]
     DT[year == y,T_hat_lr_loc := a + b * Ens_bar]
   }
-  
+  return(DT)
 }
 
 #' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by both month and location.
@@ -439,6 +438,7 @@ bias_lr_bb = function(DT,
     }
     
   }
+  return(DT)
 }
 
 
@@ -603,9 +603,13 @@ var_est_NGR_bm = function(dt,
     }
   }
   
+  if("c" %in% colnames(dt))
+  {
+    dt[,c("c","d"):=NULL]
+  }
+  
   dt = merge(dt,var_est_by_month,by = c("year","month"),all.x = TRUE)
   dt[,SD_hat_lr_bm := sqrt(c^2 + d^2*Ens_sd^2)]
-  dt[,c("c","d"):=NULL]
   
   return(dt)
 }
@@ -616,6 +620,7 @@ var_est_NGR_bm = function(dt,
 #' @param dt the data table.
 #' @param months The considered months.
 #' @param validation_years Training years and validation years.
+#' @param mc.cores Should we parallelize and with how many cores. Large datasets run into memory issues if mc.cores>1.
 #' 
 #' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
 #'
@@ -627,37 +632,100 @@ var_est_NGR_bm = function(dt,
 
 var_est_NGR_bl = function(dt,
                           months = 1:12,
-                          validation_years = 2001:2010)
+                          validation_years = 2001:2010,
+                          mc.cores = 1)
 {
-  na_loc = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
-  dt_new = dt[-na_loc,]
+  dt_new = dt[!(is.na(SST_bar) | is.na(Ens_bar)),]
   
   #grouped by location:
   
   print("minimize variance score for data grouped by location:")
   
-  vebl_parallel = function(y)
-  { return_DT = data.table(grid_id = dt[,unique(grid_id)], year = y)
-  for(gid in dt_new[,unique(grid_id)])
+  if(mc.cores == 1)
   {
-    temp = dt_new[year < y & grid_id == gid,][,Ens_var := Ens_sd^2]
-    score_by_gid = function(cd)
+    dt_gids = dt_new[month == min(month) & year == min(year),grid_id]
+    
+    var_est_bl = as.data.table(expand.grid(validation_years,dt_gids))
+    setnames(var_est_bl,c('year','grid_id'))
+    
+    
+    
+    n_gid = length(dt_gids)
+    brk = min(ceiling(n_gid/50),100)
+    
+    for(y in validation_years) 
     {
-      return(mean((temp[,var_bar]  - (cd[1]^2 + cd[2]^2 * temp[,Ens_var]))^2, na.rm = TRUE))
-    } 
-    opt_par = optim(par = c(0,1),fn = score_by_gid)
-    return_DT[grid_id == gid, "c" := opt_par$par[1]]
-    return_DT[grid_id == gid, "d" := opt_par$par[2]]
-  }
-  return(return_DT)
+      print(y)
+      temp_1 = dt_new[year < y, ]
+      
+      i = 0
+      for(gid in dt_gids)
+      {
+        if(gid %% ceiling(n_gid/brk) == 0)
+        {
+          i=i+100/brk
+          print(paste0(y,': ',floor(i),'%'))
+        }
+        temp = temp_1[ grid_id == gid,][,Ens_var := Ens_sd^2]
+        score_by_gid = function(cd)
+        {
+          return(mean((temp[,var_bar]  - (cd[1]^2 + cd[2]^2 * temp[,Ens_var]))^2, na.rm = TRUE))
+        } 
+        opt_par = optim(par = c(0,1),fn = score_by_gid)
+        var_est_bl[year == y & grid_id == gid, "c" := opt_par$par[1]]
+        var_est_bl[year == y & grid_id == gid, "d" := opt_par$par[2]]
+      }
+      print(paste0(y,': 100%'))
+    }
+    
+    
+    if("c" %in% colnames(dt))
+    {
+      dt[,c("c","d"):=NULL]
+    }
+    
+    dt = merge(dt,var_est_bl,by = c("year","grid_id"),all.x = TRUE)
+    dt[,SD_hat_lr_bl := sqrt(c^2 + d^2*Ens_sd^2)]
+    
   }
   
-  var_est_by_loc = parallel::mclapply(validation_years,vebl_parallel,mc.cores =  min(12,length(validation_years)))
-  var_est_by_loc = rbindlist(var_est_by_loc)
+  # parallelize for reasonably small data tables
   
-  dt = merge(dt,var_est_by_loc,by = c("year","grid_id"),all.x = TRUE)
-  dt[,SD_hat_lr_bl := sqrt(c^2 + d^2*Ens_sd^2)]
-  dt[,c("c","d"):=NULL]
+  if(mc.cores > 1)
+  {
+    dt_gids = dt_new[month == min(month) & year == min(year),grid_id]
+    
+    vebl_parallel = function(y)
+    { return_DT = data.table(grid_id = dt_gids, year = y)
+    
+    temp_1 = dt_new[year < y, ]
+    
+    for(gid in dt_gids)
+    {
+      temp = temp_1[ grid_id == gid,][,Ens_var := Ens_sd^2]
+      score_by_gid = function(cd)
+      {
+        return(mean((temp[,var_bar]  - (cd[1]^2 + cd[2]^2 * temp[,Ens_var]))^2, na.rm = TRUE))
+      } 
+      opt_par = optim(par = c(0,1),fn = score_by_gid)
+      return_DT[grid_id == gid, "c" := opt_par$par[1]]
+      return_DT[grid_id == gid, "d" := opt_par$par[2]]
+    }
+    return(return_DT)
+    }
+    
+    var_est_by_loc = parallel::mclapply(validation_years,vebl_parallel,mc.cores =  mc.cores)
+    var_est_by_loc = rbindlist(var_est_by_loc)
+    
+    if("c" %in% colnames(dt))
+    {
+      dt[,c("c","d"):=NULL]
+    }
+    
+    dt = merge(dt,var_est_by_loc,by = c("year","grid_id"),all.x = TRUE)
+    dt[,SD_hat_lr_bl := sqrt(c^2 + d^2*Ens_sd^2)]
+  }
+  
   
   return(dt) 
 }
@@ -667,6 +735,7 @@ var_est_NGR_bl = function(dt,
 #' @param dt the data table.
 #' @param months The considered months.
 #' @param validation_years Training years and validation years.
+#' @param mc.cores Should we parallelize and with how many cores. Large datasets run into memory issues if mc.cores>1.
 #' 
 #' @return data table containing the RMSEs for the model above, where the coefficients are estimated in three different ways: grouped by month, location and by both.
 #'
@@ -678,46 +747,105 @@ var_est_NGR_bl = function(dt,
 
 var_est_NGR_bb = function(dt,
                           months = 1:12,
-                          validation_years = 2001:2010)
+                          validation_years = 2001:2010,
+                          mc.cores = 1)
 {
   na_loc = which(dt[,is.na(SST_bar) | is.na(Ens_bar)])
   dt_new = dt[-na_loc,][,c:=NA][,d:=NA]
   
-  #grouped by both:
-  
-  print("minimize variance score for data grouped by both:")
-  
-  res_dt = list()
-  for (y in validation_years)
-  {print(y)
-    vebb_parallel = function(m)
-    {
-      temp = dt_new[year < y & month == m,]
-      
-      return_DT = data.table(grid_id = dt_new[,unique(grid_id)])
-      return_DT[,"year":=y][,"month":=m]
-      for(gid in dt_new[,unique(grid_id)])
-      {
-        temp_2 = temp[grid_id == gid,][,Ens_var := Ens_sd^2]
-        score_by_both = function(cd)
-        {
-          return(mean((temp_2[,var_bar] - (cd[1]^2 + cd[2]^2 * temp_2[,Ens_var]))^2, na.rm = TRUE))
-        } 
-        opt_par = optim(par = c(0,1),fn = score_by_both)
-        return_DT[ grid_id == gid, "c":= opt_par$par[1]]
-        return_DT[ grid_id == gid, "d":= opt_par$par[2]]
-      }  
-      return(return_DT)
-    }
-    var_est_by_both = parallel::mclapply(months,vebb_parallel,mc.cores =  min(length(months)))
-    var_est_by_both = rbindlist(var_est_by_both)
+  if(mc.cores == 1)
+  {
+    dt_gids = dt_new[month == min(month) & year == min(year),grid_id]
     
-    res_dt = rbindlist(list(res_dt,var_est_by_both[,year := y]))
+    var_est_bb = as.data.table(expand.grid(validation_years,months,dt_gids))
+    setnames(var_est_bb,c('year','month','grid_id'))
+    
+    # get number of gridpoints and how often to print progress
+    n_gid = length(dt_gids)
+    brk = min(ceiling(n_gid/50),100)
+    
+    for(y in validation_years) 
+    {
+      for(m in months)
+      {
+        temp_1 = dt_new[year < y & month == m,] 
+        i = 0
+        for(gid in dt_gids)
+        {
+          if(gid %% ceiling(n_gid/brk) == 0)
+          {
+            i=i+100/brk
+            print(paste0(y,', ',m,': ',i,'%'))
+          }
+          temp = temp_1[grid_id == gid,][,Ens_var := Ens_sd^2]
+          score_by_gid = function(cd)
+          {
+            return(mean((temp[,var_bar]  - (cd[1]^2 + cd[2]^2 * temp[,Ens_var]))^2, na.rm = TRUE))
+          } 
+          opt_par = optim(par = c(0,1),fn = score_by_gid)
+          var_est_bb[year == y & month == m & grid_id == gid, "c" := opt_par$par[1]]
+          var_est_bb[year == y & month == m & grid_id == gid, "d" := opt_par$par[2]]
+        }
+        print(paste0(y,', ',m,': 100%'))
+      }
+    }
+    
+    if("c" %in% colnames(dt))
+    {
+      dt[,c("c","d"):=NULL]
+    }
+    
+    dt = merge(dt,var_est_bb,by = c("year",'month',"grid_id"),all.x = TRUE)
+    dt[,SD_hat_lr_bb := sqrt(c^2 + d^2*Ens_sd^2)]
+    
   }
   
-  dt  = merge(dt,res_dt,by = c("year","grid_id","month"),all.x = TRUE,)
-  
-  dt[,SD_hat_lr_bb := c^2 + d^2*Ens_sd^2]
+  #parallelized version:
+  if(mc.cores > 1)
+  {
+    
+    dt_gids = dt_new[month == min(month) & year == min(year),grid_id]
+    
+    print("minimize variance score for data grouped by both:")
+    
+    res_dt = list()
+    for (y in validation_years)
+    {print(y)
+      vebb_parallel = function(m)
+      {
+        temp = dt_new[year < y & month == m,]
+        
+        return_DT = data.table(grid_id = dt_gids)
+        return_DT[,"year":=y][,"month":=m]
+        for(gid in dt_gids)
+        {
+          temp_2 = temp[grid_id == gid,][,Ens_var := Ens_sd^2]
+          score_by_both = function(cd)
+          {
+            return(mean((temp_2[,var_bar] - (cd[1]^2 + cd[2]^2 * temp_2[,Ens_var]))^2, na.rm = TRUE))
+          } 
+          opt_par = optim(par = c(0,1),fn = score_by_both)
+          return_DT[ grid_id == gid, "c":= opt_par$par[1]]
+          return_DT[ grid_id == gid, "d":= opt_par$par[2]]
+        }  
+        return(return_DT)
+      }
+      var_est_by_both = parallel::mclapply(months,vebb_parallel,mc.cores =  mc.cores)
+      var_est_by_both = rbindlist(var_est_by_both)
+      
+      res_dt = rbindlist(list(res_dt,var_est_by_both[,year := y]))
+    }
+    
+    if("c" %in% colnames(dt))
+    {
+      dt[,c("c","d"):=NULL]
+    }
+    
+    dt  = merge(dt,res_dt,by = c("year","grid_id","month"),all.x = TRUE,)
+    
+    dt[,SD_hat_lr_bb := sqrt(c^2 + d^2*Ens_sd^2)]
+    
+  }
   
   return(dt)
 }

@@ -259,9 +259,9 @@ var_sc_emp = function(m,y,dt_fc,n,p)
 
 var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
                       save_dir = NULL, file_name = "vs",
-                      mc.cores = NULL)
+                      mc_cores = NULL)
 {
-    if(is.null(mc.cores)) mc.cores = length(ms)
+    if(is.null(mc_cores)) mc_cores = length(ms)
     
     vs_all = list()
     for(i in 1:length(years))
@@ -269,7 +269,7 @@ var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
         year_i = years[i]
         print(year_i)
         ## to avoid errors in mclapply:
-        if(mc.cores == 1){
+        if(mc_cores == 1){
             l = list()
             for(j in 1:length(ms)){
                 l[[j]] = var_sc_emp(m = ms[j],
@@ -285,7 +285,7 @@ var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
                                    dt_fc = dt_fc,
                                    n = n,
                                    p = p,
-                                   mc.cores = mc.cores)
+                                   mc.cores = mc_cores)
         }
         vs_all[[i]] = rbindlist(l)
     }

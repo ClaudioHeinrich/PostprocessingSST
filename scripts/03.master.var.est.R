@@ -31,7 +31,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl" 
+name_abbr = "Full/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -61,7 +61,7 @@ dummy_function = function(k){
   sc_sma_var[[k]] = temp[,"win_length" := k]
 }
 
-sc_sma_var = parallel::mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = 8)
+sc_sma_var = parallel::mclapply(X = 1:(num_years-1), FUN = dummy_function, mc.cores = mc_cores)
 sc_sma_var = rbindlist(sc_sma_var)
 
 save(sc_sma_var, file = paste0(save_dir,"scores.bc.sd.sma.Rdata"))

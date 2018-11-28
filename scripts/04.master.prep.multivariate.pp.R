@@ -28,7 +28,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl" 
+name_abbr = "NAO_small" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -39,7 +39,7 @@ load(file = paste0(save_dir,"setup.RData"))
 
 # decide whether you want to work with SST, or with SST centered around climatology, or with SST standardized w.r.t. climatology 
 
-SST = "standardized"  # takes 'centered','standardized', or ''
+SST = ""  # takes 'centered','standardized', or ''
 
 clim_years = training_years
 
@@ -72,6 +72,46 @@ if(SST == "standardized")
 }
 
 
+##### get weight matrix for tapering and svds of data matrices over the training period #####
+
+
+Tap_dir = paste0(save_dir,"Tap/")
+dir.create(Tap_dir,showWarnings = FALSE)
+
+wm = weight_mat(DT,L = 2500) 
+
+num_loc = DT[year == min(year) & month == min(month)][!(is.na(SST_bar) | is.na(SST_hat)) ,.N]
+
+
+for(y in validation_years)
+{
+  
+  print(y)
+  
+  svd_by_month = function(m)
+    {
+    print(paste0("month =",m))  
+    
+    train_years = DT[month == m][year < y & year > min(year),][,unique(year)]
+    
+    data_mat = matrix(DT[month == m][!(is.na(SST_bar) | is.na(SST_hat)) & year %in% train_years,
+                                     SST_bar - SST_hat],
+                      nrow = num_loc)
+    
+    sam_cov_mat = 1/length(train_years) * data_mat %*% t(data_mat) 
+    
+    tap_cov_mat = wm * sam_cov_mat
+    
+    return(svd(tap_cov_mat))
+    }
+  sin_val_dec = parallel::mclapply(X = months,FUN = svd_by_month,mc.cores = mc_cores)
+
+  save(sin_val_dec,file = paste0(Tap_dir,'svd_y',y,'.RData'))
+}
+
+
+
+
 ###################################################
 ###################### PCA  #######################
 ###################################################
@@ -79,29 +119,43 @@ if(SST == "standardized")
 PCA_dir = paste0(save_dir,"PCA/")
 dir.create(PCA_dir,showWarnings = FALSE)
 
-# get sample covariance matrices
 
-wm = weight_mat(DT) # for weighting down by distance
+# how many PCs should we use?
 
-sam_cov(DT,weight_mat = wm, 
+nPCs = c()
+
+for(m in months)
+{
+  #plot(sin_val_dec[[m]]$d, main = paste0('month = ',m))
+  
+  sum_vec = cumsum(sin_val_dec[[m]]$d)
+  sum_tot = sum_vec[length(sum_vec)]
+  
+  nPCs = c(nPCs,which(sum_vec > 0.9*sum_tot)[1])
+  
+}
+
+
+PCA_cov(DT,weight_mat = wm, 
         M = months,
+        nPCs = nPCs,
         save_years = validation_years,
         save_dir = PCA_dir)
 
 ##################################################
 ###################### SE  #######################
 ##################################################
-
-SE_dir = paste0(save_dir,"SE/")
-dir.create(SE_dir,showWarnings = FALSE)
-
-# get covariance estimates
-
-cov_est_SE(DT, weight_mat = wm,
-           M = months,
-           save_years = validation_years,
-           save_dir = SE_dir)
-
+#
+# SE_dir = paste0(save_dir,"SE/")
+# dir.create(SE_dir,showWarnings = FALSE)
+# 
+# # get covariance estimates
+# 
+# cov_est_SE(DT, weight_mat = wm,
+#            M = months,
+#            save_years = validation_years,
+#            save_dir = SE_dir)
+#
 ###################################################
 ################## geostationary ##################
 ###################################################

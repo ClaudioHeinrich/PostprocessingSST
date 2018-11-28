@@ -26,7 +26,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO" 
+name_abbr = 'Full/lv' 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -35,10 +35,11 @@ load(file = paste0(save_dir,"setup.RData"))
 
 ###### compare to linear regression models ######
 
+
 # get estimates, grouped by month, location and both
-bias_lr_bm(DT,months = months,validation_years = validation_years)
-bias_lr_bl(DT,months = months,validation_years = validation_years)
-bias_lr_bb(DT,months = months,validation_years = validation_years)
+DT = bias_lr_bm(DT,months = months,validation_years = validation_years)
+DT = suppressWarnings(bias_lr_bl(DT,months = months,validation_years = validation_years)) # linear regressions at grid points with no data causes warning
+DT = suppressWarnings(bias_lr_bb(DT,months = months,validation_years = validation_years))
 
 # get RMSEs
 RMSE_lr_m = sqrt(DT[year %in% validation_years,mean((T_hat_lr_m-SST_bar)^2, na.rm = TRUE)])
@@ -66,10 +67,10 @@ RMSE_linear_models = round(RMSE_linear_models,4)
 DT = var_est_NGR_bm(DT, months = months, validation_years = validation_years)
 mean_CRPS_bm = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bm),na.rm = TRUE)]
 
-DT = var_est_NGR_bl(DT, months = months, validation_years = validation_years)
+DT = var_est_NGR_bl(DT, months = months, validation_years = validation_years,mc.cores = mc_cores)
 mean_CRPS_bl = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bl),na.rm = TRUE)]
 
-DT = var_est_NGR_bb(DT, months = months, validation_years = validation_years)
+DT = var_est_NGR_bb(DT, months = months, validation_years = validation_years,mc.cores = mc_cores)
 mean_CRPS_bb = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bb),na.rm = TRUE)]
 
 
@@ -89,23 +90,135 @@ CRPS_comparison = data.table(mean_CRPS_bm = mean_CRPS_bm,
 CRPS_comparison = round(CRPS_comparison,5)
 
 
+#####################################################
+### permutation tests for moving average vs lr_bb ###
+#####################################################
 
-### permutation test for moving average vs lr_bb ###
+# CRPS (for variance estimation)
 
 perm_test_dt = DT[year %in% validation_years & month %in% months,.(year,month,SST_bar,SST_hat,SD_hat,SD_hat_lr_bb)]
 
 # getting CRPSs
 
-perm_test_dt[,CRPS_ma := crps_na_rm(SST_bar,SST_hat,SD_hat)]
-perm_test_dt[,CRPS_lr_bb := crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bb)]
+perm_test_dt[,CRPS_ma := crps_na_rm(SST_bar, SST_hat,SD_hat)]
+perm_test_dt[,CRPS_lr_bb := crps_na_rm(SST_bar, SST_hat, SD_hat_lr_bb)]
 
-# permutation test for CRPS_ma ~ CRPS_lr_bb
+
+### permutation test for CRPS_ma ~ CRPS_lr_bb ###
+
 pt_CRPS = permutation_test_difference(na.omit(perm_test_dt[,CRPS_ma]),na.omit(perm_test_dt[,CRPS_lr_bb]), N = 500  )
 
+pdf(paste0(plot_dir,'Perm_test_CRPS.pdf'))
 
+rr = max(abs(1.1*pt_CRPS$d_bar),abs(1.1*pt_CRPS$D))
+rr = c(-rr,rr)
+
+hist(pt_CRPS$D, xlim = rr,breaks = 20,
+     xlab = '', main = 'permutation test CRPS: LR_es vs. MA')
+
+abline(v = pt_CRPS$d_bar,col = 'red')
+
+
+qq = quantile(pt_CRPS$D,c(0.025,0.975))
+
+abline(v = qq,lty = 2)
+
+dev.off()
+
+
+# permutation test for CRPS_ma ~ CRPS_lr_bb, averaged over the globe
+
+ptbm = perm_test_dt[,.('CRPS_ma' = mean(CRPS_ma,na.rm = TRUE),'CRPS_lr_bb' = mean(CRPS_lr_bb,na.rm = TRUE)),by = .(year,month)]
+
+pt_CRPS_bm = permutation_test_difference(ptbm[,CRPS_ma],ptbm[,CRPS_lr_bb], N = 5000  )
+
+pdf(paste0(plot_dir,'Perm_test_glob_mean_CRPS.pdf'))
+
+rr = max(abs(1.1*pt_CRPS_bm$d_bar),abs(1.1*pt_CRPS_bm$D))
+rr = c(-rr,rr)
+
+hist(pt_CRPS_bm$D, xlim = rr,breaks = 20,
+     xlab = '', main = 'permutation test global mean CRPS: LR_es vs. MA')
+
+abline(v = pt_CRPS_bm$d_bar,col = 'red')
+
+qq = quantile(pt_CRPS_bm$D,c(0.025,0.975))
+
+abline(v = qq,lty = 2)
+
+
+dev.off()
+
+
+
+
+#####################################################
+### permutation tests for MSE MA vs lr_bb ###
+#####################################################
+
+perm_test_dt = DT[year %in% validation_years & month %in% months,.(year,month,SST_bar,SST_hat,T_hat_lr_both)]
+
+# getting MSEs
+
+perm_test_dt[,MSE_ma := (SST_bar - SST_hat)^2]
+perm_test_dt[,MSE_lr_bb := (SST_bar - T_hat_lr_both)^2]
+
+
+### permutation test for MSE_ma ~ MSE_lr_bb ###
+
+pt_MSE = permutation_test_difference(na.omit(perm_test_dt[,MSE_ma]),na.omit(perm_test_dt[,MSE_lr_bb]), N = 500  )
+
+pdf(paste0(plot_dir,'Perm_test_MSE.pdf'))
+
+rr = max(abs(1.1*pt_MSE$d_bar),abs(1.1*pt_MSE$D))
+rr = c(-rr,rr)
+
+hist(pt_MSE$D, xlim = rr,breaks = 20,
+     xlab = '', main = 'permutation test MSE: LR vs. MA')
+
+abline(v = pt_MSE$d_bar,col = 'red')
+
+
+qq = quantile(pt_MSE$D,c(0.025,0.975))
+
+abline(v = qq,lty = 2)
+
+dev.off()
+
+# permutation test for MSE_ma vs MSE_lr_bb, averaged over the globe
+
+ptbm = perm_test_dt[,.('MSE_ma' = mean(MSE_ma,na.rm = TRUE),'MSE_lr_bb' = mean(MSE_lr_bb,na.rm = TRUE)),by = .(year,month)]
+
+pt_MSE_bm = permutation_test_difference(ptbm[,MSE_ma],ptbm[,MSE_lr_bb], N = 5000  )
+
+pdf(paste0(plot_dir,'Perm_test_glob_mean_MSE.pdf'))
+
+rr = max(abs(1.1*pt_MSE_bm$d_bar),abs(1.1*pt_MSE_bm$D))
+rr = c(-rr,rr)
+
+hist(pt_MSE_bm$D, xlim = rr,breaks = 20,
+     xlab = '', main = 'permutation test globally averaged MSE: LR_es vs. MA')
+
+abline(v = pt_MSE_bm$d_bar,col = 'red')
+
+qq = quantile(pt_MSE_bm$D,c(0.025,0.975))
+
+abline(v = qq,lty = 2)
+
+
+dev.off()
+
+
+
+
+
+#### save stuff ####
 
 time_s31 = proc.time() - time_s31
 
 save(RMSE_linear_models,CRPS_comparison,file = paste0(save_dir,'univ_scores_comp_NGR.RData'))
+
+
+
 
 save.image(file = paste0(save_dir,"setup.RData"))

@@ -45,13 +45,6 @@ cov_est_SE = function(dt, weight_mat,
       sam_cov_mat = 1/num_years * data_mat %*% t(data_mat) 
       S = weight_mat * sam_cov_mat
       
-      # cor_factor = 1 / sqrt( length(Y))
-      # 
-      # 
-      # sqrt_cov_mat = cor_factor * matrix(sqrt_cov_mat,ncol = length(Y) )
-      # 
-      # sc_mat = sqrt_cov_mat %*% t(sqrt_cov_mat)  
-      # 
       p = dim(S)[1]
       n = num_years
       
@@ -69,9 +62,16 @@ cov_est_SE = function(dt, weight_mat,
       a_n_sq = d_n_sq - b_n_sq
         
       Sigma = diag(rep(b_n_sq * m_n / d_n_sq,p)) + a_n_sq/d_n_sq * S
-    
+      
+      sin_val_dec = svd(Sigma)
+      
+      # vectorize matrix mult:
+      temp = as.vector(t(matrix(rep(sqrt(sin_val_dec$d),dim(S)[1]),nrow = dim(S)[1])))
+      
+      sqrt_Sigma = t(sin_val_dec$u * temp) # Sigma = t(sqrt_Sigma) %*% sqrt_Sigma
+      
       full_file_name = paste0(file_name,"_m",m,"_y",y,".RData")
-      save(Sigma, file = paste0(save_dir,full_file_name))
+      save(sqrt_Sigma, file = paste0(save_dir,full_file_name))
     }
   }
   
@@ -219,7 +219,7 @@ forecast_SE = function(dt, Y, M,
   }
   
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
+              "SST_hat","SST_bar","Ens_bar","Bias_Est","var_bar","SD_hat")
   SD_cols = SD_cols[which(SD_cols %in% colnames(dt))]
   fc_water <- na.omit( dt_water[,.SD,.SDcols = SD_cols])
   
@@ -234,12 +234,14 @@ forecast_SE = function(dt, Y, M,
           print(y)
           load(file = paste0(cov_dir,cov_file_name,"_m",m,"_y",y,".RData"))  
           
-          mcf = fc_water[year == y & month == m, SD_hat]/sqrt(diag(Sigma))
-          Sigma_hat = diag(mcf) %*% Sigma %*% diag(mcf)
-          no <- matrix(MASS::mvrnorm(n=n, mu=rep(0,dim(Sigma)[1]), Sigma=Sigma_hat),nrow = n)
+          mcf = fc_water[year == y & month == m, SD_hat]/diag(sqrt_Sigma)
+          sqrt_Sigma_hat = diag(mcf) %*% sqrt_Sigma 
+          
+          no = rnorm(n = dim(sqrt_Sigma_hat)[1] * n)
+          no = sqrt_Sigma_hat %*% matrix(no,nrow = dim(sqrt_Sigma_hat)[1])
           for (i in 1:n)
             {
-            dt_month[year == y, paste0("no",i):= no[i,]]
+            dt_month[year == y, paste0("no",i):= no[,i]]
             dt_month[year == y,paste0("fc",i):= SST_hat + .SD, 
                      .SDcols = paste0("no",i)]
             }

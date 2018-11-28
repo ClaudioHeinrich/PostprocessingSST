@@ -141,9 +141,10 @@ geostationary_training = function (dt ,
 #' @param dt the data table.
 #' @param Y,M Integer vectors containing year(s) and month(s).
 #' @param n Integer. Size of the desired forecast ensemble. 
+#' @param noise Logical. Should the return data contain columns with noise?
 #' @param var_dir,var_file_names Where the fitted variograms are stored.
 #' 
-#' @return data table containing n columns with noise and n columns with forecasts.
+#' @return data table containing n columns with forecasts.
 #' 
 #' 
 #' @author Claudio Heinrich        
@@ -154,6 +155,7 @@ geostationary_training = function (dt ,
 
 forecast_GS = function(dt, Y, M,
                        n=10, 
+                       noise = FALSE,
                        var_dir, var_file_name = "variogram_exp")
 {
 
@@ -205,8 +207,12 @@ forecast_GS = function(dt, Y, M,
       for (i in 1:n)
         {
         dt_month[year == y, paste0("no",i) := no[i,]]
-        dt_month[year == y, paste0("fc",i) := trc(Ens_bar + Bias_Est) + .SD, 
+        dt_month[year == y, paste0("fc",i) := trc(Ens_bar + Bias_Est + .SD), 
                  .SDcols = paste0("no",i)]
+        if(!noise)
+        {
+          dt_month[,paste0("no",i) := NULL]
+        }
         
         }
       }
@@ -221,8 +227,12 @@ forecast_GS = function(dt, Y, M,
   if(!identical(land_ids,integer(0)))
   {
     fc_land = dt[land_ids,]
-    fc_land[,  paste0("no",1:n):= NA]
     fc_land[,  paste0("fc",1:n):= NA]
+    if(noise)
+    {
+      fc_land[,  paste0("no",1:n):= NA]
+    }
+   
     
     fc = rbindlist(list(fc_water,fc_land), fill = TRUE)
   }
