@@ -4,7 +4,6 @@ library(PostProcessing)
 library(data.table)
 library(ncdf4)
 
-
 setwd("~/PostClimDataNoBackup/SFE/FcNov2018/")
 
 nc = nc_open("./fcnov2018.nc")
@@ -26,6 +25,7 @@ for(j in 1:7){
     plot_x(ts_q_below[,,1,j], Lon, Lat, mn = paste0("Q Below ",j), rr = c(0,1))
 }
 
+A = ts_q_below[,,1,2]
 ts_mean = ncvar_get(nc,"ts_mean")
 plot_x(ts_mean[,,1], Lon, Lat, mn = "Mean")
 ts_climatology = ncvar_get(nc,"ts_mean")

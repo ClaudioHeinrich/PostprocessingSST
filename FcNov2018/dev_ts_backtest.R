@@ -47,14 +47,18 @@ for(i in 1:length(vintage_years)){
 
     mod1 = lm(obs_ts_anamoly ~ ukmo_ts_anamoly + mf_ts_anamoly + norcpm_ts_anamoly + ecmwf_ts_anamoly,
               data = DT_train_y)
-    for(j in 1:1){
+    mod2 = lm(obs_ts_anamoly ~ ecmwf_ts_anamoly, data = DT_train_y)
+    for(j in 1:2){
         DT_y[, eval(paste0("model", j)) := obs_ts_climatology + predict(get(paste0("mod",j)), newdata = DT_y)]
     }
     for(m in months){
         mod_month = lm(obs_ts_anamoly ~ ukmo_ts_anamoly + mf_ts_anamoly + norcpm_ts_anamoly + ecmwf_ts_anamoly,
                        data = DT_train_y[month == m])
+        mod_month2 = lm(obs_ts_anamoly ~ ecmwf_ts_anamoly,
+                       data = DT_train_y[month == m])
         j = 1
         DT_y[month == m, eval(paste0("model_month", j)) := obs_ts_climatology + predict(mod_month,newdata = DT_y[month == m])]
+        DT_y[month == m, eval(paste0("model_month", 2)) := obs_ts_climatology + predict(mod_month2,newdata = DT_y[month == m])]
     }
     nms_ensemble = c("ecmwf_ts_bar","norcpm_ts_bar","ukmo_ts_bar","mf_ts_bar")
     DT_y[, equal_weighted := rowMeans(.SD), .SDcols = nms_ensemble]
@@ -67,7 +71,7 @@ gg = function(x,y){return(sqrt(mean( (x - y)^2)))}
 Lat_nordic = c(58,63)
 Lon_nordic = c(5,11)
 
-mod_names = c("obs_ts_climatology", "equal_weighted", "equal_weighted_anamoly", "model1", "model_month1")
+mod_names = c("obs_ts_climatology", "equal_weighted", "equal_weighted_anamoly", "model1", "model_month1", "model2", "model_month2")
 DT_y = rbindlist(DT_y_all)
 Scores_ts = DT_y[between(lat, Lat_nordic[1], Lat_nordic[2]) & between(lon, Lon_nordic[1], Lon_nordic[2]),
               lapply(.SD,gg,obs_erai_ts),

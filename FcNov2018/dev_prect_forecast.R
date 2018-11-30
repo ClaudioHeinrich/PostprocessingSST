@@ -28,7 +28,7 @@ DT_forecast[, ecmwf_prect_anamoly := ecmwf_prect_bar - ecmwf_prect_climatology, 
 DT_forecast[,model_mean := obs_prect_climatology + predict(mod_mean, newdata = DT_forecast)]
 for(i in 1:length(months)){
     m = months[i]
-    for(s in 1:9){
+    for(s in 1:99){
         mod = mod_q[[i]][[s]]
         DT_forecast[month == m, eval(paste0("q_hat_",s)) := obs_prect_climatology + predict(mod, newdata = DT_forecast[month == m])]
     }
@@ -38,8 +38,8 @@ rank1 = function(x){return(rank(x)[1])}
 for(i in 1:length(q_print)){
     q = q_print[i]
     nm = paste0("p_below_",i)
-    DT_forecast[,eval(nm) := apply(.SD,1,"rank1") / 10,
-                .SDcols = c(paste0("q_",q), paste0("q_hat_",1:9))]    
+    DT_forecast[,eval(nm) := apply(.SD,1,"rank1") / 1e2,
+                .SDcols = c(paste0("q_",q), paste0("q_hat_",1:99))]    
 }
 
 save(DT_forecast,file = "./FcNov2018/Forecast_prect.RData")
