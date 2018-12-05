@@ -47,11 +47,9 @@ RMSE_lr_loc = sqrt(DT[year %in% validation_years,mean((T_hat_lr_loc-SST_bar)^2, 
 RMSE_lr_both = sqrt(DT[year %in% validation_years,mean((T_hat_lr_both-SST_bar)^2, na.rm = TRUE)])
 
 # compare to simple moving averages:
-load(paste0(save_dir,"scores.bc.sma.RData"))
-load(paste0(save_dir,"scores.bc.ema.RData"))
 
-RMSE_sma = sc_sma[,sqrt(min(MSE))]
-RMSE_ema = sc_ema[,sqrt(min(MSE))]
+RMSE_sma = msc_sma[,sqrt(mean(min_MSE))]
+RMSE_ema = msc_ema[,sqrt(mean(min_MSE))]
 
 
 RMSE_linear_models = data.table(RMSE_lr_m = RMSE_lr_m, 
@@ -74,12 +72,8 @@ DT = var_est_NGR_bb(DT, months = months, validation_years = validation_years,mc.
 mean_CRPS_bb = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bb),na.rm = TRUE)]
 
 
-
-load(file = paste0(save_dir,"scores.bc.sd.sma.Rdata"))
-load(file = paste0(save_dir,"scores.bc.sd.ema.Rdata"))
-  
-CRPS_sma = sc_sma_var[,min(CRPS)]
-CRPS_ema = sc_ema_var[,min(CRPS)]
+CRPS_sma = msc_sd_sma[,mean(min_crps)]
+CRPS_ema = msc_sd_ema[,mean(min_crps)]
 
 CRPS_comparison = data.table(mean_CRPS_bm = mean_CRPS_bm,
                              mean_CRPS_bl = mean_CRPS_bl,
@@ -94,6 +88,8 @@ CRPS_comparison = round(CRPS_comparison,5)
 ### permutation tests for moving average vs lr_bb ###
 #####################################################
 
+N=500
+
 # CRPS (for variance estimation)
 
 perm_test_dt = DT[year %in% validation_years & month %in% months,.(year,month,SST_bar,SST_hat,SD_hat,SD_hat_lr_bb)]
@@ -106,7 +102,7 @@ perm_test_dt[,CRPS_lr_bb := crps_na_rm(SST_bar, SST_hat, SD_hat_lr_bb)]
 
 ### permutation test for CRPS_ma ~ CRPS_lr_bb ###
 
-pt_CRPS = permutation_test_difference(na.omit(perm_test_dt[,CRPS_ma]),na.omit(perm_test_dt[,CRPS_lr_bb]), N = 500  )
+pt_CRPS = permutation_test_difference(na.omit(perm_test_dt[,CRPS_ma]),na.omit(perm_test_dt[,CRPS_lr_bb]), N = N  )
 
 pdf(paste0(plot_dir,'Perm_test_CRPS.pdf'))
 
@@ -166,22 +162,25 @@ perm_test_dt[,MSE_lr_bb := (SST_bar - T_hat_lr_both)^2]
 
 ### permutation test for MSE_ma ~ MSE_lr_bb ###
 
-pt_MSE = permutation_test_difference(na.omit(perm_test_dt[,MSE_ma]),na.omit(perm_test_dt[,MSE_lr_bb]), N = 500  )
+pt_MSE = permutation_test_difference(na.omit(perm_test_dt[,MSE_ma]),na.omit(perm_test_dt[,MSE_lr_bb]), N = N )
 
 pdf(paste0(plot_dir,'Perm_test_MSE.pdf'))
 
 rr = max(abs(1.1*pt_MSE$d_bar),abs(1.1*pt_MSE$D))
 rr = c(-rr,rr)
 
-hist(pt_MSE$D, xlim = rr,breaks = 20,
-     xlab = '', main = 'permutation test MSE: LR vs. MA')
+hist(pt_MSE$D, xlim = rr,breaks = 10,
+     xlab = '', main = latex2exp::TeX('MSE permutation test for EMA vs. $NGR_{m,s}$'))
 
 abline(v = pt_MSE$d_bar,col = 'red')
 
 
-qq = quantile(pt_MSE$D,c(0.025,0.975))
-
+qq = quantile(pt_MSE$D,c(0.05))
 abline(v = qq,lty = 2)
+
+qq_2 = quantile(pt_MSE$D,c(0.01))
+abline(v = qq_2,lty = 3)
+
 
 dev.off()
 
@@ -189,7 +188,7 @@ dev.off()
 
 ptbm = perm_test_dt[,.('MSE_ma' = mean(MSE_ma,na.rm = TRUE),'MSE_lr_bb' = mean(MSE_lr_bb,na.rm = TRUE)),by = .(year,month)]
 
-pt_MSE_bm = permutation_test_difference(ptbm[,MSE_ma],ptbm[,MSE_lr_bb], N = 5000  )
+pt_MSE_bm = permutation_test_difference(ptbm[,MSE_ma],ptbm[,MSE_lr_bb], N = 10000  )
 
 pdf(paste0(plot_dir,'Perm_test_glob_mean_MSE.pdf'))
 
@@ -197,13 +196,15 @@ rr = max(abs(1.1*pt_MSE_bm$d_bar),abs(1.1*pt_MSE_bm$D))
 rr = c(-rr,rr)
 
 hist(pt_MSE_bm$D, xlim = rr,breaks = 20,
-     xlab = '', main = 'permutation test globally averaged MSE: LR_es vs. MA')
+     xlab = '', main = latex2exp::TeX('globally averaged MSE permutation test for EMA vs. $NGR_{m,s}$'))
 
 abline(v = pt_MSE_bm$d_bar,col = 'red')
 
-qq = quantile(pt_MSE_bm$D,c(0.025,0.975))
-
+qq = quantile(pt_MSE_bm$D,c(0.05))
 abline(v = qq,lty = 2)
+
+qq_2 = quantile(pt_MSE_bm$D,c(0.01))
+abline(v = qq_2,lty = 3)
 
 
 dev.off()

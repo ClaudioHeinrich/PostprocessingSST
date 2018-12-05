@@ -202,7 +202,7 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
   
   if(var){
     glob_mean_sc = DT[year %in% eval_years, 
-                    .("CRPS" = mean (crps_na_rm(SST_bar, mean = SST_hat,sd = SD_hat),na.rm = TRUE))]
+                    .("CRPS" = mean(crps_na_rm(SST_bar, mean = SST_hat,sd = SD_hat),na.rm = TRUE))]
   } else glob_mean_sc = DT[year %in% eval_years, 
                            .("MSE" = mean( (SST_bar - SST_hat)^2, na.rm=TRUE))]
   
@@ -325,6 +325,61 @@ bias_correct = function(dt, method, par_1,
   if(scores){
     mean_sc = global_mean_scores(dt, eval_years = eval_years, var = FALSE)
     return(mean_sc)
+  } else return(dt)
+  
+}
+
+#' Applies bias correction with a specified method to the data and saves or returns scores.
+#'
+#' @param dt The data table.
+#' @param method Method of bias correction. Takes "sma" for simple moving average and "ema" for exponential moving average. 
+#' @param par_1 Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).
+#' @param scores Logical. If true, the MSE is returned.
+#' @param eval_years Numerical vector. The years for evaluating the score.
+#' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
+#' @param save_dir,file_name Directory and name for the saved file.
+#' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
+#'                   
+#'                   
+#' @return The data table with corrected SST_hat and new column Bias_Est.
+#'
+#' @author Claudio Heinrich
+#' @examples \dontrun{bias_correct(saveorgo = FALSE)}
+#' 
+#' 
+#' @export
+
+bias_correct_2 = function(dt, method, par_1,
+                          saveorgo = TRUE,
+                          save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                          file_name = "dt_combine_wide_bias.RData",
+                          skip = 0,
+                          reduced_output = TRUE){
+  
+  
+  if(method == "sma"){
+    dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
+                                      vec = SST_bar - Ens_bar, 
+                                      years = year,
+                                      skip = skip),
+            by = .(Lon,Lat, month)]
+  }
+  if (method == "ema"){
+    dt[,"Bias_Est" := exp_mov_av(a = par_1,
+                                 vec = SST_bar - Ens_bar,
+                                 years = year,
+                                 skip = skip),
+       by = .(Lon,Lat, month)]
+  }
+  
+  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
+  
+  if(saveorgo){
+    save(dt, file = paste0(save_dir,file_name))
+  }
+  
+  if(reduced_output){
+    return(dt[,.(year,month,Lon,Lat,Bias_Est,SST_hat)]) 
   } else return(dt)
   
 }
@@ -467,8 +522,6 @@ sd_est = function(dt ,
                   par_1 = 16,   # if method == sma, par_1 is the length of window for the sma
                         # if method == ema, par_1 is the ratio of the exp. mov. av.
                   scores = FALSE,
-                  ens_mean = FALSE,
-                  ens_size = 9,
                   eval_years = 2001:2010,
                   saveorgo = TRUE,
                   save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
@@ -495,6 +548,61 @@ sd_est = function(dt ,
   if(scores){
     mean_sc = global_mean_scores(dt, eval_years = eval_years, var = TRUE)
     return(mean_sc)
+  } else return(dt)
+  
+}
+
+
+
+#' Estimates standard deviation with a specified method to the data and saves or returns scores.
+#'
+#' @param dt The data table.
+#' @param method Method of variance estimation. Takes "sma" for simple moving average and "ema" for exponential moving average. 
+#' @param par_1 Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).
+#' @param scores Logical. If true, the CRPS is returned.
+#' @param eval_years Numerical vector. The years for evaluating the score.
+#' @param saveorgo Logical. If TRUE, the data table with new column SD_hat is saved.
+#' @param save_dir,file_name Directory and name for the saved file.
+#'                   
+#' @return The data table dt containing a new column SD_hat.
+#'
+#' @author Claudio Heinrich
+#' @examples \dontrun{sd_est(saveorgo = FALSE)}
+#' 
+#' 
+#' @export
+
+sd_est_2 = function(dt, method, par_1,
+                    saveorgo = TRUE,
+                    save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
+                    file_name = "dt_combine_wide_bc_var.RData",
+                    skip = 0,
+                    reduced_output = TRUE)
+{
+  
+  if(method == "sma"){
+    dt = dt[,"SD_hat" := sim_mov_av(l = par_1, 
+                                      vec = var_bar, 
+                                      years = year,
+                                      skip = skip),
+            by = .(Lon,Lat, month)]
+  }
+  if (method == "ema"){
+    dt[,"SD_hat" := exp_mov_av(a = par_1,
+                                 vec = var_bar,
+                                 years = year,
+                                 skip = skip),
+       by = .(Lon,Lat, month)]
+  }
+  
+  dt[,SD_hat := sqrt(SD_hat)]
+  
+  if(saveorgo){
+    save(dt, file = paste0(save_dir,file_name))
+  }
+  
+  if(reduced_output){
+    return(dt[,.(year,month,Lon,Lat,SD_hat)]) 
   } else return(dt)
   
 }

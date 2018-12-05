@@ -24,7 +24,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO/2" 
+name_abbr = "test" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -120,7 +120,7 @@ save.image(file = paste0(save_dir,"setup.RData"))
 mod_vec = c('PCA_mc','PCA_ac','GS','ECC')
 n_mod = length(mod_vec)
 
-N = 20000
+N = 10000
 
 pdf(paste0(plot_dir,'perm_test_vs.pdf'),width = 14,height = 14)
 

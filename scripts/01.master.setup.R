@@ -18,19 +18,20 @@ options(max.print = 1e3)
 
 library(PostProcessing)
 library(data.table)
-library(tictoc)
+
 
 # choose an abbreviation for this run
 
-name_abbr = "Full/lv"
+name_abbr = "NAO_small"
 
 # choose the area of the globe to consider
-lat_box = c(40,55)
-lon_box = c(-10,15)
-
+lat_box = c(40,75)
+lon_box = c(-30,50)
 
 
 # # set a couple of parameters
+
+mc_cores = 6
 
 ens_size = 9 # size of forecast ensemble
 
@@ -51,7 +52,7 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 ### construct load wide data set ###
 
-DT = load_combined_wide()#[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
+DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box[1] & Lat <= lat_box[2]]
 
 # tidy up DT:
 

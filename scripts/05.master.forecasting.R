@@ -26,7 +26,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO/2" 
+name_abbr = "test" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -38,7 +38,7 @@ time_s5 = proc.time()
 
 fc_years = validation_years
 fc_months = months
-fc_ens_size = 250
+fc_ens_size = 50
 
 mod_vec = c('PCA_mc','PCA_ac','GS','ECC')
 
@@ -57,6 +57,7 @@ PCA_fc_mc = forecast_PCA_mult_corr(DT,
 save(PCA_fc_mc,file = paste0(PCA_dir,"fc_mc.RData"))
 
 rm(PCA_fc_mc)
+gc()
 
 PCA_fc_ac = forecast_PCA_add_corr(DT, 
                                   Y = fc_years,
@@ -69,6 +70,7 @@ save(PCA_fc_ac,file = paste0(PCA_dir,"fc_ac.RData"))
 
 rm(PCA_fc_ac)
 
+gc()
 
 ###################################################
 ################## geostationary ##################
