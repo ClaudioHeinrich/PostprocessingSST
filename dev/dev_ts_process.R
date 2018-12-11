@@ -4,12 +4,6 @@ library(PostProcessing)
 library(data.table)
 setwd("~/PostClimDataNoBackup/SFE/")
 
-ff_mean = function(x){
-    x_s = cumsum(x)
-    x_s = x_s - x
-    return(c(0,x_s[-1]/1:(length(x_s) - 1)))
-}
-
 DT = readr::read_rds("./FcNov2018/wfc_ts_hindcast.rds")
 setkey(DT,"lon","lat","month","year")
 
