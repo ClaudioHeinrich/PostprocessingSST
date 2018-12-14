@@ -10,41 +10,27 @@ print_figs = FALSE
 
 load("./Fc_201812/DT_merged.RData")
 
-vintage_years = DT_t2m[,unique(vintageyear)]
-months = DT_t2m[,unique(month)]
-mod_list = list()
-mod = list()
-DT_y_all = list()
+DT_train_y = DT_t2m
+setkey(DT_train_y, Lat,Lon,month,year)
 
+Lat_nordic = c(58,63)
+Lon_nordic = c(5,11)
+
+DT_nordic = DT_train_y[between(Lat, Lat_nordic[1], Lat_nordic[2]) & between(Lon, Lon_nordic[1], Lon_nordic[2])]
 model_names = c("obs","ecmwf","dwd","cmcc","mf","ukmo")
+for(n in 1:length(model_names)){
+    
+    nm = paste0(model_names[n], "_t2m_climatology")
+    nm_var = paste0(model_names[n], "_t2m")
+    DT_nordic[, eval(nm) := median(get(nm_var)), .(Lat, Lon, month)]
+}
 
-helper = function(i){
-    print(i)
-    y = vintage_years[i]
-
-    DT_train_y = DT_t2m[vintageyear != y]
-    setkey(DT_train_y, Lat,Lon,month,year)
-    for(n in 1:length(model_names)){
-        nm = paste0(model_names[n], "_t2m_climatology")
-        nm_var = paste0(model_names[n], "_t2m")
-        DT_train_y[, eval(nm) := median(get(nm_var)), .(Lat, Lon, month)]
-    }
-
-    nms = c("Lat", "Lon", "month", paste0(model_names,"_t2m_climatology"))
-    DT_y = unique(merge(DT_t2m[vintageyear == y],
-                        DT_train_y[,.SD,.SDcols = nms],
-                        by = c("Lat","Lon","month"),
-                        all = FALSE))
-
-    for(n in 1:length(model_names)){
-        nm = paste0(model_names[n], "_t2m_anomaly")
-        nm_var1 = paste0(model_names[n], "_t2m")
-        nm_var2 = paste0(model_names[n], "_t2m_climatology")
-        DT_train_y[, eval(nm) := get(nm_var1) - get(nm_var2)]
-        if(model_names[n] != "obs"){
-            DT_y[, eval(nm) := get(nm_var1) - get(nm_var2)]
-        }
-    }
+for(n in 1:length(model_names)){
+    nm = paste0(model_names[n], "_t2m_anomaly")
+    nm_var1 = paste0(model_names[n], "_t2m")
+    nm_var2 = paste0(model_names[n], "_t2m_climatology")
+    DT_nordic[, eval(nm) := get(nm_var1) - get(nm_var2)]
+}
 
     f = paste0("obs_t2m_anomaly ~ ",paste0(model_names[-1], "_t2m_anomaly", collapse=" + "))
     mod = lm(as.formula(f), data = DT_train_y)
@@ -63,8 +49,6 @@ helper = function(i){
 DT_y_all = parallel::mclapply(1:length(vintage_years), "helper", mc.cores = 25, mc.silent = FALSE)
 
 gg = function(x,y){return(sqrt(mean( (x - y)^2)))}
-Lat_nordic = c(58,63)
-Lon_nordic = c(5,11)
 
 mod_names = c("obs_t2m_climatology", "equal_weighted_anamoly", "model", "model_month")
 DT_y = rbindlist(DT_y_all)

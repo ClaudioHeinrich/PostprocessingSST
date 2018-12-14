@@ -13,7 +13,7 @@ DT_ukmo[, c("lon","lat") := NULL]
 setkey(DT_ukmo, "Lon","Lat", "year","month")
 
 DT_merge1 = merge(DT_obs_t2m,
-                  DT_ukmo[,.(Lon,Lat,year,month,"ukmo_ts" = ts_bar)],
+                  DT_ukmo[,.(Lon, Lat, year, month, vintagemonth, vintageyear, "ukmo_t2m" = ts_bar)],
                   by = c("year","month","Lon","Lat"),
                   all.x = FALSE,
                   all.y = TRUE)
@@ -24,7 +24,7 @@ DT_mf[,Lat := lat]
 DT_mf[, c("lon","lat") := NULL]
 setkey(DT_mf, "Lon","Lat", "year","month")
 
-DT_merge2 = merge(DT_mf[,.(Lon,Lat,year,month,"mf_ts" = ts_bar)],
+DT_merge2 = merge(DT_mf[,.(Lon,Lat,year,month,"mf_t2m" = ts_bar)],
                  DT_merge1,
                  by = c("year","month","Lon","Lat"),
                  all.y = TRUE)
@@ -35,7 +35,7 @@ DT_cmcc[,Lat := lat]
 DT_cmcc[, c("lon","lat") := NULL]
 setkey(DT_cmcc, "Lon","Lat", "year","month")
 
-DT_merge3 = merge(DT_cmcc[,.(Lon,Lat,year,month,"cmcc_ts" = ts_bar)],
+DT_merge3 = merge(DT_cmcc[,.(Lon,Lat,year,month,"cmcc_t2m" = ts_bar)],
                  DT_merge2,
                  by = c("year","month","Lon","Lat"),
                  all.y = TRUE)
@@ -46,7 +46,7 @@ DT_dwd[,Lat := lat]
 DT_dwd[, c("lon","lat") := NULL]
 setkey(DT_dwd, "Lon","Lat", "year","month")
 
-DT_merge4 = merge(DT_dwd[,.(Lon,Lat,year,month,"dwd_ts" = ts_bar)],
+DT_merge4 = merge(DT_dwd[,.(Lon,Lat,year,month,"dwd_t2m" = ts_bar)],
                  DT_merge3,
                  by = c("year","month","Lon","Lat"),
                  all.y = TRUE)
@@ -66,4 +66,5 @@ DT_merge5[Lon > 180, Lon := Lon - 360]
 
 DT_t2m = DT_merge5
 
+setkey(DT_t2m, "Lat", "Lon", "month")
 save(DT_t2m, file = "./Fc_201812/DT_merged.RData")
