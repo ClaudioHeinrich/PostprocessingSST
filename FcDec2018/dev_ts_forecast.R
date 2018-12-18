@@ -3,44 +3,69 @@ rm(list = ls())
 library(PostProcessing)
 library(data.table)
 library(quantreg)
-library(qgam)
+
 
 setwd("~/PostClimDataNoBackup/SFE/")
 path_out = "~/"
 print_figs = FALSE
 
-load("./FcNov2018/models_ts.RData")
-DT_forecast = readr::read_rds("./FcNov2018/wfc_ts_forecast2.rds")
+load("./Fc_201812/DT_merged.RData")
+setkey(DT_t2m, "Lon", "Lat", "month")
+months = DT_t2m[,unique(month)]
 
-months = c(12,1,2,3,4)
+model_names = c("ukmo",
+                "ecmwf",
+                "dwd",
+                "cmcc",
+                "mf")
 
-
-nms = c("lat", "lon", "Lat", "Lon", "month", paste0(c("ukmo","mf","ecmwf","obs"),"_ts_climatology"), paste0("q_", q_print))
-DT_forecast = unique(merge(DT_forecast,
-                           DT_train[,.SD,.SDcols = nms],
-                           by = c("lat","lon","month"),
-                           all = FALSE))
-
-DT_forecast[, ukmo_ts_anamoly := ukmo_ts_bar - ukmo_ts_climatology, .(lat, lon, month)]
-DT_forecast[, mf_ts_anamoly := mf_ts_bar - mf_ts_climatology, .(lat, lon, month)]
-DT_forecast[, ecmwf_ts_anamoly := ecmwf_ts_bar - ecmwf_ts_climatology, .(lat, lon, month)]
-
-DT_forecast[,model_mean := obs_ts_climatology + predict(mod_mean, newdata = DT_forecast)]
-for(i in 1:length(months)){
-    m = months[i]
-    for(s in 1:99){
-        mod = mod_q[[i]][[s]]
-        DT_forecast[month == m, eval(paste0("q_hat_",s)) := obs_ts_climatology + predict(mod, newdata = DT_forecast[month == m])]
-    }
+for(j in 1:length(model_names)){
+    nms_v = paste0(model_names[j], "_climatology")
+    nms_mean = paste0(model_names[j], "_t2m")
+    DT_t2m[, eval(nms_v) := median(get(nms_mean), na.rm = TRUE),
+           .(Lon, Lat, month)]
 }
 
-rank1 = function(x){return(rank(x)[1])}
-for(i in 1:length(q_print)){
-    q = q_print[i]
-    nm = paste0("p_below_",i)
-    DT_forecast[,eval(nm) := apply(.SD,1,"rank1") / 1e2,
-                .SDcols = c(paste0("q_",q), paste0("q_hat_",1:99))]    
+DT_t2m[, obs_climatology := median(obs_t2m), .(Lon, Lat, month)]
+DT_t2m[, obs_anomaly := obs_t2m - obs_climatology, .(Lon, Lat, month)]
+DT_t2m[, anamoly_sd := sd(obs_anomaly), .(Lon, Lat, month)]
+
+for(j in 1:length(model_names)){
+    nms_v = paste0(model_names[j], "_anomaly")
+    nms_v1 = paste0(model_names[j], "_t2m")
+    nms_v2 = paste0(model_names[j], "_climatology")
+    DT_t2m[, eval(nms_v) := get(nms_v1) - get(nms_v2)]
 }
 
-save(DT_forecast,file = "./FcNov2018/Forecast_ts.RData")
+ff = paste0("obs_anomaly ~ ", paste0(model_names,"_anomaly", collapse = " +  "))
+mod = lm(as.formula(ff), data = DT_t2m)
+
+DT_t2m[,anomaly_hat := predict(mod, data = DT_t2m)]
+DT_t2m[,residual_hat := obs_anomaly - anomaly_hat]
+DT_t2m[, sd_residual := sd(residual_hat), .(Lon, Lat, month)]
+
+load("./Fc_201812/Forecast_ts_processed.RData")
+
+nms_aux = c("Lon", "Lat", "month", paste0(model_names, "_climatology"), "sd_residual")
+DT_aux = unique(DT_t2m[,.SD, .SDcols = nms_aux])
+
+DT_forecast_featured = merge(DT_forecast, DT_aux, by = c("Lon", "Lat", "month"))
+
+model_names = c("ukmo",
+                "ecmwf",
+                "dwd",
+                "cmcc",
+                "meteo_france")
+
+for(j in 1:length(model_names)){
+    nms_v = paste0(model_names[j], "_anomaly")
+    nms_v1 = paste0(model_names[j], "_bar")
+    nms_v2 = paste0(model_names[j], "_climatology")
+    DT_forecast_featured[, eval(nms_v) := get(nms_v1) - get(nms_v2)]
+}
+
+DT_forecast_featured[, obs_anomaly_hat := predict(mod, newdata = DT_forecast_featured)]
+
+
+
 
