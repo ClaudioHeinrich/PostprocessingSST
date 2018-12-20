@@ -46,16 +46,12 @@ DT_t2m[, sd_residual := sd(residual_hat), .(Lon, Lat, month)]
 
 load("./Fc_201812/Forecast_ts_processed.RData")
 
-nms_aux = c("Lon", "Lat", "month", paste0(model_names, "_climatology"), "sd_residual")
+DT_forecast[, mf_bar := meteo_france_bar]
+DT_forecast[, meteo_france_bar := NULL]
+nms_aux = c("Lon", "Lat", "month", paste0(model_names, "_climatology"), "sd_residual","obs_climatology")
 DT_aux = unique(DT_t2m[,.SD, .SDcols = nms_aux])
 
 DT_forecast_featured = merge(DT_forecast, DT_aux, by = c("Lon", "Lat", "month"))
-
-model_names = c("ukmo",
-                "ecmwf",
-                "dwd",
-                "cmcc",
-                "meteo_france")
 
 for(j in 1:length(model_names)){
     nms_v = paste0(model_names[j], "_anomaly")
@@ -65,7 +61,9 @@ for(j in 1:length(model_names)){
 }
 
 DT_forecast_featured[, obs_anomaly_hat := predict(mod, newdata = DT_forecast_featured)]
+DT_forecast_featured[, forecast_t2m := obs_climatology + obs_anomaly_hat]
 
+save(DT_forecast_featured, file = "./Fc_201812/DT_t2m_forecast.RData")
 
 
 
