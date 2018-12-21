@@ -350,38 +350,32 @@ bias_correct = function(dt, method, par_1,
 #' @export
 
 bias_correct_2 = function(dt, method, par_1,
-                          saveorgo = TRUE,
-                          save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                          file_name = "dt_combine_wide_bias.RData",
                           skip = 0,
-                          reduced_output = TRUE){
-  
-  
+                          reduced_output = TRUE)
+{
   if(method == "sma"){
-    dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
-                                      vec = SST_bar - Ens_bar, 
-                                      years = year,
-                                      skip = skip),
-            by = .(Lon,Lat, month)]
+    b_hat =  dt[,.(year,month,Bias_est = sim_mov_av(l = par_1,  
+                                                    vec = SST_bar - Ens_bar, 
+                                                    years = year,
+                                                    skip = skip)),
+                by = .(Lon,Lat,month)]
   }
   if (method == "ema"){
-    dt[,"Bias_Est" := exp_mov_av(a = par_1,
-                                 vec = SST_bar - Ens_bar,
-                                 years = year,
-                                 skip = skip),
-       by = .(Lon,Lat, month)]
+    b_hat =  dt[,.(year,month,Bias_est = exp_mov_av(a = par_1,  
+                                                    vec = SST_bar - Ens_bar, 
+                                                    years = year,
+                                                    skip = skip)),
+                by = .(Lon,Lat,month)]
   }
   
-  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
+  setkey(b_hat,year,month,Lon,Lat)
   
-  if(saveorgo){
-    save(dt, file = paste0(save_dir,file_name))
-  }
+  # estimated temperature
+  ret_val = data.table(b_hat, SST_hat = trc(dt[,Ens_bar] + b_hat[,Bias_est]))
   
   if(reduced_output){
-    return(dt[,.(year,month,Lon,Lat,Bias_Est,SST_hat)]) 
-  } else return(dt)
-  
+    return(ret_val) 
+  } else return(data.table(dt,ret_val))
 }
 
 

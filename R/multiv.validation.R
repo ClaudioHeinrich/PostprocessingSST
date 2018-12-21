@@ -3,6 +3,80 @@
 #########################################
 
 
+#' new, faster plotting of multivariate rank histograms
+#' 
+#' @description computes the multivariate rank histograms for the provided forecast data table. Plots the average rank and the band depth rankq.
+#'  
+#' @param dt_fc the forecast data table.
+#' @param fc_ens_size Size of the forecast ensemble: dt_fc ought to have columns named fc1,...,fcn, where n = fc_ens_size.
+#' @param mc_cores number of cores used for parallelization.
+#' @param mn Title of the plot.
+#' @param breaks Number of breaks in the rank histograms. Should at most be 1 + fc_ens_size (which is the size of the ensemble for ECC).
+#' @param save_pdf,plot_dir,file_name Whether and where the rank histogram should be saved as pdf. \code{file_name} should not contain '.pdf'.
+#' 
+#' @return if save_pdf = FALSE the rank histogram is shown. If save_pdf = TRUE, the plots are saved and a data table with the ranks of the observations is returned.
+#' 
+#' @examples \dontrun{}
+#' 
+#' @author Claudio Heinrich        
+#' 
+#' @export
+
+mv_rank_hist_new = function(dt_fc,
+                            fc_ens_size,
+                            mc_cores = 12,
+                            mn = "",
+                            breaks = 11,
+                            save_pdf = FALSE, plot_dir = "", file_name = "")
+{
+  ym = unique(dt_fc[,YM])
+  
+  ym_ind = 1:length(ym)
+  
+  ranks_dt = data.table(YM = ym)
+  
+  ranks_matrix = matrix(ym,nrow = length(ym),ncol = 1+2*(fc_ens_size +1)) 
+  #ncol: 1 col for YM, 2 methods of ranking, for each we get ranks for observation and each Monte Carlo sample
+  
+  drm = dim(ranks_matrix)
+  
+  YM_ind = 0
+  
+  ranks_ym = function(yearmonth)
+  {print(ceiling(yearmonth/12))
+    fc_obs_dt = dt_fc[YM == yearmonth,.SD,.SDcols = c("SST_bar",paste0("fc",1:fc_ens_size))]
+    
+    temp_avg = avg.rank(fc_obs_dt)[1]
+    temp_bd = bd.rank(fc_obs_dt)[1]
+    
+    return_dt = data.table(YM = yearmonth,av.rk.obs = temp_avg, bd.rk.obs = temp_bd)
+    return(return_dt)
+  }
+  
+  ranks = rbindlist(parallel::mclapply(X = ym,
+                                       FUN = ranks_ym,
+                                       mc.cores = mc_cores,
+                                       mc.silent = FALSE))
+  
+  if(save_pdf)
+  {
+    pdf(file=paste0(plot_dir,file_name,".pdf"),width=24,height=7,points=12)
+  }
+  
+  par(mfrow=c(1,2),mex=0.5,oma = c(0,0,2.5,0),mar=c(2.5,2.5,2.5,2.5)+0.1,mgp=c(0.5,0,0))
+  
+  rhist_dt(ranks[,.(YM,av.rk.obs)], max_rk = fc_ens_size +1, breaks = breaks, hist_xlab = "average")
+  rhist_dt(ranks[,.(YM,bd.rk.obs)], max_rk = fc_ens_size +1, breaks = breaks, hist_xlab = "band depth")
+  
+  title(mn,outer = TRUE)
+  
+  if(save_pdf)
+  {
+    dev.off()  
+    return(ranks)}
+}
+
+
 ##### multivariate rank histograms ######
 
 #' making and plotting of multivariate rank histograms
@@ -66,9 +140,9 @@ mv_rank_hist = function(dt_fc,
   
   par(mfrow=c(1,3),mex=0.5,oma = c(0,0,2.5,0),mar=c(2.5,2.5,2.5,2.5)+0.1,mgp=c(0.5,0,0))
   
-  rhist_dt(ranks[,.(YM,mst.rk.obs)], breaks = breaks,  hist_xlab = "minimum spanning tree")
-  rhist_dt(ranks[,.(YM,av.rk.obs)], breaks = breaks, hist_xlab = "average")
-  rhist_dt(ranks[,.(YM,bd.rk.obs)], breaks = breaks, hist_xlab = "band depth")
+  rhist_dt(ranks[,.(YM,mst.rk.obs)], max_rk = fc_ens_size +1, breaks = breaks,  hist_xlab = "minimum spanning tree")
+  rhist_dt(ranks[,.(YM,av.rk.obs)],max_rk = fc_ens_size +1, breaks = breaks, hist_xlab = "average")
+  rhist_dt(ranks[,.(YM,bd.rk.obs)], max_rk = fc_ens_size +1, breaks = breaks, hist_xlab = "band depth")
   
   title(mn,outer = TRUE)
   
@@ -159,10 +233,13 @@ bd.rank <- function(x)
 #'  
 #' @export
 
-rhist_dt <- function(B, breaks = 10, hist_xlab="", hist_ylab="", hist_ylim=NULL)
+rhist_dt <- function(B, max_rk, breaks = 11, hist_xlab=NULL, hist_ylab=NULL, hist_ylim=NULL,mn = '')
 {
-  hist(as.vector(B[[2]]),breaks=seq(0, max(as.vector(B[[2]])), length.out = breaks), main="",xlab=hist_xlab,ylab=hist_ylab,axes=FALSE,col="gray80",border="gray60",ylim=hist_ylim)
-  abline(a=length(B[[1]])/breaks, b=0, lty=2, col="gray30")
+  hist(as.vector(B[[2]]),breaks=seq(0, max_rk, length.out = breaks), 
+       main=mn,
+       xlab=hist_xlab, ylab=hist_ylab,
+       axes=FALSE, col="gray80", border="gray60", ylim=hist_ylim)
+  abline(a=length(B[[1]])/(breaks-1), b=0, lty=2, col="gray30")
 }
 
 
@@ -284,7 +361,7 @@ var_sc_par = function(dt_fc, years, ms, n , p = 0.5,
                                    y = year_i,
                                    dt_fc = dt_fc,
                                    n = n,
-                                   p = p,
+                                 p = p,
                                    mc.cores = mc_cores)
         }
         vs_all[[i]] = rbindlist(l)

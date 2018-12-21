@@ -38,7 +38,7 @@ time_s5 = proc.time()
 
 fc_years = validation_years
 fc_months = months
-fc_ens_size = 50
+fc_ens_size = 500
 
 mod_vec = c('PCA_mc','PCA_ac','GS','ECC')
 
@@ -80,10 +80,12 @@ GS_fc = forecast_GS(DT,
                     Y = validation_years,
                     M = months,
                     n = fc_ens_size,
-                    var_dir = GS_dir)
+                    var_dir = GS_dir,
+                    mc_cores = mc_cores)
 
 save(GS_fc,file = paste0(GS_dir,"fc.RData"))
 rm(GS_fc)
+
 gc()
 
 ########################################

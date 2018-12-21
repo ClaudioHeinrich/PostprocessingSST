@@ -48,7 +48,7 @@ weight_mat = function(dt, phi = GneitingWeightFct, L = 2500)
 #' @export
 
 PCA_cov = function(dt, weight_mat,
-                       Y=unique(dt[,year])[-1], # take first year out, as it is not bias corrected
+                       Y=unique(dt[,year]),
                        M = 1:12, nPCs,
                        save_years = 2013:2018, save_dir, file_name = "PCA_cov")
 { 

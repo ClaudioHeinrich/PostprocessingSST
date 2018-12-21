@@ -24,7 +24,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "test" 
+name_abbr = "NAO/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -53,9 +53,10 @@ vs_PCA_mc = var_sc_par(dt_fc = PCA_fc_mc,  p = pp,
                     mc_cores = mc_cores)
 
 
-rm(PCA_fc_mc)
-
 save.image(file = paste0(save_dir,"setup.RData"))
+
+rm(PCA_fc_mc)
+gc()
 
 #####  ac ######
 
@@ -67,10 +68,13 @@ vs_PCA_ac = var_sc_par(dt_fc = PCA_fc_ac,  p = pp,
                        save_dir = NULL,
                        mc_cores = mc_cores)
 
-rm(PCA_fc_ac)
+
+
 
 save.image(file = paste0(save_dir,"setup.RData"))
 
+rm(PCA_fc_ac)
+gc()
 
 ###### GS ######
 

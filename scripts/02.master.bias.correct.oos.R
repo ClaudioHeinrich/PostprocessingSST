@@ -39,58 +39,104 @@ save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 load(file = paste0(save_dir,"setup.RData"))
 
 
-###### run bias analysis for simple moving averages ######
+####################################################
 
 past_0 = 5 # how many years before validation period do we consider for the RMSEs
+num_years = max(validation_years) - 1985
 
 
-num_years = max(validation_years) - DT[,min(year)]
-
-win_length = 1 : (num_years-1)
-
-MSE_by_par = function(k)
+for(m in months)
 {
-  temp = bias_correct_2(dt = DT, 
-                        method = "sma", 
-                        par_1 = k,
-                        reduced_output = TRUE)
-  return(temp[year %between% c(min(validation_years - past_0),max(validation_years)),SST_hat])
-}
+  print( c('month ',m))
+  
+  DT = get(paste0('DT',m))
 
-
-BC = parallel::mclapply(X = win_length, FUN = MSE_by_par,mc.cores = mc_cores)
-
-# restrict to validation years + the past_0 years before 
-
-Bias_est_dt = DT[year %between% c(min(validation_years - past_0),max(validation_years)),
-                 .(year,month,Lon,Lat,SST_bar)]
-
-for(k in win_length)
-{print(k)
-  Bias_est_dt[,paste0('l',k):= BC[[k]]]
-  Bias_est_dt[,paste0('err',k):= (SST_bar - eval(parse(text = paste0('l',k))))^2]
-}
-
-#get MSE by year and month, for each year based on all previous years contained in Bias_est_dt
-
-sc_sma = NULL
-
-for(y in validation_years)
-{print(y)
-  mean_sc_bm = function(m)
+  ###### run bias analysis for simple moving averages ######
+  
+  win_length = 1 : (num_years-1)
+  
+  MSE_by_par = function(k)
   {
-      temp = data.table(year = y ,month = m,Bias_est_dt[year < y & month == m,
-                                                        lapply(X = .SD,FUN = mean,na.rm = TRUE),
-                                                        .SDcols = paste0('err',win_length)])
-      return(temp)     
+    temp = bias_correct_2(dt = DT, 
+                          method = "sma", 
+                          par_1 = k,
+                          reduced_output = TRUE)
+    return(temp[year %between% c(min(validation_years - past_0),max(validation_years)),SST_hat])
   }
   
-  MSE_y = rbindlist(parallel::mclapply(X = months,FUN = mean_sc_bm,mc.cores = mc_cores))
-  sc_sma = rbindlist(list(sc_sma,MSE_y))
+  
+  BC = parallel::mclapply(X = win_length, FUN = MSE_by_par, mc.cores = mc_cores)
+  
+  # restrict to validation years + the past_0 years before 
+  
+  Bias_est_dt = DT[year %between% c(min(validation_years - past_0),max(validation_years)),
+                   .(year,month,Lon,Lat,SST_bar)]
+  
+  for(k in win_length)
+  {
+    Bias_est_dt[,paste0('l',k):= BC[[k]]]
+    Bias_est_dt[,paste0('err',k):= (SST_bar - eval(parse(text = paste0('l',k))))^2]
+  }
+  
+  #get MSE by year and month, for each year based on all previous years contained in Bias_est_dt
+  
+   mean_sc_by = function(y)
+    {
+      temp = data.table(year = y,Bias_est_dt[year < y, lapply(X = .SD,FUN = mean,na.rm = TRUE), .SDcols = paste0('err',win_length)])
+      return(temp)     
+    }
+    
+  assign(x = paste0('sc_sma_m',m), rbindlist(parallel::mclapply(X = validation_years,FUN = mean_sc_by,mc.cores = mc_cores)))
+  
+  save(paste0('sc_sma_m',m), file = paste0(save_dir,'scores.bc.sma.m',m,'.RData'))
+  
+ 
+  ###### run bias analysis for simple moving averages ######
+  
+  par_vec = seq(0.05,0.4,length.out = 24) 
+  
+  MSE_by_par = function(a)
+  {
+    temp = bias_correct_2(dt = DT, 
+                          method = "ema", 
+                          par_1 = a,
+                          reduced_output = TRUE)
+    return(temp[year %between% c(min(validation_years - past_0),max(validation_years)),SST_hat])
+  }
+  
+  
+  BC = parallel::mclapply(X = par_vec, FUN = MSE_by_par, mc.cores = mc_cores)
+  
+  # restrict to validation years + the past_0 years before 
+  
+  Bias_est_dt = DT[year %between% c(min(validation_years - past_0),max(validation_years)),
+                   .(year,month,Lon,Lat,SST_bar)]
+  
+  for(a in par_vec)
+  {ind = which(par_vec == a )
+  ra = round(a,4)
+  Bias_est_dt[,paste0('a',ra):= BC[[ind]]]
+  Bias_est_dt[,paste0('err',ra):= (SST_bar - eval(parse(text = paste0('a',ra))))^2]
+  }
+  
+  #get MSE by year and month, for each year based on all previous years contained in Bias_est_dt
+  
+  mean_sc_by = function(y)
+  {
+    temp = data.table(year = y,Bias_est_dt[year < y, lapply(X = .SD,FUN = mean,na.rm = TRUE), .SDcols = paste0('err',round(par_vec,4))])
+    return(temp)     
+  }
+  
+  sc_ema_m = rbindlist(parallel::mclapply(X = validation_years,FUN = mean_sc_by,mc.cores = mc_cores))
+  
+  assign(x = paste0('sc_ema_m',m),value = sc_ema_m)
+  
+  save(eval(parse(text = paste0('sc_ema_m',m))), file = paste0(save_dir,'scores.bc.ema.m',m,'.RData'))
+
 }
+  
 
 
-save(sc_sma, file = paste0(save_dir,"scores.bc.sma.RData"))
 
 
 ###### run bias analysis for exponential moving averages ######
@@ -102,6 +148,7 @@ MSE_by_par = function(a)
   temp = bias_correct_2(dt = DT, 
                         method = "ema", 
                         par_1 = a,
+                        saveorgo = FALSE,
                         reduced_output = TRUE)
   return(temp[year %between% c(min(validation_years - past_0),max(validation_years)),SST_hat])
 }
@@ -272,9 +319,10 @@ for(y in validation_years)
 for(y in validation_years)
 {
   print(y) 
-  temp = bias_correct(dt = DT,
+  temp = bias_correct_2(dt = DT,
                          method = opt_par[year == y, method],
-                         par_1 = opt_par[year == y,par])[year == y,]
+                         par_1 = opt_par[year == y,par],
+                         reduced_output = TRUE)[year == y,]
   DT[year == y,][,Bias_Est := temp[,Bias_Est]][,SST_hat := temp[,SST_hat]]
 }
 

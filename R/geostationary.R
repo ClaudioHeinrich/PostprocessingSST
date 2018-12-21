@@ -28,7 +28,7 @@
 #' 
 #' @importFrom spacetime STFDF
 #' @importFrom sp SpatialPoints spDists SpatialPointsDataFrame
-#' @importFrom gstat variogramST fit.variogram
+#' @importFrom gstat variogramST fit.variogram 
 #' 
 #' @export
 
@@ -125,10 +125,27 @@ geostationary_training = function (dt ,
     
     Mod <- gstat::fit.variogram(spEmpVgm, gstat::vgm("Exp"), fit.sills = c(T,T))
     
-    save(sp,stfdf,Mod,Dist,file = paste0(save_dir,file_name,mon,".RData"))
+    # get and save covariance matrix
+    
+    psill <- Mod$psill[2]
+    range <- Mod$range[2]
+    nugget <- max(Mod$psill[1],0)
+    
+    Sigma <- psill*exp(-Dist/range)
+    sills <- diag(Sigma) + nugget
+    diag(Sigma) <- sills
+    
+    ns <- length(sp)
+    
+    svd_Sigma = svd(Sigma)
+    
+    sqrt_Sigma = svd_Sigma$u %*% sqrt(diag(svd_Sigma$d)) 
+    
+    save(sp,stfdf,Mod,Dist,sqrt_Sigma,file = paste0(save_dir,file_name,mon,".RData"))
     
   }
 }
+
 
 
 
@@ -154,7 +171,8 @@ geostationary_training = function (dt ,
 #' @export
 
 forecast_GS = function(dt, Y, M,
-                       n=10, 
+                       n=10,
+                       mc_cores = 12,
                        noise = FALSE,
                        var_dir, var_file_name = "variogram_exp")
 {
@@ -172,7 +190,7 @@ forecast_GS = function(dt, Y, M,
   }
   
   SD_cols = c("Lon","Lat","grid_id","month","year","YM",
-              "SST_hat","SST_bar",paste0("Ens",1:ens_size),"Ens_bar","Bias_Est","var_bar","SD_hat")
+              "SST_hat","SST_bar","Ens_bar","Bias_Est","var_bar","SD_hat")
   SD_cols = SD_cols[which(SD_cols %in% colnames(dt))]
   
   fc_water <- na.omit( dt_water[,.SD,.SDcols = SD_cols])
@@ -197,16 +215,16 @@ forecast_GS = function(dt, Y, M,
     dt_month = fc_water[month == m,]
     
     for (y in Y)
-      {
+      {print(c(y,m))
       # marginally correct Sigma:
       mcf = dt_month[year == y, SD_hat]/sqrt(Sigma[1])
-      Sigma_hat = diag(mcf) %*% Sigma %*% diag(mcf)
+      sqrt_Sigma_hat =   diag(mcf) %*% sqrt_Sigma
       
       # generate noise:
-      no <- matrix(MASS::mvrnorm(n=n, mu=rep(0,length(sp)), Sigma=Sigma_hat),nrow = n) # (function 'matrix' is necessary in case n=1)
+      no <- sqrt_Sigma_hat %*% matrix(data = rnorm(n * dim(sqrt_Sigma_hat)[1]),ncol = n)
       for (i in 1:n)
         {
-        dt_month[year == y, paste0("no",i) := no[i,]]
+        dt_month[year == y, paste0("no",i) := no[,i]]
         dt_month[year == y, paste0("fc",i) := trc(Ens_bar + Bias_Est + .SD), 
                  .SDcols = paste0("no",i)]
         if(!noise)
@@ -219,7 +237,8 @@ forecast_GS = function(dt, Y, M,
     return(dt_month)
   }
   
-  temp = parallel::mclapply(M,forecast_by_month,mc.cores = length(M))
+  
+  temp = parallel::mclapply(M,forecast_by_month,mc.cores = mc_cores)
   fc_water = rbindlist(temp)
     
   #-------- add land --------------

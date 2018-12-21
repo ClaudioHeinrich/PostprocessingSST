@@ -157,7 +157,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
 #' @import sp maptools
 
 
-plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
+plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,...,
                         theta = 0.5, pixels = 256,
                         col_scheme = "bwr", set_white = NULL,
                         xlab = "", ylab = "",
@@ -256,7 +256,7 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,
   par(mar = c(2,2,2,2))
   
   fields::image.plot(im_0,
-                     zlim=rr, main = mn,
+                     zlim=rr, main = mn,...,
                      xlim = range(Lons), xlab=xlab,
                      ylim = range(Lats), ylab=ylab,
                      breaks=brk,
