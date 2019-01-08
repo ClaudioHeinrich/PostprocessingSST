@@ -339,10 +339,17 @@ y = max(validation_years)
 row_sma = msc_sma[year == y,-1,with = FALSE]
 row_ema = msc_ema[year == y,-1,with = FALSE]
 
-y_range = range(list(row_sma[,-'min_l',with = FALSE],row_ema[,-'min_a',with = FALSE]))  
+# reduce window length for plot to make it better readable
+
+wl = win_length[5:length(win_length)]
+
+values = as.vector(sqrt(row_sma[,-c('min_MSE','min_l'),with = FALSE]))
+
+values = values[,5:length(win_length)]
+
+y_range = range(list(row_sma[,-'min_l',with = FALSE][,5:length(win_length)],row_ema[,-'min_a',with = FALSE]))  
 
 y_range = sqrt(y_range)
-
 
 
 pdf(paste0(plot_dir,"RMSE_by_par.pdf"),width = 15)
@@ -351,8 +358,8 @@ pdf(paste0(plot_dir,"RMSE_by_par.pdf"),width = 15)
   
   ## plot for sma ##
   
-  plot(x = win_length, 
-       y = as.vector(sqrt(row_sma[,-c('min_MSE','min_l'),with = FALSE])),
+  plot(x = wl, 
+       y = values,
        ylim = y_range,
        type = "b",
        col = "blue",
@@ -362,7 +369,7 @@ pdf(paste0(plot_dir,"RMSE_by_par.pdf"),width = 15)
   )
   
   # highlight minimum and add minimum reference line 
-  abline(h = row_sma[,sqrt(min_MSE)], lty = "dashed", col = adjustcolor("blue",alpha = .5))
+  abline(h = row_ema[,sqrt(min_MSE)], lty = "dashed", col = adjustcolor("blue",alpha = .5))
   
   points(x = row_sma[,min_l],
          y = row_sma[,sqrt(min_MSE)],
@@ -483,14 +490,54 @@ plot_dir = plot_dir0
 m = 6
 y = 2016
 
-plot_smooth(DT[year == y & month == m,.(Lon,Lat,SST_bar - SST_hat)], 
-            mn = latex2exp::TeX('observed forecast residual June 2016'), 
-            rr = c(-3,3),
-            pixels = 512,
-            save_pdf = TRUE,
-            save_dir = plot_dir,
-            file_name = 'Example_res'
-            )  
+#in order to add route, we need to set the stretch parameter manually:
+
+temp = DT[year == y & month == m,.(Lon,Lat,SST_bar - SST_hat)]
+
+Lons = unique(temp[,Lon])
+Lats = unique(temp[,Lat])
+
+n_lon = length(Lons)
+n_lat = length(Lats)
+
+save_cex = par('cex')
+
+
+pdf(paste0(plot_dir,'Example_res.pdf'),width = 7,height = 7 * n_lat/n_lon)
+  
+  par('cex' = save_cex)
+  plot_smooth(DT[year == y & month == m,.(Lon,Lat,SST_bar - SST_hat)], 
+              mn = latex2exp::TeX('observed forecast residual June 2016'), 
+              rr = c(-3,3),
+              pixels = 512,
+              save_pdf = FALSE,
+              save_dir = plot_dir,
+              file_name = 'Example_res'
+              )  
+  
+  #add points and shipping route
+  
+  Bordeaux = c(-0.57,44.8)
+  New_York = c(-74,40.7)
+  Norfolk = c(-76.3,36.9)
+  
+  Miami = c(-80.2,25.8)
+  
+  p1 = data.table(Lon = Bordeaux[1], Lat =Bordeaux[2], Loc = "Le Havre") 
+  p2 = data.table(Lon = Norfolk[1], Lat = Norfolk[2], Loc = "New York") 
+  
+  cities = rbindlist(list(p1,p2))
+  
+  points(cities[,Lon],cities[,Lat],col="black", cex=2, pch=20)
+  
+  par('cex' = save_cex)
+  
+  # Connection between Bordeaux and Norfolk
+  inter <- geosphere::gcIntermediate(Bordeaux, Norfolk, n=100, addStartEnd=TRUE, breakAtDateLine=F)             
+  lines(inter, col="black", lwd=2)
+  
+dev.off()
+
 
 ####################################################################
 

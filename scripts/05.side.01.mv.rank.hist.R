@@ -50,7 +50,7 @@ rks_PCA_mc = mv_rank_hist_new(PCA_fc_mc, fc_ens_size = fc_ens_size,
 
 load(paste0(PCA_dir,"fc_ac.RData"))
 
-rks_PCA_mc = mv_rank_hist_new(PCA_fc_ac, fc_ens_size = fc_ens_size, 
+rks_PCA_ac = mv_rank_hist_new(PCA_fc_ac, fc_ens_size = fc_ens_size, 
                               mc_cores = mc_cores,
                               breaks = brks, mn = "PCA_ac rank histograms",
                               save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_ac")
