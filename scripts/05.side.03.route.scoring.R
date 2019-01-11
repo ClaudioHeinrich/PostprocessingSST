@@ -20,7 +20,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO/lv" 
+name_abbr = "NAO/lv/2" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -37,11 +37,14 @@ time_s53 = proc.time()
 # Fix two points p1 and p2. These are then connected by a route (as the crow flies, not caring about land in between).
 # A grid point in dt is then considered for scoring if it is not on land and is nearest neighbour to a point on the route. 
 
-p1 = data.table(Lon = 0.1, Lat = 49.5, Loc = "Le Havre") 
-p2 = data.table(Lon = -74, Lat = 40.7, Loc = "New York") 
+Bordeaux = c(-0.57,44.8)
+Norfolk = c(-76.3,36.9)
 
-route_name = "Le Havre to New York"
-file_name = "scores_LH_to_NY"
+p1 = data.table(Lon = Bordeaux[1], Lat = Bordeaux[2], Loc = 'Bordeaux') 
+p2 = data.table(Lon = Norfolk[1], Lat = Norfolk[2], Loc = "Norfolk") 
+
+route_name = "Bordeaux to Norfolk"
+file_name = "scores_Bd_to_Nf"
 
 
 # p1 = data.table(Lon = 5.32, Lat = 60.4, Loc = "Bergen") 
@@ -234,7 +237,7 @@ save(scores_dt,file = paste0(save_dir,'route_scores.RData'))
 
 ### permutation tests ###
 
-funn = 'max'
+funn = 'min'
 score = 'MSE'
 
 N = 20000

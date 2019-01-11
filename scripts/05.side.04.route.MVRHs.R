@@ -9,7 +9,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO/lv" 
+name_abbr = "NAO/lv/2" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -62,22 +62,4 @@ rks_ECC_route = mv_rank_hist_new(ECC_fc_route, fc_ens_size = ens_size,
 time_s54 = proc.time() - time_s54
 
 save.image(file = paste0(save_dir,"setup.RData"))
-
-y = 2010
-
-for(m in 1:12){
-test = matrixStats::rowRanks(as.matrix(GS_fc_route[year == y &month == m & !is.na(SST_hat),.SD,.SDcols = c('SST_bar',paste0('fc',1:500))]))
-hist(test[,1],main = c(m,y))
-}
-
-
-test2 = matrixStats::rowRanks(as.matrix(PCA_mc_fc_route[ !is.na(SST_hat),.SD,.SDcols = c('SST_bar',paste0('fc',1:500))]))
-hist(test2[,1],main = c(m,y))
-
-test3 = matrixStats::rowRanks(as.matrix(PCA_ac_fc_route[ !is.na(SST_hat),.SD,.SDcols = c('SST_bar',paste0('fc',1:500))]))
-hist(test3[,1],main = c(m,y))
-
-test4 = matrixStats::rowRanks(as.matrix(PCA_mc_fc_route[ !is.na(SST_hat),.SD,.SDcols = c('SST_bar',paste0('fc',1:500))]))
-hist(test4[,1],main = c(m,y))
-
 

@@ -207,8 +207,8 @@ forecast_GS = function(dt, Y, M,
     nugget <- max(Mod$psill[1],0)
     
     Sigma <- psill*exp(-Dist/range)
-    sills <- diag(Sigma) + nugget
-    diag(Sigma) <- sills
+    diag(Sigma) <- diag(Sigma) + nugget
+    
     
     ns <- length(sp)
     

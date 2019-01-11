@@ -108,54 +108,6 @@ rr = c(-(max(abs(rr))),(max(abs(rr))))
 
 plot_smooth(dt_test_new,paste0('PC1'),mn = '1st PC of covariance matrix for June',save_pdf = TRUE,file_name = '1stPCtapered',save_dir = plot_dir,xlab = '',ylab = '' )  
 
-########################################################
-
-
-############# Plot of normalized SST #######################
-
-
-name_abbr = "Full" 
-
-save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
-
-load(file = paste0(save_dir,"setup.RData"))
-
-# reset plot directory
-
-plot_dir = plot_dir0
-
-# year and month
-y = 2016
-m = 5
-
-
-DT = DT[Lat %between% Lat_res]
-
-dt_ym = DT[year == y & month == m]
-
-# get sample mean and sample variance
-
-test_dt = DT[month == m & year < y & !is.na(SST_hat),][,.('clim' = mean(SST_bar,na.rm = TRUE),'clim_sd' = sd(SST_bar,na.rm = TRUE)),by = grid_id]
-
-n_years = dt[month == m & year < y & !is.na(SST_hat),][grid_id == min(grid_id),.N]
-
-temp = dt_ym[!is.na(SST_hat),][,'clim' := test_dt[,clim]][,'clim_sd' := test_dt[, clim_sd]]
-
-dt_ym2 = merge(temp,dt_ym,by = colnames(dt_ym),all.y = TRUE)
-
-
-# bound standard deviations away from 0
-
-dt_ym2[clim_sd < 0.1,clim_sd := 0.1]
-
-# get standardized SST and plot
-dt_ym2[ ,'SST_stan' := (SST_bar - clim)/clim_sd]
-
-plot_smooth(dt_ym2,'SST_stan',rr = c(-5,5),
-            mn = 'normalized sea surface temperature in May 2016',
-            pixels = 512,
-            save_pdf = TRUE, save_dir = plot_dir,file_name = 'sst_nor_m05_y2016')
-
 
 
 ##################################################
@@ -329,7 +281,7 @@ dev.off()
 
 #######################################################
 
-####### Plot RMSE by weighting parameter ##############
+####### Plot MSE by weighting parameter ##############
 
 #### plotting ####
 
@@ -352,7 +304,7 @@ y_range = range(list(row_sma[,-'min_l',with = FALSE][,5:length(win_length)],row_
 y_range = sqrt(y_range)
 
 
-pdf(paste0(plot_dir,"RMSE_by_par.pdf"),width = 15)
+pdf(paste0(plot_dir,"MSE_by_par.pdf"),width = 15)
 
   par('mfrow' = c(1,2))
   
@@ -363,9 +315,9 @@ pdf(paste0(plot_dir,"RMSE_by_par.pdf"),width = 15)
        ylim = y_range,
        type = "b",
        col = "blue",
-       main = paste0("RMSE for bias correction by SMA"),
+       main = paste0("MSE for bias correction by SMA"),
        xlab = "window length",
-       ylab = "RMSE"
+       ylab = "MSE"
   )
   
   # highlight minimum and add minimum reference line 
@@ -385,9 +337,9 @@ pdf(paste0(plot_dir,"RMSE_by_par.pdf"),width = 15)
        ylim = y_range,
        type = "b",
        col = "blue",
-       main = paste0("RMSE for bias correction by EMA"),
+       main = paste0("MSE for bias correction by EMA"),
        xlab = "scale parameter",
-       ylab = "RMSE"
+       ylab = "MSE"
   )
   
   # highlight minimum and add minimum reference line 
@@ -518,13 +470,10 @@ pdf(paste0(plot_dir,'Example_res.pdf'),width = 7,height = 7 * n_lat/n_lon)
   #add points and shipping route
   
   Bordeaux = c(-0.57,44.8)
-  New_York = c(-74,40.7)
   Norfolk = c(-76.3,36.9)
   
-  Miami = c(-80.2,25.8)
-  
-  p1 = data.table(Lon = Bordeaux[1], Lat =Bordeaux[2], Loc = "Le Havre") 
-  p2 = data.table(Lon = Norfolk[1], Lat = Norfolk[2], Loc = "New York") 
+  p1 = data.table(Lon = Bordeaux[1], Lat = Bordeaux[2], Loc = 'Bordeaux') 
+  p2 = data.table(Lon = Norfolk[1], Lat = Norfolk[2], Loc = "Norfolk") 
   
   cities = rbindlist(list(p1,p2))
   
