@@ -39,7 +39,8 @@ geostationary_training = function (dt ,
                                    save_dir,
                                    file_name = "variogram_exp_m",
                                    nintv = 75,
-                                   truncate = TRUE){
+                                   truncate = TRUE,
+                                   mc_cores = 1){
 
   
   
@@ -49,101 +50,114 @@ geostationary_training = function (dt ,
   Lat_max  = dt[,range(Lat)][2]
   
   
-  for(mon in m){
-    print(paste0("month = ",mon))
-    
-    DT = dt[month == mon & year %in% training_years,]
-    
-    land_ids <- which(DT[, is.na(Ens_bar) | is.na(SST_bar)])
-    if(!identical(land_ids,integer(0)))
-    {
-      DT = DT[-land_ids,]
-    }
-    
-    sp <- sp::SpatialPoints(cbind(x=DT[YM == min(YM), Lon],
-                                  y=DT[YM == min(YM), Lat]), 
-                            proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
-    
-    # function to convert YM into the right date format:
-    
-    time_convert = function(YM){
-      M = YM %% 12
-      M[M == 0] = 12
-      Y = (YM - M)/ 12
-      M[M < 10]  = paste0(0,M[M < 10])
-      as.Date(paste0(Y,"-",M,"-15"))
-    }
-    
-    time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
-    
-    setkey(DT,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
-    data = DT[,.(trc(Ens_bar+Bias_Est)-SST_bar)] 
-    setnames(data,"Res")
-    
-    stfdf = spacetime::STFDF(sp, time, data)
-    
-    #### Calculate the empirical semi-variogram
-    #### ----------------------------------------------
-    
-    ## calculate the distance matrix [km], full symmetric matrix
-    Dist <- sp::spDists(sp, longlat = TRUE)
-    
-    ## set the intervals
-    up_Dist <- Dist[upper.tri(Dist, diag = FALSE)] 
-    sort_up <- sort(up_Dist)
-    
-    bound_id = seq(1,length(up_Dist),length.out = nintv + 1)
-    boundaries <- sort_up[bound_id]
-    
-    empVgm <- gstat::variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries, assumeRegular = TRUE, na.omit = TRUE) 
+  #parallelize by month
   
-    #### Fit to the Exponential semi-variogram function
-    #### -------------------------------------------------- 
-  
-    
-    ## set the cutoff - sometimes performance improves if up to 10% of the largest distances are ignored in the variogram fit
-    if(truncate) 
-    {
-      cutoff_ind  = ceiling(0.9*nintv)
-      cutoff = empVgm$dist[cutoff_ind]
-    } else {
-      cutoff = max(empVgm$dist)
+  gt_bm = function(mon)
+  {
+      print(paste0("month = ",mon))
+      
+      DT = dt[month == mon & year %in% training_years,]
+      
+      land_ids <- which(DT[, is.na(Ens_bar) | is.na(SST_bar)])
+      if(!identical(land_ids,integer(0)))
+      {
+        DT = DT[-land_ids,]
       }
+      
+      sp <- sp::SpatialPoints(cbind(x=DT[YM == min(YM), Lon],
+                                    y=DT[YM == min(YM), Lat]), 
+                              proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
+      
+      # function to convert YM into the right date format:
+      
+      time_convert = function(YM){
+        M = YM %% 12
+        M[M == 0] = 12
+        Y = (YM - M)/ 12
+        M[M < 10]  = paste0(0,M[M < 10])
+        as.Date(paste0(Y,"-",M,"-15"))
+      }
+      
+      time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
+      
+      setkey(DT,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
+      data = DT[,.(trc(Ens_bar+Bias_Est)-SST_bar)] 
+      setnames(data,"Res")
+      
+      stfdf = spacetime::STFDF(sp, time, data)
+      
+      #### Calculate the empirical semi-variogram
+      #### ----------------------------------------------
+      
+      ## calculate the distance matrix [km], full symmetric matrix
+      Dist <- sp::spDists(sp, longlat = TRUE)
+      
+      ## set the intervals
+      up_Dist <- Dist[upper.tri(Dist, diag = FALSE)] 
+      sort_up <- sort(up_Dist)
+      
+      bound_id = seq(1,length(up_Dist),length.out = nintv + 1)
+      boundaries <- sort_up[bound_id]
+      
+      empVgm <- gstat::variogramST( Res ~ 1, stfdf, tlags=0, boundaries = boundaries, assumeRegular = TRUE, na.omit = TRUE) 
     
-  
-    ## prepare empirical variograms for fitting
-    spEmpVgm <- empVgm[empVgm$dist<=cutoff,] 
-    spEmpVgm <- spEmpVgm[spEmpVgm$timelag==0,]
-    sSpEmpVgm <- spEmpVgm[spEmpVgm$np!=0,] 
-    spEmpVgm <- sSpEmpVgm[,1:3] 
-    class(spEmpVgm) <- c("gstatVariogram", "data.frame")
-    spEmpVgm$dir.hor <- 0
-    spEmpVgm$dir.ver <- 0
+      #### Fit to the Exponential semi-variogram function
+      #### -------------------------------------------------- 
     
-    ## Exponential semi-variogram function with nugget, see the 1st argument. 
-    ## Fixing "psill", fit "nugget" and "range", the 2nd arg.
+      
+      ## set the cutoff - sometimes performance improves if up to 10% of the largest distances are ignored in the variogram fit
+      if(truncate) 
+      {
+        cutoff_ind  = ceiling(0.9*nintv)
+        cutoff = empVgm$dist[cutoff_ind]
+      } else {
+        cutoff = max(empVgm$dist)
+        }
+      
     
-    Mod <- gstat::fit.variogram(spEmpVgm, gstat::vgm("Exp"), fit.sills = c(T,T))
-    
-    # get and save covariance matrix
-    
-    psill <- Mod$psill[2]
-    range <- Mod$range[2]
-    nugget <- max(Mod$psill[1],0)
-    
-    Sigma <- psill*exp(-Dist/range)
-    sills <- diag(Sigma) + nugget
-    diag(Sigma) <- sills
-    
-    ns <- length(sp)
-    
-    svd_Sigma = svd(Sigma)
-    
-    sqrt_Sigma = svd_Sigma$u %*% sqrt(diag(svd_Sigma$d)) 
-    
-    save(sp,stfdf,Mod,Dist,sqrt_Sigma,file = paste0(save_dir,file_name,mon,".RData"))
-    
+      ## prepare empirical variograms for fitting
+      spEmpVgm <- empVgm[empVgm$dist<=cutoff,] 
+      spEmpVgm <- spEmpVgm[spEmpVgm$timelag==0,]
+      sSpEmpVgm <- spEmpVgm[spEmpVgm$np!=0,] 
+      spEmpVgm <- sSpEmpVgm[,1:3] 
+      class(spEmpVgm) <- c("gstatVariogram", "data.frame")
+      spEmpVgm$dir.hor <- 0
+      spEmpVgm$dir.ver <- 0
+      
+      ## Exponential semi-variogram function with nugget, see the 1st argument. 
+      ## Fixing "psill", fit "nugget" and "range", the 2nd arg.
+      
+      Mod <- gstat::fit.variogram(spEmpVgm, gstat::vgm("Exp"), fit.sills = c(T,T))
+      
+      # get and save covariance matrix
+      
+      psill <- Mod$psill[2]
+      range <- Mod$range[2]
+      nugget <- max(Mod$psill[1],0)
+      
+      Sigma <- psill*exp(-Dist/range)
+      sills <- diag(Sigma) + nugget
+      diag(Sigma) <- sills
+      
+      ns <- length(sp)
+      
+      svd_Sigma = svd(Sigma)
+      
+      sqrt_Sigma = svd_Sigma$u %*% sqrt(diag(svd_Sigma$d)) 
+      
+      save(sp,stfdf,Mod,Dist,sqrt_Sigma,file = paste0(save_dir,file_name,mon,".RData"))
   }
+  
+  if(mc_cores == 1)
+  {
+    for(mon in m)
+    {
+      gt_bm(mon)
+    }
+  } else {
+    parallel::mclapply(X = m,FUN = gt_bm,mc.cores = mc_cores)
+  }
+  
 }
 
 

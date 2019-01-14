@@ -11,6 +11,7 @@
 #' @param col_scheme Either "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
 #' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
 #' @param xlab,ylab Labeling.
+#' @param brks Vector containing breaks for the temperature scale. If NULL, 10 equally spaced values are picked
 #' @param save_pdf,save_dir,file_name Whether, where and under which name the plot should be saved.
 #' @param stretch_par Numeric. Only used when save_pdf == TRUE. Stretches the pdf output. Default is NULL, where it is stretched to #Lons/#Lats.
 #'
@@ -31,6 +32,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
                             rr = NULL,
                             col_scheme = "bwr", set_white = NULL,
                             xlab = "", ylab = "",
+                            brks = NULL,
                             save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot",stretch_par = NULL)
 {
  
@@ -68,9 +70,15 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
   # --- scaling and colors ---
   
   brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.lab = round(brk[brk.ind],2)
-  brk.at = brk[brk.ind]
+  if(is.null(brks))
+  {
+    brk.ind = round(seq(1,length(brk),length = 10))
+    brk.lab = round(brk[brk.ind],2)
+    brk.at = brk[brk.ind] 
+  } else {
+    brk.lab = brks
+    brk.at = brks
+  }
   
   if(col_scheme == "bwr"){
     if(is.null(set_white)){
@@ -105,7 +113,11 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
     
     pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
     
-    suppressWarnings(par(par_0))
+    # somehow this doesn't pass on font sizes?
+    par('cex' = par_0$cex)
+    par('cex.lab' = par_0$cex.lab)
+    par('cex.axis' = par_0$cex.axis)
+    par('mfrow' = par_0$mfrow)
   }
   
   par(mar = c(2,2,2,2))
@@ -139,6 +151,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
 #' @param col_scheme Either "bwr" for blue - white - red, "wr" for white - red, or "wb" for white - blue. Specifies the color scheme of the plot. 
 #' @param set_white Forces the blue-white-red color scheme to center white at the set value if specified.
 #' @param xlab,ylab Labeling.
+#' @param brks vector of breaks for the temperature scale, if NULL, ten equally spaced numbers are picked.
 #' @param save_pdf,save_dir,file_name Whether, where and under which name the plot should be saved.
 #' @param stretch_par Numeric. Only used when save_pdf == TRUE. Stretches the pdf output. Default is NULL, where it is stretched to #Lons/#Lats.
 #'
@@ -161,6 +174,7 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,...,
                         theta = 0.5, pixels = 256,
                         col_scheme = "bwr", set_white = NULL,
                         xlab = "", ylab = "",
+                        brks = NULL,
                         save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot", stretch_par = NULL)
 {
   # prepare data table
@@ -213,9 +227,15 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,...,
   # --- scaling and colors ---
   
   brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 10))
-  brk.lab = round(brk[brk.ind],2)
-  brk.at = brk[brk.ind]
+  if(is.null(brks))
+  {
+    brk.ind = round(seq(1,length(brk),length = 10))
+    brk.lab = round(brk[brk.ind],2)
+    brk.at = brk[brk.ind] 
+  } else {
+    brk.lab = brks
+    brk.at = brks
+  }
   
   if(col_scheme == "bwr"){
     if(is.null(set_white)){
@@ -251,6 +271,11 @@ plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,...,
     pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
     
     suppressWarnings(par(par_0))
+    # somehow this doesn't pass on font sizes?
+    par('cex' = par_0$cex)
+    par('cex.lab' = par_0$cex.lab)
+    par('cex.axis' = par_0$cex.axis)
+    par('mfrow' = par_0$mfrow)
     }
   
   par(mar = c(2,2,2,2))
