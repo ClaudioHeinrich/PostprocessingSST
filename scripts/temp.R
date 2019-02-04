@@ -1,26 +1,20 @@
 
-##################################################################################################
+###############################################################################
 
-###################  master script part 4 - setting up multivariate models  ######################
+#############  side script 5.1 - multivariate rank histograms  ################
 
-##################################################################################################
+###############################################################################
 
-# This script sets up the different methods of multivariate post-processing, by computing and saving covariance estimates etc.
-# As part of this script you should choose whether to consider centered or even standardized variables.
-#
-# Files generated:
+# This script compares the multivariate post-processing methods by means of their multivariate rank histograms
+# 
+# Plots generated: rank_histo_PCA.pdf, rank_histo_SE.pdf, rank_histo_GS.pdf, rank_histo_ECC.pdf,
 #   
-# Data files: PCA/sam_cov_m+_y++.RData, SE/cov_est_SE_m+_y++.RData, 
-#             where + labels the months considered and ++ the years in the validation period.
-#
-# Requires previous run of 03.master.bias.correct 
-# with the same value of name_abbr as below.
+# Requires previous run of 04.master.multiv.pp.R with the same value of name_abbr as below.
 
 ##### setting up ######
 
-rm(list = ls())
 
-time_s4 = proc.time()
+rm(list = ls())
 
 setwd("~/NR/SFE")
 options(max.print = 1e3)
@@ -28,88 +22,39 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO/lv/2" 
+name_abbr = "Full/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
 
+time_s51 = proc.time()
 
-##### centered variables? #####
+mc_cores = 3
 
-# decide whether you want to work with SST, or with SST centered around climatology, or with SST standardized w.r.t. climatology 
-
-SST = ""  # takes 'centered','standardized', or ''
-
-clim_years = training_years
+sma_par = data.table(year = validation_years,method = NA_character_,par = NA_real_)
 
 
-if(SST == "centered")
+for(y in validation_years)
 {
-  DT = dt_transform_center(DT,clim_years)
-  
-  name_abbr = paste0(name_abbr,"/centered" )
-  
-  save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
-  dir.create(save_dir,showWarnings = FALSE)
-  
-  plot_dir = paste0("./figures/", name_abbr,"/")
-  dir.create(plot_dir, showWarnings = FALSE)
-  
-}
-if(SST == "standardized")
-{
-  DT = dt_transform_stan(DT,clim_years)
-  
-  name_abbr = paste0(name_abbr,"/standardized")
-  
-  save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
-  dir.create(save_dir,showWarnings = FALSE)
-  
-  plot_dir = paste0("./figures/", name_abbr,"/")
-  dir.create(plot_dir, showWarnings = FALSE)
-  
+  sma_par[year == y, method := 'sma']
+  sma_par[year == y,par := msc_sma[year == y,min_l]]
 }
 
 
-###################################################
-################## geostationary ##################
-###################################################
+# bias correction year by year
 
-GS_dir = paste0(save_dir, "GS/")
-dir.create(GS_dir, showWarnings = FALSE)
+DT[,Bias_Est_sma := 0][,SST_hat_sma := 0]
 
-geostationary_training(dt = DT, 
-                       training_years = training_years,
-                       m = months,
-                       save_dir = GS_dir)
+for(y in validation_years)
+{
+  print(y) 
+  temp = bias_correct_2(dt = DT,
+                        method = sma_par[year == y, method],
+                        par_1 = sma_par[year == y,par])[year == y,]
+  DT[year == y, Bias_Est_sma := temp[,Bias_est]][year == y,SST_hat_sma := temp[,SST_hat]]
+}
 
-
-# specifications for the desired forecasts:
-
-fc_years = validation_years
-fc_months = months
-fc_ens_size = 500
-
-
-###################################################
-################## geostationary ##################
-###################################################
-
-GS_fc = forecast_GS(DT,
-                    Y = validation_years,
-                    M = months,
-                    n = fc_ens_size,
-                    var_dir = GS_dir,
-                    mc_cores = mc_cores)
-
-save(GS_fc,file = paste0(GS_dir,"fc.RData"))
-rm(GS_fc)
-
-gc()
-
+rm(temp)
 
 save.image(file = paste0(save_dir,"setup.RData"))
-
-
-

@@ -29,6 +29,8 @@ mv_rank_hist_new = function(dt_fc,
                             breaks = 11,
                             save_pdf = FALSE, plot_dir = "", file_name = "")
 {
+  dt_fc = dt_fc[!is.na(SST_hat)]
+  
   ym = unique(dt_fc[,YM])
   
   ym_ind = 1:length(ym)
@@ -43,7 +45,7 @@ mv_rank_hist_new = function(dt_fc,
   YM_ind = 0
   
   ranks_ym = function(yearmonth)
-  {print(ceiling(yearmonth/12))
+  {print(floor(yearmonth/12))
     fc_obs_dt = dt_fc[YM == yearmonth,.SD,.SDcols = c("SST_bar",paste0("fc",1:fc_ens_size))]
     
     temp_avg = avg.rank(fc_obs_dt)[1]
@@ -103,6 +105,8 @@ mv_rank_hist = function(dt_fc,
                         breaks = 10,
                         save_pdf = FALSE, plot_dir = "", file_name = "")
 {
+  dt_fc = dt_fc[!is.na(SST_hat)]
+  
   ym = unique(dt_fc[,YM])
   
   ranks_matrix = matrix(ym,nrow = length(ym),ncol = 1+3*(fc_ens_size +1)) 
@@ -194,7 +198,7 @@ mv.rank <- function(x)
 #' @export
 
 avg.rank <- function(x)  {
-  x.ranks <- apply(x,1,rank)
+  x.ranks <- apply(x,1,rank,ties = 'random')
   x.preranks <- apply(x.ranks,1,mean)
   x.rank <- rank(x.preranks,ties="random")
   return(x.rank)
@@ -211,7 +215,7 @@ bd.rank <- function(x)
   d <- dim(x)
   x.prerank <- array(NA,dim=d)
   for(i in 1:d[1]) {
-    tmp.ranks <- rank(x[i,])
+    tmp.ranks <- rank(x[i,],ties = 'random')
     x.prerank[i,] <- (d[2] - tmp.ranks) * (tmp.ranks - 1)
   }
   x.rank <- apply(x.prerank,2,mean) + d[2] - 1

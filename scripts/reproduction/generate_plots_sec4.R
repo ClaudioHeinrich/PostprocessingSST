@@ -85,7 +85,7 @@ y_range = range(list(row_sma[,-'min_l',with = FALSE][,5:length(win_length)],row_
 pdf(paste0(plot_dir,"MSE_by_par.pdf"),width = 15)
   
   par('mfrow' = c(1,2))
-  par('cex' = 1.25, 'cex.lab' = 0.9,'cex.axis' = 0.75)
+  par('cex' = 1.25, 'cex.lab' = 0.9,'cex.axis' = 0.9)
   
   ## plot for sma ##
   
@@ -94,7 +94,7 @@ pdf(paste0(plot_dir,"MSE_by_par.pdf"),width = 15)
        ylim = y_range,
        type = "b",
        col = "blue",
-       main = paste0("MSE for bias correction by SMA"),
+       main = paste0("SMA"),
        xlab = "window length",
        ylab = "MSE"
   )
@@ -116,7 +116,7 @@ pdf(paste0(plot_dir,"MSE_by_par.pdf"),width = 15)
        ylim = y_range,
        type = "b",
        col = "blue",
-       main = paste0("MSE for bias correction by EMA"),
+       main = paste0("EMA"),
        xlab = "scale parameter",
        ylab = "MSE"
   )
@@ -176,16 +176,21 @@ DT_calib[,"PIT_mc_sd" := sd(PIT_mc), by = grid_id]
 
 ########### plot mean and standard deviation ################
 
+par('cex' = 1.5,'cex.axis' = 0.75)
 plot_diagnostic(DT_calib[year == min(year) & Lat %between% Lat_res & month == min(month), .(Lon,Lat,PIT_mc_mean)],
                 rr = c(0,1),
-                mn = paste0("PIT mean"),
+                mn = latex2exp::TeX('PIT mean, EMA'),
+                brks = c(0,0.25,0.5,0.75,1),
                 save_pdf = TRUE, save_dir = plot_dir, file_name = "PIT_mean")
 
 unif_sd = sqrt(1/12) #standard deviation of uniform distribution
 
+brks = round(seq(0,2*unif_sd,length.out = 5),2)
+
 plot_diagnostic(DT_calib[year == min(year) & Lat %between% Lat_res & month == min(month), .(Lon,Lat,PIT_mc_sd)],
                 rr = c(0, 2*unif_sd), set_white = unif_sd,
-                mn = paste0("PIT standard deviation"),
+                brks = brks,
+                mn = latex2exp::TeX('PIT sd, EMA'),
                 save_pdf = TRUE, save_dir = plot_dir, file_name = "PIT_sd")
 
 
@@ -201,7 +206,8 @@ DT_calib_3[,"PIT_mc_sd" := sd(PIT_mc), by = grid_id]
 
 plot_diagnostic(DT_calib_3[year == min(year) & Lat %between% Lat_res & month == min(month), .(Lon,Lat,PIT_mc_mean)],
                 rr = c(0,1),
-                mn = paste0("PIT mean, linear regression"),
+                mn = latex2exp::TeX('PIT mean, NGR_{m,s}'),
+                brks = c(0,0.25,0.5,0.75,1),
                 save_pdf = TRUE, save_dir = plot_dir, file_name = "PIT_mean_lr")
 
 
@@ -238,126 +244,6 @@ plot_dir = plot_dir0
 ##################### plot example residual ########################
 
 
-# for showing fewer breaks than usual we define a variation on the plotting function 
-
-library(fields,sp)
-
-plot_smooth = function( dt, var = colnames(dt)[3], mn = var, rr = NULL,...,
-                        theta = 0.5, pixels = 256,
-                        col_scheme = "bwr", set_white = NULL,
-                        xlab = "", ylab = "",
-                        save_pdf = FALSE, save_dir = "./figures/", file_name = "diag_plot", stretch_par = NULL)
-{
-  # prepare data table
-  
-  if("year" %in% colnames(dt))
-  {
-    if("month" %in% colnames(dt))
-    {
-      dt = dt[year == min(year) & month == min(month),.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
-    } else {
-      dt = dt[month == min(month),.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
-    }
-  } else {
-    dt = dt[,.SD,.SDcols = c('Lon','Lat',var)][order(Lat,Lon)]
-  }
-  
-  
-  #--- create image ---
-  
-  x = dt[,.(Lon,Lat)]
-  setnames(x,c("Lon","Lat"), c("lon","lat"))
-  
-  Lons = unique(dt[,Lon])
-  Lats = unique(dt[,Lat])
-  
-  n_lon = length(Lons)
-  n_lat = length(Lats)
-  
-  A = matrix(dt[[3]],  n_lon, n_lat)
-  
-  im_0 = fields::image.smooth(fields::as.image(A,x = x,nx = pixels,ny = pixels),theta = theta)
-  
-  ## Find the points that fall over land
-  
-  if(!exists("wrld_simpl")) data(wrld_simpl, package = 'maptools') 
-  
-  all_loc = expand.grid(lat = im_0$x,lon = im_0$y)
-  pts <- sp::SpatialPoints(all_loc, proj4string=sp::CRS(sp::proj4string(wrld_simpl)))
-  ii <- !is.na(sp::over(pts, wrld_simpl)$FIPS)
-  im_0$z[ii] = NA
-  
-  # --- fix range of plot and fill in values for points out of range ---
-  
-  if(is.null(rr))  rr = range(im_0$z,na.rm=TRUE)
-  if(!is.null(rr)){
-    im_0$z[im_0$z< min(rr)] = min(rr)
-    im_0$z[im_0$z> max(rr)] = max(rr)
-  }
-  
-  # --- scaling and colors ---
-  
-  brk = seq(rr[1],rr[2],length = 500)
-  brk.ind = round(seq(1,length(brk),length = 5))
-  brk.lab = round(brk[brk.ind],2)
-  brk.at = brk[brk.ind]
-  
-  if(col_scheme == "bwr"){
-    if(is.null(set_white)){
-      color <- fields::designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"))
-    }else{
-      zero.ind = min(which(brk > set_white))/length(brk)
-      color <- fields::designer.colors(n=length(brk)-1, col = c("darkblue","white","darkred"), x = c(0,zero.ind,1))
-    }
-  }
-  if(col_scheme == "wr"){
-    color <- fields::designer.colors(n=length(brk)-1, col = c("white","darkred"))
-  }
-  if(col_scheme == "wb"){
-    color <- fields::designer.colors(n=length(brk)-1, col = c("white","blue"))
-  }
-  
-  # color NAs grey
-  
-  newz.na <- rr[2]+(rr[2]-rr[1])/length(color) # new z for NA
-  im_0$z[which(is.na(im_0$z))] <- newz.na 
-  rr[2] <- newz.na # extend the range to include the new value 
-  color <- c(color, 'gray') # extend the color range by gray
-  brk = c(brk,rr[2]) # extend the vector of breaks
-  
-  #--- plotting ---
-  
-  if(save_pdf) 
-  {
-    if (is.null(stretch_par)) stretch_par = n_lat/n_lon
-    
-    par_0 = par() # allow to set par manually before calling the function
-    
-    pdf(paste0(save_dir,file_name,".pdf"),width = 7,height = stretch_par * 7)
-    
-    suppressWarnings(par(par_0))
-  }
-  
-  par(mar = c(2,2,2,2))
-  
-  fields::image.plot(im_0,
-                     zlim=rr, main = mn,...,
-                     xlim = range(Lons), xlab=xlab,
-                     ylim = range(Lats), ylab=ylab,
-                     breaks=brk,
-                     col=color,
-                     axis.args=list(at = brk.at,
-                                    label = brk.lab))
-  
-  # add world map
-  
-  maps::map("world", add = TRUE)
-  
-  if(save_pdf) dev.off()
-  
-}
-
-
 
 m = 6
 y = 2016
@@ -379,8 +265,9 @@ pdf(paste0(plot_dir,'Example_res.pdf'),width = 7,height = 7 * n_lat/n_lon)
 
 par('cex' = save_cex)
 plot_smooth(DT[year == y & month == m,.(Lon,Lat,SST_bar - SST_hat)], 
-            mn = latex2exp::TeX('observed forecast residual June 2016'), 
+            mn = '', 
             rr = c(-3,3),
+            brks = c(-3,-1.5,0,1.5,3),
             pixels = 512,
             save_pdf = FALSE,
             save_dir = plot_dir,

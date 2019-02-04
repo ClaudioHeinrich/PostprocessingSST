@@ -20,7 +20,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO/lv/2" 
+name_abbr = "NAO/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -135,7 +135,7 @@ fun_list = lapply(fun_nlist,get)
 
 
 ######################################################
-###### Get RMSEs for the  maximum along route ########
+###### Get MSEs for the  maximum along route ########
 ######################################################
 
 # initialize data tables:
@@ -143,7 +143,7 @@ fun_list = lapply(fun_nlist,get)
 validation_dt = as.data.table(expand.grid(months,validation_years))
 setnames(validation_dt,c("month","year"))
 
-scores_dt = as.data.table(expand.grid(  model = mod_vec_all, fun = fun_nlist,RMSE = 0,CRPS = 0))
+scores_dt = as.data.table(expand.grid(  model = mod_vec_all, fun = fun_nlist,MSE = 0,CRPS = 0))
 
 # get observation
 
@@ -195,17 +195,16 @@ for(name in fun_nlist)
     
     validation_dt = data.table(validation_dt,temp)
     
-    ### get RMSE ###
+    ### get MSE ###
     
     obs = validation_dt[,eval(parse(text = paste0('SST_',name)))]
     fcs = validation_dt[,eval(parse(text = paste0(mod,'_',name,'_fc')))]
     
     validation_dt[,paste0('MSE_',mod,'_',name,'_fc'):=(obs-fcs)^2]
     
-    rmse = sqrt(mean((obs - fcs)^2))
+    mse = mean((obs - fcs)^2)
     
-    
-    scores_dt[model == mod & fun == name,RMSE:=rmse]
+    scores_dt[model == mod & fun == name,MSE:=mse]
     
     ### get CRPS ###
     
@@ -225,10 +224,10 @@ for(name in fun_nlist)
   obs = validation_dt[,eval(parse(text = paste0('SST_',name)))]
   fcs = validation_dt[,eval(parse(text = paste0(mod,'_',name,'_fc')))]
   
-  rmse = sqrt(mean((obs - fcs)^2))
+  mse = mean((obs - fcs)^2)
   crps = mean(abs(obs-fcs))
   
-  scores_dt[model == mod & fun == name,RMSE:=rmse]
+  scores_dt[model == mod & fun == name,MSE:=mse]
   scores_dt[model == mod & fun == name,CRPS:=crps]
 }
   

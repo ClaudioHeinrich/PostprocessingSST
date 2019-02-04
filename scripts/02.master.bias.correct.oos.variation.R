@@ -32,7 +32,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_small" 
+name_abbr = "test" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -269,16 +269,45 @@ for(y in validation_years)
 
 # bias correction year by year
 
+
 for(y in validation_years)
 {
   print(y) 
-  temp = bias_correct(dt = DT,
+  temp = bias_correct_2(dt = DT,
                          method = opt_par[year == y, method],
                          par_1 = opt_par[year == y,par])[year == y,]
-  DT[year == y,][,Bias_Est := temp[,Bias_Est]][,SST_hat := temp[,SST_hat]]
+  DT[year == y,Bias_Est := temp[,Bias_est]][year == y ,SST_hat := temp[,SST_hat]]
 }
 
 rm(temp)
+
+
+# exponential moving average performs best, but for comparison also compute the bias estimate using simple moving averages
+
+sma_par = data.table(year = validation_years,method = NA_character_,par = NA_real_)
+
+
+for(y in validation_years)
+{
+  sma_par[year == y, method := 'sma']
+  sma_par[year == y,par := msc_sma[year == y,min_l]]
+}
+
+
+# bias correction year by year
+
+for(y in validation_years)
+{
+  print(y) 
+  temp = bias_correct_2(dt = DT,
+                      method = sma_par[year == y, method],
+                      par_1 = sma_par[year == y,par])[year == y,]
+  DT[year == y,Bias_Est_SMA := temp[,Bias_est]][year == y,SST_hat_sma := temp[,SST_hat]]
+}
+
+rm(temp)
+
+
 
 # For the training years the bias correction considers also the future, 
 # and uses the parameter and method estimated for the first validation year
