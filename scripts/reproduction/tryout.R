@@ -1,4 +1,8 @@
 
+
+#tryout, do somethings get better when we take more principal components and move the distance up to 4000 km?
+
+
 ##################################################################################################
 
 ###################  master script part 4 - setting up multivariate models  ######################
@@ -28,48 +32,23 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO" 
+name_abbr = "NAO/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
 load(file = paste0(save_dir,"setup.RData"))
 
+# reset name abbr
 
-##### centered variables? #####
+name_abbr = "NAO/lv/tryout" 
 
-# decide whether you want to work with SST, or with SST centered around climatology, or with SST standardized w.r.t. climatology 
+save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+dir.create(save_dir,showWarnings = FALSE)
 
-SST = ""  # takes 'centered','standardized', or ''
+plot_dir = paste0('./figures/',name_abbr,'/')
+dir.create(save_dir,showWarnings = FALSE)
 
-clim_years = training_years
 
-
-if(SST == "centered")
-{
-  DT = dt_transform_center(DT,clim_years)
-
-  name_abbr = paste0(name_abbr,"/centered" )
-  
-  save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
-  dir.create(save_dir,showWarnings = FALSE)
-  
-  plot_dir = paste0("./figures/", name_abbr,"/")
-  dir.create(plot_dir, showWarnings = FALSE)
-  
-}
-if(SST == "standardized")
-{
-  DT = dt_transform_stan(DT,clim_years)
-
-  name_abbr = paste0(name_abbr,"/standardized")
-  
-  save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
-  dir.create(save_dir,showWarnings = FALSE)
-  
-  plot_dir = paste0("./figures/", name_abbr,"/")
-  dir.create(plot_dir, showWarnings = FALSE)
-  
-}
 
 
 ##### get weight matrix for tapering and svds of data matrices over the training period #####
@@ -78,7 +57,7 @@ if(SST == "standardized")
 Tap_dir = paste0(save_dir,"Tap/")
 dir.create(Tap_dir,showWarnings = FALSE)
 
-wm = weight_mat(DT,L = 2500) 
+wm = weight_mat(DT,L = 5000) 
 
 num_loc = DT[year == min(year) & month == min(month)][!(is.na(SST_bar) | is.na(SST_hat)) ,.N]
 
@@ -89,7 +68,7 @@ for(y in validation_years)
   print(y)
   
   svd_by_month = function(m)
-    {
+  {
     print(paste0("month =",m))  
     
     train_years = DT[month == m][year < y & year > min(year),][,unique(year)]
@@ -103,9 +82,9 @@ for(y in validation_years)
     tap_cov_mat = wm * sam_cov_mat
     
     return(svd(tap_cov_mat))
-    }
+  }
   sin_val_dec = parallel::mclapply(X = months,FUN = svd_by_month,mc.cores = mc_cores)
-
+  
   save(sin_val_dec,file = paste0(Tap_dir,'svd_y',y,'.RData'))
 }
 
@@ -127,12 +106,11 @@ nPCs = c()
 for(m in months)
 {
   #plot(sin_val_dec[[m]]$d, main = paste0('month = ',m))
-  load(paste0(Tap_dir,'svd_y',2010,'.RData'))
   
   sum_vec = cumsum(sin_val_dec[[m]]$d)
   sum_tot = sum_vec[length(sum_vec)]
   
-  nPCs = c(nPCs,which(sum_vec > 0.9*sum_tot)[1])
+  nPCs = c(nPCs,which(sum_vec > 0.95*sum_tot)[1])
   
 }
 
@@ -144,20 +122,7 @@ PCA_cov(DT,weight_mat = wm,
         save_years = validation_years,
         save_dir = PCA_dir)
 
-##################################################
-###################### SE  #######################
-##################################################
-#
-# SE_dir = paste0(save_dir,"SE/")
-# dir.create(SE_dir,showWarnings = FALSE)
-# 
-# # get covariance estimates
-# 
-# cov_est_SE(DT, weight_mat = wm,
-#            M = months,
-#            save_years = validation_years,
-#            save_dir = SE_dir)
-#
+
 ###################################################
 ################## geostationary ##################
 ###################################################
@@ -179,4 +144,74 @@ dir.create(ECC_dir, showWarnings = FALSE)
 
 #####
 
+####### generate forecasts ###############
+
+# specifications for the desired forecasts:
+
+fc_years = validation_years
+fc_months = months
+fc_ens_size = 500
+
+mod_vec = c('PCA_mc','PCA_ac','GS','ECC')
+
+
+###################################################
+###################### PCA  #######################
+###################################################
+
+PCA_fc_mc = forecast_PCA_mult_corr(DT, 
+                                   Y = fc_years,
+                                   M = fc_months,
+                                   n = fc_ens_size,
+                                   nPCs = nPCs,
+                                   cov_dir = PCA_dir)
+
+save(PCA_fc_mc,file = paste0(PCA_dir,"fc_mc.RData"))
+
+rm(PCA_fc_mc)
+gc()
+
+PCA_fc_ac = forecast_PCA_add_corr(DT, 
+                                  Y = fc_years,
+                                  M = fc_months,
+                                  n = fc_ens_size,
+                                  nPCs = nPCs,
+                                  cov_dir = PCA_dir)
+
+save(PCA_fc_ac,file = paste0(PCA_dir,"fc_ac.RData"))
+
+rm(PCA_fc_ac)
+
+gc()
+
+###################################################
+################## geostationary ##################
+###################################################
+
+GS_fc = forecast_GS(DT,
+                    Y = validation_years,
+                    M = months,
+                    n = fc_ens_size,
+                    var_dir = GS_dir,
+                    mc_cores = mc_cores)
+
+save(GS_fc,file = paste0(GS_dir,"fc.RData"))
+rm(GS_fc)
+
+gc()
+
+########################################
+################ ECC  ##################
+########################################
+
+ECC_fc = forecast_ECC(DT,
+                      Y = validation_years,
+                      M = months,
+                      ens_size = ens_size)
+
+save(ECC_fc,file = paste0(ECC_dir,"fc.RData"))
+rm(ECC_fc)
+
 save.image(file = paste0(save_dir,"setup.RData"))
+
+

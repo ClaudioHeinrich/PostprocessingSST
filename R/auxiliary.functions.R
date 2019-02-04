@@ -40,9 +40,10 @@ GneitingWeightFct = function(x,L)
     
     ret_value[x == 0] = 1
     
-    t = x[x != 0]/L
-    ret_value[x != 0] = (1-t)*sin(2*pi*t)/(2*pi*t)+(1-cos(2*pi*t))/(2*pi^2*t)   
+    t = x[x != 0 & x <= L]/L
+    ret_value[x != 0 & x <= L] = (1-t)*sin(2*pi*t)/(2*pi*t)+(1-cos(2*pi*t))/(2*pi^2*t)   
     
+    ret_value[ret_value < 0] = 0 # for rounding errors
     return(ret_value)
   }
 
@@ -77,6 +78,8 @@ trc = function (x,truncation.value = -1.79){
 #' l = permutation_test_difference(a,b)
 #' q = sum(l$D <= l$d_bar) / length(l$D)
 #' @author Alex
+#' 
+#' @export
 #' 
 permutation_test_difference = function(a,
                                        b,

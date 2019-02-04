@@ -22,7 +22,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "NAO_small" 
+name_abbr = "NAO/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -30,7 +30,8 @@ load(file = paste0(save_dir,"setup.RData"))
 
 time_s51 = proc.time()
 
-mc_cores = 5
+mc_cores = 3
+
 
 ##################
 
@@ -47,6 +48,9 @@ rks_PCA_mc = mv_rank_hist_new(PCA_fc_mc, fc_ens_size = fc_ens_size,
                               save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_mc")
 
 
+rm(PCA_fc_mc)
+gc()
+
 
 load(paste0(PCA_dir,"fc_ac.RData"))
 
@@ -54,6 +58,9 @@ rks_PCA_ac = mv_rank_hist_new(PCA_fc_ac, fc_ens_size = fc_ens_size,
                               mc_cores = mc_cores,
                               breaks = brks, mn = "PCA_ac rank histograms",
                               save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_ac")
+
+rm(PCA_fc_ac)
+gc()
 
 
 ### SE ###
@@ -75,6 +82,9 @@ rks_GS = mv_rank_hist_new(GS_fc, fc_ens_size = fc_ens_size,
                           save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_GS")
 
 
+rm(GS_fc)
+gc()
+
 ### ECC ###
 
 # get forecast:
@@ -86,6 +96,9 @@ rks_ECC = mv_rank_hist_new(ECC_fc, fc_ens_size = ens_size,
                            breaks = brks, mn = "ECC rank histograms",
                            save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_ECC_new")
 
+
+rm(ECC_fc)
+gc()
 
 time_s51 = proc.time() - time_s51
 

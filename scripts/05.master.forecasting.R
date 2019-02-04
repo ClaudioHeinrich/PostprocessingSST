@@ -26,7 +26,7 @@ options(max.print = 1e3)
 library(PostProcessing)
 library(data.table)
 
-name_abbr = "Atl/standardized" 
+name_abbr = "NAO/lv" 
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -38,37 +38,38 @@ time_s5 = proc.time()
 
 fc_years = validation_years
 fc_months = months
-fc_ens_size = 100
+fc_ens_size = 500
 
+mod_vec = c('PCA_mc','PCA_ac','GS','ECC')
 
 
 ###################################################
 ###################### PCA  #######################
 ###################################################
 
-PCA_fc = forecast_PCA(DT, 
-                      Y = fc_years,
-                      M = fc_months,
-                      n = fc_ens_size,
-                      cov_dir = PCA_dir)
+PCA_fc_mc = forecast_PCA_mult_corr(DT, 
+                                   Y = fc_years,
+                                   M = fc_months,
+                                   n = fc_ens_size,
+                                   nPCs = nPCs,
+                                   cov_dir = PCA_dir)
 
-save(PCA_fc,file = paste0(PCA_dir,"fc.RData"))
+save(PCA_fc_mc,file = paste0(PCA_dir,"fc_mc.RData"))
 
-rm(PCA_fc)
+rm(PCA_fc_mc)
 gc()
 
-##################################################
-###################### SE  #######################
-##################################################
+PCA_fc_ac = forecast_PCA_add_corr(DT, 
+                                  Y = fc_years,
+                                  M = fc_months,
+                                  n = fc_ens_size,
+                                  nPCs = nPCs,
+                                  cov_dir = PCA_dir)
 
-SE_fc = forecast_SE(DT,
-                    Y = fc_years,
-                    M = fc_months,
-                    n = fc_ens_size,
-                    cov_dir = SE_dir)
+save(PCA_fc_ac,file = paste0(PCA_dir,"fc_ac.RData"))
 
-save(SE_fc,file = paste0(SE_dir,"fc.RData"))
-rm(SE_fc)
+rm(PCA_fc_ac)
+
 gc()
 
 ###################################################
@@ -79,10 +80,12 @@ GS_fc = forecast_GS(DT,
                     Y = validation_years,
                     M = months,
                     n = fc_ens_size,
-                    var_dir = GS_dir)
+                    var_dir = GS_dir,
+                    mc_cores = mc_cores)
 
 save(GS_fc,file = paste0(GS_dir,"fc.RData"))
 rm(GS_fc)
+
 gc()
 
 ########################################

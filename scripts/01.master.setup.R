@@ -18,25 +18,27 @@ options(max.print = 1e3)
 
 library(PostProcessing)
 library(data.table)
-library(tictoc)
+
 
 # choose an abbreviation for this run
 
-
-name_abbr = "Atl"
+name_abbr = "test_2"
 
 # choose the area of the globe to consider
-lat_box = c(-35,10)
-lon_box = c(-45,15)
+lat_box = c(55,75)
+lon_box = c(0,25)
 
-# set a couple of parameters
+
+# # set a couple of parameters
 
 ens_size = 9 # size of forecast ensemble
 
-training_years = 1985:2009
-validation_years = 2010:2016 
+training_years = 1985:2000
+validation_years = 2001:2016 
 
 months = 1:12
+
+mc_cores = length(months)
 
 ##### setting up complete - now move to creation #####
 
@@ -54,13 +56,26 @@ DT = load_combined_wide()[Lon >= lon_box[1] & Lon <= lon_box[2] & Lat >= lat_box
 
 # tidy up DT:
 
+setkey(x = DT,year,month,Lon,Lat)
+
 DT = DT[month %in% months,]
 DT[,YM := 12*year + month]
 DT = DT[order(year,month,Lon,Lat)]
 
-setcolorder(DT,c("year","month",'Lon','Lat','YM','grid_id','SST_bar','Ens_bar','Ens_sd',paste0('Ens',1:ens_size)))
+DT[,paste0('Ens',1:ens_size):=NULL]
 
 
+setcolorder(DT,c("year","month",'Lon','Lat','YM','grid_id','SST_bar','Ens_bar','Ens_sd'))
+
+# split DT by months
+
+# for(m in months)
+# {
+#   assign(x = paste0('DT',m),value = DT[month == m])
+# }
+# 
+# rm(DT)
+# gc()
 
 time_s1 = proc.time() - time_s1
 # save everything:
