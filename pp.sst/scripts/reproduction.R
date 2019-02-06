@@ -38,6 +38,7 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 DT = copy(example_dt)
 DT
+save(DT,file = paste0(save_dir,'data.RData'))
 
 # example plot of SST:
 
