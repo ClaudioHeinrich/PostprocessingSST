@@ -19,11 +19,13 @@ setwd('/nr/user/claudio/pkg/paper/PostprocessingSST')
 options(max.print = 1e3)
 
 library(devtools)
+library(data.table)
+
 
 install_github('ClaudioHeinrich/PostprocessingSST/pp.sst',auth_token = 'bac902c57e1224898cca4d13a7bae0368563da30')
 
 library(pp.sst) # contains all relevant functions as well as an example data set
-library(data.table)
+
 
 ### set directories for derived data and plots ###
 
@@ -60,9 +62,9 @@ ens_size = 9 # number of forecast ensemble
 training_years = 1985:2000
 validation_years = 2001:2016
 
-mc_cores = 4 # number of cores for parallelization
+mc_cores = 6 # number of cores for parallelization
 
-months = 1 # do not change: only month 6 is included in the example data
+months = 2 # do not change: only month 2 is included in the example data
 
 ####################################################
 
