@@ -22,7 +22,7 @@ library(devtools)
 library(data.table)
 
 
-install_github('ClaudioHeinrich/PostprocessingSST/pp.sst',auth_token = 'bac902c57e1224898cca4d13a7bae0368563da30')
+install_github('ClaudioHeinrich/PostprocessingSST/pp.sst')
 
 library(pp.sst) # contains all relevant functions as well as an example data set
 
