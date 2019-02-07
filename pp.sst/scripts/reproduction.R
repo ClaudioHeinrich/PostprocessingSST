@@ -6,7 +6,7 @@
 
 ##########################################################################
 
-# This script reproduces the results of the paper Heinrich et al. 2019, Postprocessing seasonal weather forecasts
+# This script reproduces the results of the paper Postprocessing seasonal weather forecasts
 
 
 
@@ -612,6 +612,8 @@ temp = sd_est(dt = DT[year %in% training_years],
 
 DT[year %in% training_years, SD_hat:=temp[,SD_hat]]
 
+save(DT,file = paste0(save_dir,'data.RData'))
+
 
 #######################################################################
 #######################################################################
@@ -668,6 +670,7 @@ mean_CRPS_bl = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bl),na.rm = TRUE)]
 
 #grouped by both (same as by location):
 DT[,SD_hat_lr_bb:=SD_hat_lr_bl]
+mean_CRPS_bb = DT[,mean(crps_na_rm(SST_bar,SST_hat,SD_hat_lr_bb),na.rm = TRUE)]
 
 # get mean CRPS for moving averages:
 CRPS_sma = msc_sd_sma[,mean(min_crps)]
@@ -904,7 +907,7 @@ dir.create(GS_dir, showWarnings = FALSE)
 geostationary_training(dt = DT,
                        training_years = training_years,
                        m = months,
-                       save_dir = GS_dir,mc_cores)
+                       save_dir = GS_dir,mc_cores = mc_cores)
 
 ########################################
 ################ ECC  ##################
@@ -1073,4 +1076,300 @@ for(mod1 in mod_vec)
 ###################################################################################
 ###################################################################################
 ###################################################################################
+
+####################################
+####### Case study: route ##########
+####################################
+
+# get route:
+
+Bordeaux = c(-0.57,44.8)
+Norfolk = c(-76.3,36.9)
+
+p1 = data.table(Lon = Bordeaux[1], Lat = Bordeaux[2], Loc = 'Bordeaux')
+p2 = data.table(Lon = Norfolk[1], Lat = Norfolk[2], Loc = "Norfolk")
+
+route_name = "Bordeaux to Norfolk"
+file_name = "scores_Bd_to_Nf"
+
+
+# get grid ids_along this route: fix n and use gcIntermediate to find n coordinates on the route from p1 to p2 as the crow flies:
+
+n = 1000
+route = geosphere::gcIntermediate(p1[,.(Lon,Lat)],p2[,.(Lon,Lat)],n = n)
+
+# find the grid_ids in DT closest to the coordinates on the route:
+
+grid_id_dt = unique(DT[,.(Lon,Lat,grid_id)])
+
+point_match = NULL
+for(j in 1:dim(route)[1])
+{
+  a = geosphere::distHaversine(as.vector(route[j,]),as.matrix(grid_id_dt[,.(Lon,Lat)]))
+  point_match[j] = which.min(a)
+}
+
+dt_route = unique(grid_id_dt[point_match,])
+route_ids = dt_route[,grid_id]
+
+###################################
+
+# renaming for convenience
+
+PCA_ac_fc = PCA_fc_ac
+PCA_mc_fc = PCA_fc_mc
+
+########################################
+
+mod_vec = c('PCA_mc','PCA_ac','GS','ECC')
+
+mod_vec_all = c('PFC',mod_vec)
+
+# reduce data to route
+
+DT_route = DT[grid_id %in% route_ids & year %in% validation_years,]
+
+for(mod in mod_vec){
+  assign(paste0(mod,'_fc_route'),get(paste0(mod,'_fc'))[grid_id %in% route_ids,])
+}
+
+
+########################################
+
+# put considered functionals in a list, the paper shows just the result for the minimum
+
+fun_nlist = list('max','min','mean')
+fun_list = lapply(fun_nlist,get)
+
+
+######################################################
+###### Get MSEs for the  maximum along route ########
+######################################################
+
+# initialize data table for results:
+
+validation_dt = as.data.table(expand.grid(months,validation_years))
+setnames(validation_dt,c("month","year"))
+
+scores_dt = as.data.table(expand.grid(  model = mod_vec_all, fun = fun_nlist,MSE = 0,CRPS = 0))
+
+# get observation
+
+for(name in fun_nlist)
+{
+  fun = get(name)
+
+  DT_route[,paste0('SST_',name) := fun(SST_bar, na.rm = TRUE), by = .(month,year)]
+
+  temp = DT_route[grid_id == min(grid_id) ,eval(parse(text = paste0('SST_',name)))]
+  validation_dt[,paste0('SST_',name) := temp]
+
+  # get value of point forecast
+
+  # the weird column name is for unification with other models
+  DT_route[,paste0('PFC_',name,'_fc') := fun(SST_hat,na.rm = TRUE),by = .(month,year)]
+
+  temp = DT_route[grid_id == min(grid_id) ,eval(parse(text = paste0('PFC_',name,'_fc')))]
+  validation_dt[,paste0('PFC_',name,'_fc') := temp]
+
+  # get value of multivariate forecasts for the different models:
+
+  for(mod in mod_vec)
+  {
+    print(c(name,mod))
+
+    # how large is the ensemble?
+    es_mod = fc_ens_size
+    if( mod == 'ECC')
+    {
+      es_mod = 9
+    }
+
+
+    fc_temp = get(paste0(mod,'_fc_route'))
+
+    # get the forecasted values:
+    for(i in 1:es_mod)
+    {
+      fc_temp[,paste0(mod,'_',name,'_',i) := lapply(X = .SD,FUN = fun,na.rm = TRUE),by = .(month,year),.SDcols = paste0('fc',i)]
+    }
+
+    # take mean over all forecasts and put this into validation_dt
+
+    fc_temp = fc_temp[grid_id == min(grid_id) ,.SD,.SDcols = paste0(mod,'_',name,'_',1:es_mod)]
+    fc_temp[,paste0(mod,'_',name,'_fc') := rowMeans(.SD),.SDcols = paste0(mod,'_',name,'_',1:es_mod)]
+
+    temp = fc_temp[,.SD,.SDcols = paste0(mod,'_',name,'_fc')]
+
+    validation_dt = data.table(validation_dt,temp)
+
+    ### get MSE ###
+
+    obs = validation_dt[,eval(parse(text = paste0('SST_',name)))]
+    fcs = validation_dt[,eval(parse(text = paste0(mod,'_',name,'_fc')))]
+
+    validation_dt[,paste0('MSE_',mod,'_',name,'_fc'):=(obs-fcs)^2]
+
+    mse = mean((obs - fcs)^2)
+
+    scores_dt[model == mod & fun == name,MSE:=mse]
+
+    ### get CRPS ###
+
+    data = as.matrix(fc_temp[,.SD,.SDcols = paste0(mod,'_',name,'_',1:es_mod)])
+
+    crps = scoringRules::crps_sample(y = obs,
+                                     dat = data)
+
+    validation_dt[,paste0('CRPS_',mod,'_',name,'_fc'):=crps]
+
+    scores_dt[model == mod & fun == name, CRPS := mean(crps)]
+  }
+
+  # scores for point forecasts:
+  mod = 'PFC'
+
+  obs = validation_dt[,eval(parse(text = paste0('SST_',name)))]
+  fcs = validation_dt[,eval(parse(text = paste0(mod,'_',name,'_fc')))]
+
+  mse = mean((obs - fcs)^2)
+  crps = mean(abs(obs-fcs))
+
+  scores_dt[model == mod & fun == name,MSE:=mse]
+  scores_dt[model == mod & fun == name,CRPS:=crps]
+}
+
+
+save(scores_dt,file = paste0(save_dir,'route_scores.RData'))
+
+### permutation tests ###
+
+funn = 'min'
+score = 'MSE'
+
+N = 10000
+
+#pdf(paste0(plot_dir,'perm_test_routescores.pdf'),width = 14,height = 14)
+
+par( oma=c(0,6,6,0), mfrow=c(length(mod_vec),length(mod_vec)), mar=c(3,3,2,2)+0.1 )
+
+for(mod1 in mod_vec)
+{
+
+  for(mod2 in mod_vec)
+  {
+    col_name_1 = paste0(score,'_',mod1,'_',funn,'_fc')
+    col_name_2 = paste0(score,'_',mod2,'_',funn,'_fc')
+
+    # permutation test for mod1 ~ mod2
+    pt_vs = permutation_test_difference(validation_dt[,get(col_name_1)],validation_dt[,get(col_name_2)], N=N)
+
+    x_lim_max = 1.1*max(abs(c(pt_vs$d_bar,pt_vs$D)))
+
+    hist(pt_vs$D, xlim = c(-x_lim_max,x_lim_max),main = paste0(mod1,' vs. ',mod2),breaks = 20)
+
+    qq_1 = quantile(pt_vs$D,c(0.05))
+
+    abline(v = pt_vs$d_bar,col = 'red')
+
+    abline(v = qq_1,lty = 2)
+
+    qq_2 = quantile(pt_vs$D,c(0.01))
+
+    abline(v = qq_2,lty = 3)
+  }
+}
+
+
+### get p-value for all tests ###
+
+library(stats)
+
+p_values_route_scoring = as.data.table(expand.grid(MOD1 = mod_vec,MOD2 = mod_vec,SCORE = c('MSE','CRPS'),FUN = c('max','min')))
+
+p_values_route_scoring[,p_value:=NA_real_]
+
+for(funn in c('max','min') )
+{
+  for(score in c('CRPS','MSE'))
+  {
+    print(c(funn,score))
+
+    for(mod1 in mod_vec)
+    {
+
+      for(mod2 in mod_vec)
+      {
+        col_name_1 = paste0(score,'_',mod1,'_',funn,'_fc')
+        col_name_2 = paste0(score,'_',mod2,'_',funn,'_fc')
+
+        # permutation test for mod1 ~ mod2
+        pt_vs = permutation_test_difference(validation_dt[,get(col_name_1)],validation_dt[,get(col_name_2)], N=N)
+
+        p_val_f = ecdf(pt_vs$D)
+        p_val = p_val_f(pt_vs$d_bar)
+
+        p_values_route_scoring[MOD1 == mod1 & MOD2 == mod2 & SCORE == score & FUN == funn, p_value := p_val]
+
+      }
+    }
+
+  }
+}
+
+save(p_values_route_scoring,file = paste0(save_dir,'p_values.RData'))
+
+
+#################################
+#################################
+#################################
+
+ #### multivariate rank histograms ####
+
+##################
+
+brks = 6
+
+### PCA ###
+
+# get forecast:
+
+
+rks_PCA_mc_route = mv_rank_hist_new(PCA_mc_fc_route, fc_ens_size = fc_ens_size,
+                                    mc_cores = mc_cores,
+                                    breaks = brks, mn = "PCA_mc rank histograms",
+                                    save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_mc_route")
+
+
+
+
+
+rks_PCA_ac_route = mv_rank_hist_new(PCA_ac_fc_route, fc_ens_size = fc_ens_size,
+                                    mc_cores = mc_cores,
+                                    breaks = brks, mn = "PCA_ac rank histograms",
+                                    save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_PCA_ac_route")
+
+
+### geostationary ###
+
+rks_GS_route = mv_rank_hist_new(GS_fc_route, fc_ens_size = fc_ens_size,
+                                mc_cores = mc_cores,
+                                breaks = brks, mn = "GS rank histograms",
+                                save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_GS_route")
+
+
+### ECC ###
+
+rks_ECC_route = mv_rank_hist_new(ECC_fc_route, fc_ens_size = ens_size,
+                                 mc_cores = mc_cores,
+                                 breaks = brks, mn = "ECC rank histograms",
+                                 save_pdf = TRUE, plot_dir = plot_dir, file_name = "rank_histo_ECC_route")
+
+
+
+
+
+### save entire workspace ###
+
+save.image(file = paste0(save_dir,'results.RData'))
 
