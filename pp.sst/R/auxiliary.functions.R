@@ -69,7 +69,7 @@ trc = function (x,truncation.value = -1.79){
 #' @param a Vector, the scores from one method
 #' @param b Vector, the scores from some other method
 #' @param N Integer, the size of the permutation distribution
-#' @return A list with the mean of the difference and the permutation distribution of that difference
+#' @return A list with the mean of the difference and the permutation distribution of that difference and the p-value
 #' @examples
 #' N = 1e2
 #' trend  = 1:N
@@ -77,7 +77,7 @@ trc = function (x,truncation.value = -1.79){
 #' b = trend - .01 + rnorm(N, .001)
 #' l = permutation_test_difference(a,b)
 #' q = sum(l$D <= l$d_bar) / length(l$D)
-#' @author Alex
+#' @author Alex,Claudio
 #' 
 #' @export
 #' 
@@ -95,5 +95,48 @@ permutation_test_difference = function(a,
         d_i[w_swap] = -d_i[w_swap]
         D[i] = mean(d_i)
     }
-    return(list(d_bar = d_bar, D = D))
+    
+    p_val = sum(d_bar > sort(D))/N + sum(d_bar == sort(D))/(2*N)
+    
+    return(list(d_bar = d_bar, D = D,p_val = p_val))
+}
+
+
+#' Run a bootstrap test of the pairwise difference between two vectors of numbers
+#' @param sc1 Vector, the scores from one method
+#' @param sc2 Vector, the scores from some other method
+#' @param N Integer, the size of the bootstrap distribution
+#' @param q_prob a vector containing probabilities for which the quantiles should be returned from the bootstrap distribution
+#' @return A list as returned by the function boot::boot, with additional values p_val and q
+#' @examples
+#' N = 1e2
+#' trend  = 1:N
+#' sc1 = trend + .01 + rnorm(N, .001)
+#' sc2 = trend - .01 + rnorm(N, .001)
+#' l = bootstrap_difference(sc1,sc2)
+#' @author Claudio
+#' 
+#' @importFrom boot boot
+#' 
+#' @export
+#' 
+bootstrap_difference = function(sc1,sc2,q_prob, N = 1e3){
+  
+  data = sc1-sc2
+  
+  diff = function(x,inds){return(mean(x[inds]))}
+  
+  bt = boot(data,diff,R = N)
+  
+  t0 = bt$t0
+  t = bt$t
+  
+  #p-value:
+  bt$p_val = sum(t0 > t)/N + sum(t0 == t)/(2*N)
+  
+  #quantiles
+  bt$q = quantile(t,q_prob)
+  
+  
+  return(bt)
 }

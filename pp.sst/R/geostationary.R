@@ -56,16 +56,16 @@ geostationary_training = function (dt ,
   {
       print(paste0("month = ",mon))
       
-      DT = dt[month == mon & year %in% training_years,]
+      dt_temp = dt[month == mon & year %in% training_years,]
       
-      land_ids <- which(DT[, is.na(Ens_bar) | is.na(SST_bar)])
+      land_ids <- which(dt_temp[, is.na(Ens_bar) | is.na(SST_bar)])
       if(!identical(land_ids,integer(0)))
       {
-        DT = DT[-land_ids,]
+        dt_temp = dt_temp[-land_ids,]
       }
       
-      sp <- sp::SpatialPoints(cbind(x=DT[YM == min(YM), Lon],
-                                    y=DT[YM == min(YM), Lat]), 
+      sp <- sp::SpatialPoints(cbind(x=dt_temp[YM == min(YM), Lon],
+                                    y=dt_temp[YM == min(YM), Lat]), 
                               proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
       
       # function to convert YM into the right date format:
@@ -78,10 +78,10 @@ geostationary_training = function (dt ,
         as.Date(paste0(Y,"-",M,"-15"))
       }
       
-      time = as.POSIXct( time_convert(unique(DT[,YM])), tz = "GMT")
+      time = as.POSIXct( time_convert(unique(dt_temp[,YM])), tz = "GMT")
       
-      setkey(DT,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
-      data = DT[,.(trc(Ens_bar+Bias_Est)-SST_bar)] 
+      setkey(dt_temp,YM,Lon,Lat) # for creating STFDFs the data should be ordered such that the 'spatial index is moving fastest'
+      data = dt_temp[,.(trc(Ens_bar+Bias_Est)-SST_bar)] 
       setnames(data,"Res")
       
       stfdf = spacetime::STFDF(sp, time, data)

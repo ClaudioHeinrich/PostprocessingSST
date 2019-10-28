@@ -29,7 +29,7 @@
 #' @importFrom maps map
 
 plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
-                            rr = NULL,
+                            rr = NULL, 
                             col_scheme = "bwr", set_white = NULL,
                             xlab = "", ylab = "",
                             brks = NULL,
@@ -58,6 +58,7 @@ plot_diagnostic = function( dt, var = colnames(dt)[3], mn = var,
   
   n_lon = length(Lons)
   n_lat = length(Lats)
+  
   
   if(is.null(rr))  rr = range(dt[,3],na.rm=TRUE)
   if(!is.null(rr)){

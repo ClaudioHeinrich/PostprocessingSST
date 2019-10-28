@@ -1,13 +1,21 @@
 rm(list = ls())
 
 library(devtools,roxygen2)
+library(data.table)
 
-setwd('/nr/user/claudio/pkg/paper_pkg/PostprocessingSST')
+setwd('/nr/user/claudio/pkg/paper/PostprocessingSST')
 
-create('pp.sst')
-
+ff = "./pp.sst"
+if(!file.exists(ff)){
+  dir.create('pp.sst')
+}
 
 # document
 
 setwd('./pp.sst')
 document()
+
+setwd('..')
+install('pp.sst')
+
+library(pp.sst)

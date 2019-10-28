@@ -247,6 +247,27 @@ rhist_dt <- function(B, max_rk, breaks = 11, hist_xlab=NULL, hist_ylab=NULL, his
 }
 
 
+#' histogram transformation 
+#' 
+#' when working with rank histograms problems arise when the number of bins does not divide the number of possible ranks
+#' This function solves this problem by randomizing the data such that it is uniform on [0,1] if it was uniform before
+#' 
+#' @param vec A vector containing ranks. 
+#'
+#' @return A transformed vector containing data on [0,1]
+#'   
+#' @author Claudio Heinrich
+#'  
+#' @export
+
+hist_transform <- function(vec)
+{
+  randomize = runif(n = length(vec))
+  return( (vec - 1 + randomize))
+}
+
+
+
 ############################################
 ####### 'Empirical' variogram scores #######
 ############################################

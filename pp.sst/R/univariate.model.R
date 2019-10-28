@@ -1,5 +1,5 @@
 
-#' computes simple moving averages, is resistant to missing values  
+#' computes simple moving averages, resistant to missing values  
 #'
 #' @param l length of the averaging window.
 #' @param vec,years vectors of the same length, vec[i] contains the value corresponding to year years[i]
@@ -277,94 +277,28 @@ return(dt)
 #' @param dt The data table.
 #' @param method Method of bias correction. Takes "sma" for simple moving average and "ema" for exponential moving average. 
 #' @param par_1 Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).
-#' @param scores Logical. If true, the MSE is returned.
-#' @param eval_years Numerical vector. The years for evaluating the score.
-#' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
-#' @param save_dir,file_name Directory and name for the saved file.
-#' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
+#' @param ... arguments passed on to the moving average function, e.g. two_sided for the training period.                   
 #'                   
-#'                   
-#' @return The data table with corrected SST_hat and new column Bias_Est.
+#' @return A data table containing columns .(year,month,Lon,Lat,Bias_est,SST_hat).
 #'
 #' @author Claudio Heinrich
-#' @examples \dontrun{bias_correct(saveorgo = FALSE)}
-#' 
 #' 
 #' @export
 
-bias_correct = function(dt, method, par_1,
-                        scores = FALSE,
-                        eval_years = 2001:2010,
-                        saveorgo = TRUE,
-                        save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                        file_name = "dt_combine_wide_bias.RData",
-                        skip = 0){
-  
-  
-  if(method == "sma"){
-       dt = dt[,"Bias_Est" := sim_mov_av(l = par_1, 
-                                         vec = SST_bar - Ens_bar, 
-                                         years = year,
-                                         skip = skip),
-               by = .(Lon,Lat, month)]
-  }
-  if (method == "ema"){
-       dt[,"Bias_Est" := exp_mov_av(a = par_1,
-                                    vec = SST_bar - Ens_bar,
-                                    years = year,
-                                    skip = skip),
-          by = .(Lon,Lat, month)]
-  }
-  
-  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
-  
-  if(saveorgo){
-    save(dt, file = paste0(save_dir,file_name))
-  }
-  
-  if(scores){
-    mean_sc = global_mean_scores(dt, eval_years = eval_years, var = FALSE)
-    return(mean_sc)
-  } else return(dt)
-  
-}
-
-#' Applies bias correction with a specified method to the data and saves or returns scores.
-#'
-#' @param dt The data table.
-#' @param method Method of bias correction. Takes "sma" for simple moving average and "ema" for exponential moving average. 
-#' @param par_1 Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).
-#' @param scores Logical. If true, the MSE is returned.
-#' @param eval_years Numerical vector. The years for evaluating the score.
-#' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
-#' @param save_dir,file_name Directory and name for the saved file.
-#' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
-#'                   
-#'                   
-#' @return The data table with corrected SST_hat and new column Bias_Est.
-#'
-#' @author Claudio Heinrich
-#' @examples \dontrun{bias_correct(saveorgo = FALSE)}
-#' 
-#' 
-#' @export
-
-bias_correct_2 = function(dt, method, par_1,
-                          skip = 0,
-                          reduced_output = TRUE)
+bias_correct = function(dt, method, par_1, ...)
 {
   if(method == "sma"){
-    b_hat =  dt[,.(year,month,Bias_est = sim_mov_av(l = par_1,  
-                                                    vec = SST_bar - Ens_bar, 
-                                                    years = year,
-                                                    skip = skip)),
+    b_hat =  dt[,.(year,Bias_est = sim_mov_av(l = par_1,  
+                                              vec = SST_bar - Ens_bar, 
+                                              years = year,
+                                              ...)),
                 by = .(Lon,Lat,month)]
   }
   if (method == "ema"){
-    b_hat =  dt[,.(year,month,Bias_est = exp_mov_av(a = par_1,  
-                                                    vec = SST_bar - Ens_bar, 
-                                                    years = year,
-                                                    skip = skip)),
+    b_hat =  dt[,.(year,Bias_est = exp_mov_av(a = par_1,  
+                                              vec = SST_bar - Ens_bar, 
+                                              years = year,
+                                              ...)),
                 by = .(Lon,Lat,month)]
   }
   
@@ -373,9 +307,8 @@ bias_correct_2 = function(dt, method, par_1,
   # estimated temperature
   ret_val = data.table(b_hat, SST_hat = trc(dt[,Ens_bar] + b_hat[,Bias_est]))
   
-  if(reduced_output){
-    return(ret_val) 
-  } else return(data.table(dt,ret_val))
+  return(ret_val) 
+  
 }
 
 
@@ -408,12 +341,65 @@ bias_lr_bm = function(DT,
                                  data=DT[year < y,.(SST_bar,Ens_bar,month)])
     
     months = as.character(DT[year == y,month])
-    DT[year == y, c("a","b"):= coef(fits_by_month)[months,]]
-    DT[year == y, T_hat_lr_m := a + b * Ens_bar]
+    DT[year == y, c("a_bm","b_bm"):= coef(fits_by_month)[months,]]
+    DT[year == y, T_hat_lr_bm := a_bm + b_bm * Ens_bar]
   }
   return(DT)
 }
 
+
+#' computes climatology and sample climatology, always oos starting from the last year
+#' 
+#' @param DT the data table.
+
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+compute_clim = function(DT)
+{
+  DT[,clim := (cumsum(SST_bar) - SST_bar)/(year - min(year) ),.(month,Lon,Lat)]
+  DT[,fc_clim := (cumsum(Ens_bar) - Ens_bar)/(year - min(year)),.(month,Lon,Lat)]
+  DT[,ano:= SST_bar - clim]
+  DT[,fc_ano:= SST_hat - fc_clim]
+  
+  return(DT)
+}
+
+
+#' computes the MSE when instead of bias correction the locally adaptive model SST_ano = a + b Ens_bar_ano is used (as in standard NGR), with data grouped by month.
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param validation_years validation years.
+#' 
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr_bm(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+bias_lr_bm_la = function(DT,
+                      months = 1:12,
+                      validation_years = 2001:2010)
+{
+  
+  for(y in validation_years) # parallelizing runs into memory issues, and for some reason is not faster?
+  {
+    print(y)
+    # grouped by month
+    
+        fits_by_month = lme4::lmList(formula = ano ~ 1 + fc_ano | month,
+                                 data=DT[year < y,.(ano,fc_ano,month)])
+    
+    months = as.character(DT[year == y,month])
+    DT[year == y, c("a_bm_la","b_bm_la"):= coef(fits_by_month)[months,]]
+    DT[year == y, T_hat_lr_bm_la := clim + a_bm_la + b_bm_la * fc_ano]
+  }
+  return(DT)
+}
 
 #' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by location.
 #' 
@@ -440,12 +426,47 @@ bias_lr_bl = function(DT,
   {
     print(y)
     
-    fits_by_loc = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
-                               data=DT[year < y,.(SST_bar,Ens_bar,grid_id)])
+    fits_by_loc = suppressWarnings(lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+                                                data=DT[year < y,.(SST_bar,Ens_bar,grid_id)]))
     
     grid_ids = as.character(DT[year == y,grid_id])
-    DT[year == y,c("a","b"):= coef(fits_by_loc)[grid_ids,]]
-    DT[year == y,T_hat_lr_loc := a + b * Ens_bar]
+    DT[year == y,c("a_bl","b_bl"):= coef(fits_by_loc)[grid_ids,]]
+    DT[year == y,T_hat_lr_bl := a_bl + b_bl * Ens_bar]
+  }
+  return(DT)
+}
+
+#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by location.
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param training_years,validation_years Training years and validation years.
+#' 
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr_bl(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+
+bias_lr_bl_la = function(DT,
+                      months = 1:12,
+                      validation_years = 2001:2010)
+{
+  
+  # grouped by location
+  for(y in validation_years)
+  {
+    print(y)
+    
+    fits_by_loc = suppressWarnings( lme4::lmList(formula =  ano ~ 1 + fc_ano | grid_id,
+                               data=DT[year < y,.(ano,clim,fc_ano,grid_id)]))
+    
+    grid_ids = as.character(DT[year == y,grid_id])
+    DT[year == y,c("a_bl_la","b_bl_la"):= coef(fits_by_loc)[grid_ids,]]
+    DT[year == y,T_hat_lr_bl_la := clim + a_bl_la + b_bl_la * fc_ano]
   }
   return(DT)
 }
@@ -478,17 +499,114 @@ bias_lr_bb = function(DT,
       
       data = DT[month == m][year < y,.(SST_bar,Ens_bar,grid_id)]
       data[,grid_id := as.factor(grid_id)]
-      fits_by_both = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
-                                  data=data)
+      fits_by_both = suppressWarnings(lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+                                                   data=data))
       gids = as.character(DT[month == m][year == y,grid_id])
-      DT[month == m & year == y,c("a","b"):= coef(fits_by_both)[gids,]]
-      DT[month == m & year == y,T_hat_lr_both := a + b * Ens_bar]
+      DT[month == m & year == y,c("a_bb","b_bb"):= coef(fits_by_both)[gids,]]
+      DT[month == m & year == y,T_hat_lr_bb := a_bb + b_bb * Ens_bar]
       
     }
     
   }
   return(DT)
 }
+
+
+#' computes the RMSE when instead of bias correction the linear model SST_hat = a + b Ens_bar is used (as in standard NGR), with data grouped by both month and location.
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param training_years,validation_years Training years and validation years.
+#' 
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr_bm(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+bias_lr_bb_la = function(DT,
+                         months = 1:12,
+                         validation_years = 2001:2010)
+{
+  
+  # grouped by location
+  for(y in validation_years)
+  {
+    for(m in months)
+    {
+      print(c(y,m))
+      
+      data = DT[month == m][year < y,.(clim,ano,fc_ano,grid_id)]
+      data[,grid_id := as.factor(grid_id)]
+      fits_by_both = suppressWarnings(lme4::lmList(formula = ano ~ 1 + fc_ano | grid_id,
+                                  data=data))
+      gids = as.character(DT[month == m][year == y,grid_id])
+      DT[month == m & year == y,c("a_bb_la","b_bb_la"):= coef(fits_by_both)[gids,]]
+      DT[month == m & year == y,T_hat_lr_bb_la := clim + a_bb_la + b_bb_la * fc_ano]
+      
+    }
+    
+  }
+  return(DT)
+}
+
+
+#' parallelized version of bias_lr_bb
+#' 
+#' @param DT the data table.
+#' @param months The considered months.
+#' @param validation_years Validation years.
+#' @param ... Arguments passed on to mclapply, most importantly mc.cores.
+#' 
+#'
+#' @examples \dontrun{ DT = load_combined_wide()
+#'                     bias_lr_bm(DT = DT)}
+#'   
+#' @author Claudio Heinrich
+#' 
+#' @export
+
+bias_lr_bb_par = function(DT,
+                          months = 1:12,
+                          validation_years = 2001:2016,
+                          mc_cores
+                          )
+{
+  if('a' %in% colnames(DT))
+  {
+    DT[,c('a','b','T_hat_lr_both'):= NULL]
+  }
+  
+  gids = DT[,unique(grid_id)]
+  gids_char = as.character(gids)
+  
+  bias_by_month_par = function(m)
+  {
+    ret_dt = as.data.table(expand.grid(month = m, year = validation_years,grid_id = gids))
+    for(y in validation_years)
+    {
+      data = DT[month == m][year < y,.(SST_bar,Ens_bar,grid_id)]
+      data[,grid_id := as.factor(grid_id)]
+      fits_by_both = lme4::lmList(formula = SST_bar ~ 1 + Ens_bar | grid_id,
+                                  data=data)
+      
+      ret_dt[month == m & year == y,c("a","b"):= coef(fits_by_both)[gids_char,]]
+      ret_dt[month == m & year == y,T_hat_lr_both := a + b * DT[month == m & year ==y,Ens_bar]]
+    }
+    return(ret_dt)
+  }
+  
+  T_hat = rbindlist(parallel::mclapply(months,bias_by_month_par, mc.cores = mc_cores))
+  
+  setkey(T_hat,year,month,grid_id)
+  DT = merge(DT,T_hat,all.x = TRUE)
+  
+  return(DT)
+}
+
+
 
 
 
@@ -566,100 +684,32 @@ sd_est = function(dt ,
 #' 
 #' @export
 
-sd_est_2 = function(dt, method, par_1,
-                    saveorgo = TRUE,
-                    save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                    file_name = "dt_combine_wide_bc_var.RData",
-                    skip = 0,
-                    reduced_output = TRUE)
+sd_est_2 = function(dt, method, par_1,...)
 {
   
   if(method == "sma"){
-    dt = dt[,"SD_hat" := sim_mov_av(l = par_1, 
+    sd_hat = dt[,"SD_hat" := sim_mov_av(l = par_1, 
                                       vec = var_bar, 
                                       years = year,
-                                      skip = skip),
+                                      ...),
             by = .(Lon,Lat, month)]
   }
   if (method == "ema"){
-    dt[,"SD_hat" := exp_mov_av(a = par_1,
+    sd_hat = dt[,"SD_hat" := exp_mov_av(a = par_1,
                                  vec = var_bar,
                                  years = year,
-                                 skip = skip),
+                                 ...),
        by = .(Lon,Lat, month)]
   }
   
-  dt[,SD_hat := sqrt(SD_hat)]
+  sd_hat[,SD_hat := sqrt(SD_hat)]
+  sd_hat = sd_hat[,.(year,month,Lon,Lat,SD_hat)]
   
-  if(saveorgo){
-    save(dt, file = paste0(save_dir,file_name))
-  }
-  
-  if(reduced_output){
-    return(dt[,.(year,month,Lon,Lat,SD_hat)]) 
-  } else return(dt)
-  
+  return(sd_hat)
+
 }
 
 
-#' Applies bias correction with a specified method to the data and saves or returns scores.
-#'
-#' @param dt The data table.
-#' @param method Method of bias correction. Takes "sma" for simple moving average and "ema" for exponential moving average. 
-#' @param par_1 Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).
-#' @param scores Logical. If true, the MSE is returned.
-#' @param eval_years Numerical vector. The years for evaluating the score.
-#' @param saveorgo Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.
-#' @param save_dir,file_name Directory and name for the saved file.
-#' @param skip Integer. Passed on to sim_mov_av or exp_mov_av.
-#'                   
-#'                   
-#' @return The data table with corrected SST_hat and new column Bias_Est.
-#'
-#' @author Claudio Heinrich
-#' @examples \dontrun{bias_correct(saveorgo = FALSE)}
-#' 
-#' 
-#' @export
-
-bias_correct_training = function(dt = NULL,
-                                method,
-                                training_years = 1985:2000,
-                                eval_years = 2001:2010,
-                                saveorgo = TRUE,
-                                save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-                                file_name = "dt_combine_wide_bias.RData",
-                                skip = 0){
-  
-  if(is.null(dt)) dt = load_combined_wide(bias = TRUE) 
-  
-  if(method[1] == "sma")
-    {
-      dt[year %in% training_years,"Bias_Est" :=   sim_mov_av(l = as.double(method[2]),
-                                                           vec = SST_bar - Ens_bar,
-                                                           years = year,
-                                                           skip = skip,
-                                                           twosided = TRUE),
-         by = .(grid_id, month)]
-  }
-  if (method[1] == "ema"){
-    dt[year %in% training_years,"Bias_Est" :=   exp_mov_av(a = as.double(method[2]),
-                                                           vec = SST_bar - Ens_bar,
-                                                           years = year,
-                                                           skip = skip,
-                                                           twosided = TRUE),
-       by = .(grid_id, month)]
-    
-  }
-  
-  dt[,"SST_hat" := trc(Ens_bar + Bias_Est)]
-  
-  if(saveorgo){
-    save(dt, file = paste0(save_dir,file_name))
-  } 
-    
-  return(dt)
-}
 
 #' Estimates the variance as has been suggested for NGR, grouped by month
 #' 
