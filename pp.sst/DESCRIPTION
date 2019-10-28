@@ -5,7 +5,8 @@ Authors@R: person("Claudio", "Heinrich", email = "claudio.heinrich@nr.no", role 
 Description: Reproduces the results presented in Heinrich et al. 2019.
 Depends: 
   R (>= 3.4.1),
-  data.table
+  data.table,
+  parallel
 License: MIT license
 Encoding: UTF-8
 LazyData: true
