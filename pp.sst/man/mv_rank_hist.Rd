@@ -4,8 +4,8 @@
 \alias{mv_rank_hist}
 \title{making and plotting of multivariate rank histograms}
 \usage{
-mv_rank_hist(dt_fc, fc_ens_size, mn = "", breaks = 10, save_pdf = FALSE,
-  plot_dir = "", file_name = "")
+mv_rank_hist(dt_fc, fc_ens_size, mn = "", breaks = 10,
+  save_pdf = FALSE, plot_dir = "", file_name = "")
 }
 \arguments{
 \item{dt_fc}{the forecast data table.}

@@ -4,11 +4,11 @@
 \alias{make_combined_wide_dataset}
 \title{Make the combined dataset for all years and store in a wide format}
 \usage{
-make_combined_wide_dataset(y_start = 1985, y_stop = 2010, vintage = "mr",
-  data_dir = "~/PostClimDataNoBackup/",
+make_combined_wide_dataset(y_start = 1985, y_stop = 2010,
+  vintage = "mr", data_dir = "~/PostClimDataNoBackup/",
   grid_mapping_loc = "~/PostClimDataNoBackup/SFE/Derived/",
-  output_loc = "~/PostClimDataNoBackup/SFE/Derived/", output_name = NULL,
-  lat_box = c(-Inf, Inf), lon_box = c(-Inf, Inf))
+  output_loc = "~/PostClimDataNoBackup/SFE/Derived/",
+  output_name = NULL, lat_box = c(-Inf, Inf), lon_box = c(-Inf, Inf))
 }
 \arguments{
 \item{y_start}{The first year for which we have obs/ens data}

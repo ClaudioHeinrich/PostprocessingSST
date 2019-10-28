@@ -2,7 +2,6 @@
 % Please edit documentation in R/auxiliary.functions.R, R/univariate.model.R
 \name{crps_na_rm}
 \alias{crps_na_rm}
-\alias{crps_na_rm}
 \title{crps score for normal distribution, resistant to missing values and 0 standard deviation}
 \usage{
 crps_na_rm(y, mean, sd)

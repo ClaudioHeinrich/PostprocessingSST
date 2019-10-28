@@ -21,8 +21,6 @@
 #' 
 #' @return data table containing n columns with noise and n columns with forecasts.
 #' 
-#' @examples \dontrun{ DT = load_combined_wide(data_dir = "~/PostClimDataNoBackup/SFE/Derived/NAO", output_name = "dt_combine_NAO_wide_bc.RData") \cr
-#'                     geostationary_training(dt = DT)}
 #' 
 #' @author Claudio Heinrich, Yuan Qifen        
 #' 

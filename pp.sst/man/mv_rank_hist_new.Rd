@@ -4,8 +4,8 @@
 \alias{mv_rank_hist_new}
 \title{new, faster plotting of multivariate rank histograms}
 \usage{
-mv_rank_hist_new(dt_fc, fc_ens_size, mc_cores = 12, mn = "", breaks = 11,
-  save_pdf = FALSE, plot_dir = "", file_name = "")
+mv_rank_hist_new(dt_fc, fc_ens_size, mc_cores = 12, mn = "",
+  breaks = 11, save_pdf = FALSE, plot_dir = "", file_name = "")
 }
 \arguments{
 \item{dt_fc}{the forecast data table.}

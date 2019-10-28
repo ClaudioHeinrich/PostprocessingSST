@@ -4,8 +4,8 @@
 \alias{dt_transform_center}
 \title{Transforming the datatable (which has been univariately post-processed) by replacing temperatures by temperature anamolies}
 \usage{
-dt_transform_center(dt, clim_years, trafo_colnames = c("SST_bar", "SST_hat",
-  "Ens_bar", paste0("Ens", 1:9)))
+dt_transform_center(dt, clim_years, trafo_colnames = c("SST_bar",
+  "SST_hat", "Ens_bar", paste0("Ens", 1:9)))
 }
 \arguments{
 \item{dt}{the data table.}

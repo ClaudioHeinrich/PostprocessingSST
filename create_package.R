@@ -1,9 +1,9 @@
 rm(list = ls())
 
-library(devtools,roxygen2)
-library(data.table)
+library(devtools)
+library(roxygen2)
 
-setwd('/nr/user/claudio/pkg/paper/PostprocessingSST')
+#setwd('./')
 
 ff = "./pp.sst"
 if(!file.exists(ff)){

@@ -4,10 +4,7 @@
 \alias{sd_est_2}
 \title{Estimates standard deviation with a specified method to the data and saves or returns scores.}
 \usage{
-sd_est_2(dt, method, par_1, saveorgo = TRUE,
-  save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-  file_name = "dt_combine_wide_bc_var.RData", skip = 0,
-  reduced_output = TRUE)
+sd_est_2(dt, method, par_1, ...)
 }
 \arguments{
 \item{dt}{The data table.}
@@ -16,13 +13,13 @@ sd_est_2(dt, method, par_1, saveorgo = TRUE,
 
 \item{par_1}{Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).}
 
-\item{saveorgo}{Logical. If TRUE, the data table with new column SD_hat is saved.}
-
-\item{save_dir, file_name}{Directory and name for the saved file.}
-
 \item{scores}{Logical. If true, the CRPS is returned.}
 
 \item{eval_years}{Numerical vector. The years for evaluating the score.}
+
+\item{saveorgo}{Logical. If TRUE, the data table with new column SD_hat is saved.}
+
+\item{save_dir, file_name}{Directory and name for the saved file.}
 }
 \value{
 The data table dt containing a new column SD_hat.

@@ -4,9 +4,7 @@
 \alias{bias_correct}
 \title{Applies bias correction with a specified method to the data and saves or returns scores.}
 \usage{
-bias_correct(dt, method, par_1, scores = FALSE, eval_years = 2001:2010,
-  saveorgo = TRUE, save_dir = "~/PostClimDataNoBackup/SFE/Derived/",
-  file_name = "dt_combine_wide_bias.RData", skip = 0)
+bias_correct(dt, method, par_1, ...)
 }
 \arguments{
 \item{dt}{The data table.}
@@ -15,26 +13,13 @@ bias_correct(dt, method, par_1, scores = FALSE, eval_years = 2001:2010,
 
 \item{par_1}{Numeric. If method == "sma", par_1 is the (integer) length of the moving average window, if method == "ema", par_1 is the scale parameter for the exponential downscaling, typically in (0,1).}
 
-\item{scores}{Logical. If true, the MSE is returned.}
-
-\item{eval_years}{Numerical vector. The years for evaluating the score.}
-
-\item{saveorgo}{Logical. If TRUE, the data table with corrected SST_hat and new column Bias_Est is saved.}
-
-\item{save_dir, file_name}{Directory and name for the saved file.}
-
-\item{skip}{Integer. Passed on to sim_mov_av or exp_mov_av.}
+\item{...}{arguments passed on to the moving average function, e.g. two_sided for the training period.}
 }
 \value{
-The data table with corrected SST_hat and new column Bias_Est.
+A data table containing columns .(year,month,Lon,Lat,Bias_est,SST_hat).
 }
 \description{
 Applies bias correction with a specified method to the data and saves or returns scores.
-}
-\examples{
-\dontrun{bias_correct(saveorgo = FALSE)}
-
-
 }
 \author{
 Claudio Heinrich

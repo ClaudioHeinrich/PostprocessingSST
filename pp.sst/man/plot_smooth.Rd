@@ -7,7 +7,8 @@
 plot_smooth(dt, var = colnames(dt)[3], mn = var, rr = NULL, ...,
   theta = 0.5, pixels = 256, col_scheme = "bwr", set_white = NULL,
   xlab = "", ylab = "", brks = NULL, save_pdf = FALSE,
-  save_dir = "./figures/", file_name = "diag_plot", stretch_par = NULL)
+  save_dir = "./figures/", file_name = "diag_plot",
+  stretch_par = NULL)
 }
 \arguments{
 \item{dt}{The data table.}

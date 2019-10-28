@@ -14,7 +14,7 @@ permutation_test_difference(a, b, N = 5000)
 \item{N}{Integer, the size of the permutation distribution}
 }
 \value{
-A list with the mean of the difference and the permutation distribution of that difference
+A list with the mean of the difference and the permutation distribution of that difference and the p-value
 }
 \description{
 Run a permutation test of the pairwise difference between two vectors of numbers
@@ -28,5 +28,5 @@ l = permutation_test_difference(a,b)
 q = sum(l$D <= l$d_bar) / length(l$D)
 }
 \author{
-Alex
+Alex,Claudio
 }

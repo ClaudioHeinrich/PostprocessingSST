@@ -4,9 +4,9 @@
 \alias{geostationary_training}
 \title{preparation for geostationary forecasts}
 \usage{
-geostationary_training(dt, training_years = 1985:2000, m = 1:12, save_dir,
-  file_name = "variogram_exp_m", nintv = 75, truncate = TRUE,
-  mc_cores = 1)
+geostationary_training(dt, training_years = 1985:2000, m = 1:12,
+  save_dir, file_name = "variogram_exp_m", nintv = 75,
+  truncate = TRUE, mc_cores = 1)
 }
 \arguments{
 \item{dt}{the data table.}

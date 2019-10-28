@@ -2,7 +2,7 @@
 % Please edit documentation in R/univariate.model.R
 \name{sim_mov_av}
 \alias{sim_mov_av}
-\title{computes simple moving averages, is resistant to missing values}
+\title{computes simple moving averages, resistant to missing values}
 \usage{
 sim_mov_av(l, vec, years, skip = 0, twosided = FALSE)
 }
@@ -15,7 +15,7 @@ sim_mov_av(l, vec, years, skip = 0, twosided = FALSE)
 a vector of the same length as the input vectors. At location j it contains the average of the values contained in vec that fall into the period of the last l years (excluding the present). First entry is 0. NAs are ignored.
 }
 \description{
-computes simple moving averages, is resistant to missing values
+computes simple moving averages, resistant to missing values
 }
 \examples{
 sim_mov_av(5, rnorm(10), c(1990,1993,1995:2002))

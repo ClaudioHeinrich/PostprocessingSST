@@ -8,15 +8,23 @@
 
 # This script sets up a run of the post-processing analysis 
 
+# installing the R-package:
+
 rm(list = ls())
 
+install.packages('devtools')
+library(devtools)
+
+install_github('ClaudioHeinrich/PostprocessingSST/pp.sst')
+
+
+#start timer:
 time_s1 = proc.time()
 
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
-library(PostProcessing)
-library(data.table)
+library(pp.sst)
 
 
 # choose an abbreviation for this run and give it a description, see the README file for more details. 
