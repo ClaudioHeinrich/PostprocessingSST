@@ -9,5 +9,7 @@
 #' 
 #' @docType data
 #' 
+#' @format A data table.
+#' 
 #' @usage data(DT)
 "DT"

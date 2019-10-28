@@ -44,10 +44,10 @@ plot_dir = file.path('~','SST','Figures', name_abbr)
 dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
 
 
-# choose the area of the globe to consider:
+# choose the area of the globe to consider: Reduce this to a smaller window when testing scripts.
 
-lat_box = c(-90,90)
-lon_box = c(-180,180)
+lat_box = c(0, 65)
+lon_box = c(-90, 40)
 
 
  # a couple of parameters:

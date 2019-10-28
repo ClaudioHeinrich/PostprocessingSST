@@ -54,7 +54,7 @@ forecast_Schaake = function(dt,obs_ens_years,
   # remove land:
   
   dt_temp = dt[!(is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat))]
-  dt_hist = dt_hist[!is.na(Bias_Est) ]
+  dt_hist = dt_hist[!(is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat))]
   
   na_rows = dt[,(is.na(Bias_Est) | is.na(Ens_bar) | is.na(SD_hat))]
   

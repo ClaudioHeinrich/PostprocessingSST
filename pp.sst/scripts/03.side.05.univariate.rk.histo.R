@@ -10,24 +10,20 @@
 
 rm(list = ls())
 
-time_s35 = proc.time()
-
-setwd("~/NR/SFE")
 options(max.print = 1e3)
 
-library(PostProcessing)
-library(data.table)
+library(pp.sst)
 
-name_abbr = "test" 
+name_abbr = "Full" 
 
-save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+save_dir = file.path('~','SST','Derived', name_abbr)
 
 load(file = paste0(save_dir,"setup.RData"))
 
-DT[,SST_bar := trc(SST_bar)]
 
-na_loc = which(DT[,is.na(SST_bar) | is.na(Ens_bar) ])  
+###########
 
+na_loc = which(DT[,is.na(SST_bar) | is.na(Ens_bar) ])  # land locations
 
 # number of simulations and of breaks in the histogram: choose n = 10*k-1 and nbreaks = 10*k
 n=99

@@ -9,20 +9,17 @@
 # The rank histograms are for the entire region contained in DT (not shown in the paper).
 
 
-##### setting up ######
-
+#### setting up ######
 
 rm(list = ls())
 
-setwd("~/NR/SFE")
 options(max.print = 1e3)
 
-library(PostProcessing)
-library(data.table)
+library(pp.sst)
 
-name_abbr = "test" 
+name_abbr = "Full" 
 
-save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+save_dir = file.path('~','SST','Derived', name_abbr)
 
 load(file = paste0(save_dir,"setup.RData"))
 

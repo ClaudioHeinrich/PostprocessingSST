@@ -21,7 +21,6 @@ Imports:
   maptools,
   MASS,
   matrixStats,
-  parallel,
   scoringRules,
   sp,
   spacetime,

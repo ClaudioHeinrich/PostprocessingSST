@@ -15,19 +15,19 @@
 
 rm(list = ls())
 
-time_s3oos = proc.time()
-
-setwd("~/NR/SFE")
 options(max.print = 1e3)
 
-library(PostProcessing)
-library(data.table)
+library(pp.sst)
 
-name_abbr = "test" 
+name_abbr = "Full" 
 
-save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
+save_dir = file.path('~','SST','Derived', name_abbr)
 
 load(file = paste0(save_dir,"setup.RData"))
+
+# start timer:
+
+time_s3 = proc.time()
 
 ###### getting sample variances of ensemble  ######
 
@@ -289,7 +289,7 @@ DT[!(year %in% ema_years), SD_hat := SD_hat_sma]
 
 #### time, update script counter, save ####
 
-time_s3oos = proc.time() - time_s3oos
+time_s3 = proc.time() - time_s3
 
 script_counter = 3
 
