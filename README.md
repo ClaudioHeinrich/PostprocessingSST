@@ -7,6 +7,7 @@ This package contains codes for the post-processing methods developped in the pa
 It contains as data example sea surface temperature forecasts issued by the Norwegian climate prediction model, as well as ERA5 observations, from 1985 to 2016, 
 covering large parts of the Atlantic ocean (~70 MB). Please contact the authors if you are interested in getting access to the full dataset considered in the paper.
 For more details on the data we refer to the main body of the paper as well as the data documentation in the R package.
+
 An important function to visualize the data stored in this data table is the function plot_diagnostic, see documentation.
 
 The reproduction of the results presented in the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts'
