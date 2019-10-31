@@ -18,7 +18,7 @@ options(max.print = 1e3)
 #install.packages('devtools')
 library(devtools)
 
-devtools::install_github('ClaudioHeinrich/PostprocessingSST/pp.sst')
+devtools::install_github('ClaudioHeinrich/pp.sst')
 
 
 library(pp.sst)
