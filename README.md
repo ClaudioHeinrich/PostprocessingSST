@@ -1,7 +1,7 @@
 
-#############################################################################################################################
+#################################################################
  Code repository accompanying the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts' 
-#############################################################################################################################
+#################################################################
 
 This package contains codes for the post-processing methods developped in the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts'.
 It requires R, version 3.4.1 or newer. Roughly 10GB RAM are minimal requirement for running the code on the full test data set. If less is available, reduce the size of the spatial window, see below.
