@@ -1,17 +1,31 @@
 
-########################################################################################################################################
-##### Code repository accompanying the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts' #####
-########################################################################################################################################
+#############################################################################################################################
+ Code repository accompanying the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts' 
+#############################################################################################################################
 
 This package contains codes for the post-processing methods developped in the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts'.
-It contains as data example sea surface temperature forecasts issued by the Norwegian climate prediction model, as well as ERA5 observations, from 1985 to 2016, 
-covering large parts of the Atlantic ocean (~70 MB). Please contact the authors if you are interested in getting access to the full dataset considered in the paper.
+It requires R, version 3.4.1 or newer. Roughly 10GB RAM are minimal requirement for running the code on the full test data set. If less is available, reduce the size of the spatial window, see below.
+
+The package can be installed by devtools::install_github('ClaudioHeinrich/pp.sst'). However, this command is included in the first script 01.master.setup.R
+
+The package contains a data example of sea surface temperature forecasts issued by the Norwegian climate prediction model, as well as OISST observations, from 1985 to 2016, 
+covering large parts of the Atlantic ocean (~70 MB). 
+The OISST observational dataset is freely available at ftp://ftp.cdc.noaa.gov/Datasets/noaa.oisst.v2/sst.mnmean.nc
+The unprocessed predictions by NorCPM require access to NIRD Norwegian, see details at https://wiki.uib.no/norcpm.
+The link to the run used in the paper is /projects/NS9039K/shared/norcpm/cases/NorCPM/NorCPM_V1c/ana_19800115_me_hindcasts/.
+If you don't have access and  would like to gain it please contact one of the authors.
 For more details on the data we refer to the main body of the paper as well as the data documentation in the R package.
 
-An important function to visualize the data stored in this data table is the function plot_diagnostic, see documentation.
+The name of the example data table is DT, '?DT' provides further information. An important function to visualize the data stored in this data table is the function plot_diagnostic, see documentation.
 
-The reproduction of the results presented in the paper 'Multivariate postprocessing methods for high-dimensional seasonal weather forecasts'
-follows along several scripts (in the scripts folder). 
+The code was tested on a server with 480 GB RAM and 30 CPU cores, where one full run (all master scripts, considering the entire provided test data set) took approximately 1 hour and 20 minutes to complete. The memory usage never went above 2 %, and only two cores were in fact used. The code will therefore also run on any standard laptop. For shorter runtimes we recommend restricting the data to a smaller spatial window. This is done by changing the variables lat_box and lon_box in script 01.master.setup.R. When the code is run on Windows, parallelization needs to be turned off which is done by setting the variable mc_cores to 1 in 01.master.setup.R.
+
+
+######################
+### Code structure ###
+######################
+
+The reproduction of the results follows along several scripts (in the scripts folder, i.e. at https://github.com/ClaudioHeinrich/pp.sst/tree/master/scripts). 
 These scripts are divided into main scripts (named <number>.master.<description>.R) and side scripts
 (named <masternumber>.side.<sidenumber>.<description>.R).
 The numbering indicates dependencies, which will be described in the following. 
@@ -22,14 +36,13 @@ Splitting the scripts therefore makes it easier and faster to reproduce specific
 As argued in the article, computation time is usually not a major issue when dealing with seasonal forecasts. 
 When you predict a month ahead, it is quite alright spending several hours and possible days to improve your forecast, unlike in short-range weather prediction.
 
-####################################################################################################
-##### The script 01.master.setup.R, handling multiple runs and the variable name_abbr variable #####
-####################################################################################################
+The reproduction relies on the data (both observations and predictions) being already stored in a data table of the same format as the example data table DT. The file scripts/various/data_processing.R shows how such a data table can be constructed from netcdf files. 
 
-This script 01.master.setup.R is the first one that should be run. It does the setup, specifies parameters and loads the required data. 
-The data needs to be available in form of an R data table containing predictions and observations.
-An example data.table containing the data restricted to a spatial window is contained in this package. 
-If you are interested in getting access to the full data set, please contact one of the authors.
+###########################################################################################
+##### The script 01.master.setup.R, handling multiple runs and the variable name_abbr #####
+###########################################################################################
+
+This script 01.master.setup.R is the first one that should be run. It installs the pp.sst package (which contains the example data table DT required for reproduction), and specifies parameters. 
 
 Sometimes you might want to try different parameter settings (e.g. a different validation period) without overwriting the derived data from previous runs.
 This is handled by the variable name_abbr, the abbreviated name of the run.

@@ -14,7 +14,7 @@
 #' @author Alex Lenkoski
 #' @examples
 #' ##construct_grid_map()
-contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
+construct_grid_map = function(dt_ens = load_ensemble(1985,1),
                              dt_obs = load_observations(1985,1))
 {
 
@@ -51,7 +51,7 @@ contruct_grid_map = function(dt_ens = load_ensemble(1985,1),
 load_ensemble = function(year,
                          month,
                          vintage = "mr",
-                         data_dir = "~/PostClimDataNoBackup/")
+                         data_dir = "~/PostClimDataNoBackup/SFE/NorCPM_Ocean/")
 {
 
   ##------ Setup ----------
@@ -65,7 +65,7 @@ load_ensemble = function(year,
   ##-----------------------
 
   ##---- Collect Grid Info ------------------
-  gridname <- "./Data/grid.nc"
+  gridname <- paste0(data_dir,"grid.nc")
   ncgrid <- ncdf4::nc_open(gridname)
   grid_lon_ens <- ncdf4::ncvar_get(ncgrid, "plon")
   grid_lat_ens <- ncdf4::ncvar_get(ncgrid, "plat")
@@ -73,7 +73,7 @@ load_ensemble = function(year,
   ##-----------------------------------------
 
   ##-------- Find target run ----------------
-  filedir <- paste0(data_dir,"SFE/NorCPM_Ocean/")
+  filedir <- data_dir
   ff_all = system(paste0("ls ",filedir,"*_mem01.micom.hm.",year,"-",month,".nc"), intern = TRUE)
   
   if (vintage == "mr") {ff_use = tail(ff_all,1)
@@ -181,12 +181,6 @@ load_observations = function(year, month,
 #' ##combine_data_wide(dt_ens,dt_obs,dt_map)
 combine_data_wide= function(dt_ens, dt_obs, dt_map)
 {
-  ##------- Collapse Observations -------
-  dt_obs[,SST_Name:=paste0("SST",Obs)]
-  dt_obs_wide = dcast(dt_obs, Lon + Lat ~ SST_Name,value.var="SST")
-  dt_obs_wide[,SST_bar:= rowMeans(dt_obs_wide[,paste0("SST",1:10)])]
-  dt_obs_wide[,SST_sd:= apply(dt_obs_wide[,paste0("SST",1:10)],1,"sd")]
-  ##-------------------------------------
   
   ##------- Collapse Ensemble -----------
   dt_ens[,Ens_Name:=paste0("Ens",Ens)]
@@ -203,7 +197,8 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
   
   ##------- Now fill in Observations --------
   setkey(dt_ens_wide, "Lon_Obs", "Lat_Obs")
-  dt_combine = dt_obs_wide[dt_ens_wide]
+  setkey(dt_obs,'Lon','Lat')
+  dt_combine = dt_obs[dt_ens_wide]
   dt_combine[,i.Lon := NULL]
   dt_combine[,i.Lat := NULL]
   ##-----------------------------------------
@@ -220,7 +215,7 @@ combine_data_wide= function(dt_ens, dt_obs, dt_map)
   f_lat = approxfun(cutoff_lat, 0:(n_lat - 1) * n_lon, method="constant", rule = 2)
   dt_combine[,grid_id := f_lon(Lon) + f_lat(Lat)]
   ##--------------------------------------
-  
+  return(dt_combine)
 }
 
 #'  Load a pre-rendered combined wide dataset

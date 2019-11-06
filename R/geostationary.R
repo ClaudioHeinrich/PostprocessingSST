@@ -17,7 +17,7 @@
 #' @param saveorgo Logical, whether we save or not. 
 #' @param save_dir,file_name The directory to save in. The name of the file of the saved variogram for a given month is \code{file_name <month> .RData}.
 #' @param nintv Integer. How many distance bins are considered for the empirical variogram.
-#' @param truncate Logical. The empirical variogram oftentimes is far from the fitted variogram for the 10% largest distances considered. If truncate == TRUE, those are ignored leading to a visually much better fit of the variogram.
+#' @param truncate Logical. The empirical variogram oftentimes is far from the fitted variogram for the 10 percent largest distances considered. If truncate == TRUE, those are ignored leading to a visually much better fit of the variogram.
 #' 
 #' @return data table containing n columns with noise and n columns with forecasts.
 #' 

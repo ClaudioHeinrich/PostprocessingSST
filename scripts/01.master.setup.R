@@ -12,7 +12,7 @@
 
 rm(list = ls())
 
-setwd("~")
+setwd("~/pkg/paper/PostprocessingSST/")
 options(max.print = 1e3)
 
 #install.packages('devtools')
@@ -29,7 +29,7 @@ time_s1 = proc.time()
 
 # choose an abbreviation for this run and give it a description, see the README file for more details. 
 
-name_abbr = "Full"
+name_abbr = "pp.sst/Full"
 
 description = 'Working on the full data set.'
 

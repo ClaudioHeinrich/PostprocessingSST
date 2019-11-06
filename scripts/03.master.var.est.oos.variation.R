@@ -19,7 +19,7 @@ options(max.print = 1e3)
 
 library(pp.sst)
 
-name_abbr = "Full" 
+name_abbr = "pp.sst/Full" 
 
 save_dir = file.path('~','SST','Derived', name_abbr)
 

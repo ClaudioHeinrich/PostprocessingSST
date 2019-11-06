@@ -7,7 +7,6 @@
 #' @return vector of the same length as y containing crps scores.
 #'
 #' @author Claudio Heinrich
-#' @examples crps_na_rm(c(NA,rnorm(10)), 1,1)
 #' 
 #' @importFrom scoringRules crps
 #' 
@@ -55,7 +54,6 @@ GneitingWeightFct = function(x,L)
 #' 
 #' @author Claudio Heinrich
 #' 
-#' @example trc(c(-2,3))
 #' 
 #' @export
 
@@ -113,7 +111,7 @@ permutation_test_difference = function(a,
 #' trend  = 1:N
 #' sc1 = trend + .01 + rnorm(N, .001)
 #' sc2 = trend - .01 + rnorm(N, .001)
-#' l = bootstrap_difference(sc1,sc2)
+#' l = bootstrap_difference(sc1,sc2,q_prob = c(0.05,0.95))
 #' @author Claudio
 #' 
 #' @importFrom boot boot
@@ -126,7 +124,7 @@ bootstrap_difference = function(sc1,sc2,q_prob, N = 1e3){
   
   diff = function(x,inds){return(mean(x[inds]))}
   
-  bt = boot(data,diff,R = N)
+  bt = boot::boot(data,diff,R = N)
   
   t0 = bt$t0
   t = bt$t
@@ -135,7 +133,7 @@ bootstrap_difference = function(sc1,sc2,q_prob, N = 1e3){
   bt$p_val = sum(t0 > t)/N + sum(t0 == t)/(2*N)
   
   #quantiles
-  bt$q = quantile(t,q_prob)
+  bt$q = stats::quantile(t,q_prob)
   
   
   return(bt)

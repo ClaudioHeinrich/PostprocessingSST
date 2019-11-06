@@ -133,7 +133,6 @@ exp_mov_av = function( a,vec, years, skip = 0,twosided = FALSE){
 #' @return vector of the same length as y containing crps scores.
 #'
 #' @author Claudio Heinrich
-#' @examples crps_na_rm(c(NA,rnorm(10)), 1,1)
 #' 
 #' @importFrom scoringRules crps
 #' 
@@ -215,7 +214,7 @@ global_mean_scores = function (DT, eval_years = 2001:2010, var = TRUE){
 #' @param ens_size integer. Size of the ensemble.
 #' @param saveorgo logical. Do we save the data table?
 #' @param save_dir,file_name character strings. Directory and file name for saving.
-#' @param mean_est
+#' @param mean_est For internal use - don't change this.
 #' 
 #' @return the data table dt with a new column labelled 'var_bar'
 #' 
