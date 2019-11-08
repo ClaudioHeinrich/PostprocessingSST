@@ -18,7 +18,7 @@ For more details on the data we refer to the main body of the paper as well as t
 
 The name of the example data table is DT, '?DT' provides further information. An important function to visualize the data is the function plot_diagnostic, see documentation.
 
-The code was tested on a server with 480 GB RAM and 30 CPU cores, where one full run (all master scripts, considering the entire provided test data set) took approximately 1 hour and 20 minutes to complete. The memory usage never went above 2 %, and only two cores were in fact used. The code will therefore also run on any standard laptop. For shorter runtimes we recommend restricting the data to a smaller spatial window. This is done by changing the variables lat_box and lon_box in script 01.master.setup.R. When the code is run on Windows, parallelization needs to be turned off, which is done by setting the variable mc_cores to 1 in 01.master.setup.R.
+The code was tested on a Linux x86 (64-bit) server with two Inter Xeon E5-2630 v3 processors, 16 cores, 32 threads and 256 GB memory, where one full run (all master scripts, considering the entire provided test data set) took approximately 1 hour and 20 minutes to complete. The memory usage never went above 2 %, and only two cores were in fact used. The code will therefore also run on any standard laptop. For shorter runtimes we recommend restricting the data to a smaller spatial window. This is done by changing the variables lat_box and lon_box in script 01.master.setup.R. When the code is run on Windows, parallelization needs to be turned off, which is done by setting the variable mc_cores to 1 in 01.master.setup.R.
 
 
 ######################
