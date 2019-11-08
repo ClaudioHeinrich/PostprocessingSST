@@ -4,6 +4,9 @@
 #' A dataset containing the (not postprocessed) predictions by NorCPM and the corresponding observations (OISST) for monthly mean sea surface temperature.
 #' The data is restricted to January and February over the Northern Atlantic Ocean, in order to keep it at a moderate size.
 #' See the main body of the paper for more details. For visualization of the data please check the function \code{plot_diagnostic}.
+#' For getting access to the full data containing all months and the entire globe please contact the authors of the article.
+#' 
+#' 
 #'
 #' @format A data frame with 557.700 rows and 17 variables:
 #' \describe{
@@ -15,6 +18,6 @@
 #'   \item{grid_id}{An identifyer of the grid point.}
 #' }
 #'
-#' @source \url{The OISST data is available at https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/access/. NorCPM is currently under development and the forecasts are not directly available online. Please contact one of the authors for getting access to the full data.}
+#' @source The OISST data is available at \url{https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/access/.} NorCPM is currently under development and the predictions used in this work are not publicly available online, but will be made available upon request. Please contact one of the authors.
 #' 
 "DT"
