@@ -38,6 +38,8 @@ When you predict a month ahead, it is quite alright spending several hours and p
 
 The reproduction relies on the data (both observations and predictions) being already stored in a data table of the same format as the example data table DT. The file scripts/various/data_processing.R shows how such a data table can be constructed from netcdf files. 
 
+Additionally, the script 'generate_plots' reproduces all plots shown in the paper. It essentially requires all other scripts to be run previously, see the script for more details.
+
 ###########################################################################################
 ##### The script 01.master.setup.R, handling multiple runs and the variable name_abbr #####
 ###########################################################################################

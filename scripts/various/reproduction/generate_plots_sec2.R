@@ -16,9 +16,9 @@ time_s4 = proc.time()
 setwd("~/NR/SFE")
 options(max.print = 1e3)
 
-library(PostProcessing)
 library(data.table)
 
+devtools::load_all()
 
 ########### set parameters for plots #######################
 
@@ -37,7 +37,7 @@ Lat_res = c(-75,80) # Latitude restrictions for area plots in order to exclude t
 ############# Plot of normalized SST #######################
 
 
-name_abbr = "Full" 
+name_abbr = "Full"
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -89,9 +89,9 @@ plot_smooth(dt_ym2,'SST_stan',rr = c(-5,5),
 #### plot of the first principal component ####
 
 
-# get data 
+# get data
 
-name_abbr = "NAO" 
+name_abbr = "NAO"
 
 save_dir = paste0("~/PostClimDataNoBackup/SFE/Derived/", name_abbr,"/")
 
@@ -110,7 +110,7 @@ m = 7
 
 # get the singular value decomposition of weight matrix * sample covariance matrix
 
-wm = weight_mat(DT,L = 7000) 
+wm = weight_mat(DT,L = 7000)
 
 
 num_loc = DT[year == min(year) & month == min(month)][!(is.na(SST_bar) | is.na(SST_hat)) ,.N]
@@ -121,7 +121,7 @@ data_mat = matrix(DT[month == m][!(is.na(SST_bar) | is.na(SST_hat)) & year %in% 
                                  SST_bar - SST_hat],
                   nrow = num_loc)
 
-sam_cov_mat = 1/length(train_years) * data_mat %*% t(data_mat) 
+sam_cov_mat = 1/length(train_years) * data_mat %*% t(data_mat)
 
 
 sin_val_dec_1 = svd(wm * sam_cov_mat)
@@ -143,11 +143,11 @@ dt_ym = fc_water[month == m & year == y,]
 for(i in 1:30)
 {
   temp =  sin_val_dec_1$u[,i]
-  
+
   dt_ym[,paste0('PC',i):= temp]
-  
+
   dt_test = rbindlist(list(dt_ym,dt[year == y & month ==m][is.na(Ens_bar) | is.na(SST_bar),.SD,.SDcols = SD_cols]), fill = TRUE)
-  
+
 }
 
 
@@ -158,6 +158,6 @@ dt_test_new = dt_test[Lon >= -20 & Lat >= 50,]
 rr = dt_test_new[,range(PC1,na.rm = TRUE)]
 rr = c(-(max(abs(rr))),(max(abs(rr))))
 
-plot_smooth(dt_test_new,paste0('PC1'),mn = '1st PC of covariance matrix for June',save_pdf = TRUE,file_name = '1stPCtapered',save_dir = plot_dir,xlab = '',ylab = '' )  
+plot_smooth(dt_test_new,paste0('PC1'),mn = '1st PC of covariance matrix for June',save_pdf = TRUE,file_name = '1stPCtapered',save_dir = plot_dir,xlab = '',ylab = '' )
 
 
